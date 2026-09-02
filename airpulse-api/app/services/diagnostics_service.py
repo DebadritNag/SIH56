@@ -106,10 +106,36 @@ class DiagnosticsService:
             "latest_index_value": float(latest_index) if latest_index is not None else None,
         }
 
+    async def storage_status(self) -> dict[str, Any]:
+        """
+        Live Supabase Storage check using the service role. Confirms the key is valid and
+        the expected private buckets exist. Falls back to 'local_fallback' when the key is
+        a placeholder or Storage is unreachable (offline mode still works via local scratch).
+        """
+        from app.services.storage_service import ALL_BUCKETS, get_storage_service
+
+        key = settings.SUPABASE_SERVICE_ROLE_KEY
+        if not key or any(m in key for m in ("placeholder", "CHANGE_ME")):
+            return {"status": "local_fallback", "buckets_present": 0, "buckets_expected": len(ALL_BUCKETS)}
+        try:
+            buckets = await get_storage_service().list_buckets()
+            present = {b.get("id") for b in buckets}
+            expected = set(ALL_BUCKETS)
+            configured = expected.issubset(present)
+            return {
+                "status": "configured" if configured else "partial",
+                "buckets_present": len(expected & present),
+                "buckets_expected": len(expected),
+                "missing": sorted(expected - present),
+            }
+        except Exception:
+            return {"status": "local_fallback", "buckets_present": 0, "buckets_expected": len(ALL_BUCKETS)}
+
     async def build_diagnostics(self) -> dict[str, Any]:
         connected, latency = await self.database_latency_ms()
         realtime = await self.realtime_configured()
         counts = await self.counts()
+        storage = await self.storage_status()
         supabase_configured = bool(settings.SUPABASE_URL) and "example.supabase.co" not in settings.SUPABASE_URL
         jwt_ready = bool(settings.SUPABASE_JWT_SECRET) and not any(
             m in settings.SUPABASE_JWT_SECRET for m in ("placeholder", "CHANGE_ME")
@@ -121,7 +147,8 @@ class DiagnosticsService:
             "supabase_url": settings.SUPABASE_URL if supabase_configured else None,
             "realtime": "configured" if realtime["configured"] else "not_configured",
             "realtime_tables": realtime["tables"],
-            "storage": "configured",  # buckets provisioned via migration
+            "storage": storage["status"],
+            "storage_buckets": f"{storage['buckets_present']}/{storage['buckets_expected']}",
             "auth": "configured" if jwt_ready else "not_configured",
             "latest_migration": await self.latest_migration(),
             **counts,

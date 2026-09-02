@@ -137,6 +137,114 @@ export const mockRouteDetailDelBom: RouteInsightDetail = {
   ]
 };
 
+export const mockRouteDetails: Record<string, RouteInsightDetail> = {
+  'DEL-BOM': mockRouteDetailDelBom,
+  'DEL-BLR': {
+    route_code: 'DEL-BLR',
+    origin: 'Delhi (DEL)',
+    destination: 'Bengaluru (BLR)',
+    distance_km: 1740,
+    traffic_weight_pct: 11.8,
+    market_status: 'ELEVATED',
+    data_confidence_pct: 98,
+    current_median_fare: 8150,
+    change_7d_pct: 8.6,
+    change_30d_pct: 14.9,
+    advance_purchase_curve: [
+      { days_prior: 45, window_label: 'T+45', today_fare: 5100, median_30d_fare: 4950 },
+      { days_prior: 30, window_label: 'T+30', today_fare: 5800, median_30d_fare: 5400 },
+      { days_prior: 15, window_label: 'T+15', today_fare: 6950, median_30d_fare: 6400 },
+      { days_prior: 7,  window_label: 'T+7',  today_fare: 8900, median_30d_fare: 7600 },
+      { days_prior: 1,  window_label: 'T+1',  today_fare: 13200, median_30d_fare: 10800 },
+    ],
+    sources_comparison: [
+      { source_name: 'Airline Direct (IndiGo & Air India)', source_type: 'Airline Direct', median_fare: 8100, min_fare: 7450, observations: 284, freshness: '1m ago', agreement_status: 'Agreement', reliability_score: 0.99 },
+      { source_name: 'OTA Source 01 (MakeMyTrip)', source_type: 'OTA', median_fare: 8200, min_fare: 7520, observations: 204, freshness: '2m ago', agreement_status: 'Agreement', reliability_score: 0.97 },
+      { source_name: 'OTA Source 02 (EaseMyTrip)', source_type: 'OTA', median_fare: 8140, min_fare: 7480, observations: 178, freshness: '5m ago', agreement_status: 'Agreement', reliability_score: 0.95 },
+      { source_name: 'OTA Source 03 (Cleartrip)', source_type: 'OTA', median_fare: 8250, min_fare: 7590, observations: 142, freshness: '7m ago', agreement_status: 'Agreement', reliability_score: 0.93 },
+    ]
+  },
+  'BOM-BLR': {
+    route_code: 'BOM-BLR',
+    origin: 'Mumbai (BOM)',
+    destination: 'Bengaluru (BLR)',
+    distance_km: 842,
+    traffic_weight_pct: 9.4,
+    market_status: 'NORMAL',
+    data_confidence_pct: 96,
+    current_median_fare: 5200,
+    change_7d_pct: 2.1,
+    change_30d_pct: 4.5,
+    advance_purchase_curve: [
+      { days_prior: 45, window_label: 'T+45', today_fare: 3100, median_30d_fare: 3050 },
+      { days_prior: 30, window_label: 'T+30', today_fare: 3600, median_30d_fare: 3500 },
+      { days_prior: 15, window_label: 'T+15', today_fare: 4400, median_30d_fare: 4300 },
+      { days_prior: 7,  window_label: 'T+7',  today_fare: 5400, median_30d_fare: 5100 },
+      { days_prior: 1,  window_label: 'T+1',  today_fare: 8800, median_30d_fare: 7900 },
+    ],
+    sources_comparison: [
+      { source_name: 'Airline Direct (IndiGo & Akasa)', source_type: 'Airline Direct', median_fare: 5180, min_fare: 4750, observations: 220, freshness: '3m ago', agreement_status: 'Agreement', reliability_score: 0.99 },
+      { source_name: 'OTA Source 01 (MakeMyTrip)', source_type: 'OTA', median_fare: 5220, min_fare: 4800, observations: 165, freshness: '4m ago', agreement_status: 'Agreement', reliability_score: 0.98 },
+      { source_name: 'OTA Source 02 (EaseMyTrip)', source_type: 'OTA', median_fare: 5190, min_fare: 4720, observations: 140, freshness: '4m ago', agreement_status: 'Agreement', reliability_score: 0.96 },
+      { source_name: 'OTA Source 03 (Cleartrip)', source_type: 'OTA', median_fare: 5280, min_fare: 4850, observations: 110, freshness: '8m ago', agreement_status: 'Agreement', reliability_score: 0.94 },
+    ]
+  },
+  'DEL-CCU': {
+    route_code: 'DEL-CCU',
+    origin: 'Delhi (DEL)',
+    destination: 'Kolkata (CCU)',
+    distance_km: 1305,
+    traffic_weight_pct: 7.8,
+    market_status: 'SURGING',
+    data_confidence_pct: 95,
+    current_median_fare: 9450,
+    change_7d_pct: 22.4,
+    change_30d_pct: 38.6,
+    advance_purchase_curve: [
+      { days_prior: 45, window_label: 'T+45', today_fare: 5400, median_30d_fare: 4800 },
+      { days_prior: 30, window_label: 'T+30', today_fare: 6600, median_30d_fare: 5500 },
+      { days_prior: 15, window_label: 'T+15', today_fare: 8200, median_30d_fare: 6800 },
+      { days_prior: 7,  window_label: 'T+7',  today_fare: 10800, median_30d_fare: 8200 },
+      { days_prior: 1,  window_label: 'T+1',  today_fare: 15900, median_30d_fare: 11400 },
+    ],
+    sources_comparison: [
+      { source_name: 'Airline Direct (Air India & IndiGo)', source_type: 'Airline Direct', median_fare: 9400, min_fare: 8700, observations: 210, freshness: '2m ago', agreement_status: 'Agreement', reliability_score: 0.99 },
+      { source_name: 'OTA Source 01 (MakeMyTrip)', source_type: 'OTA', median_fare: 9480, min_fare: 8750, observations: 180, freshness: '3m ago', agreement_status: 'Agreement', reliability_score: 0.97 },
+      { source_name: 'OTA Source 02 (EaseMyTrip)', source_type: 'OTA', median_fare: 9420, min_fare: 8690, observations: 150, freshness: '6m ago', agreement_status: 'Agreement', reliability_score: 0.95 },
+      { source_name: 'OTA Source 03 (Cleartrip)', source_type: 'OTA', median_fare: 9550, min_fare: 8820, observations: 120, freshness: '5m ago', agreement_status: 'Agreement', reliability_score: 0.92 },
+    ]
+  },
+  'HYD-DEL': {
+    route_code: 'HYD-DEL',
+    origin: 'Hyderabad (HYD)',
+    destination: 'Delhi (DEL)',
+    distance_km: 1253,
+    traffic_weight_pct: 6.9,
+    market_status: 'NORMAL',
+    data_confidence_pct: 96,
+    current_median_fare: 6100,
+    change_7d_pct: 3.4,
+    change_30d_pct: 6.2,
+    advance_purchase_curve: [
+      { days_prior: 45, window_label: 'T+45', today_fare: 3800, median_30d_fare: 3700 },
+      { days_prior: 30, window_label: 'T+30', today_fare: 4300, median_30d_fare: 4200 },
+      { days_prior: 15, window_label: 'T+15', today_fare: 5200, median_30d_fare: 5000 },
+      { days_prior: 7,  window_label: 'T+7',  today_fare: 6400, median_30d_fare: 6100 },
+      { days_prior: 1,  window_label: 'T+1',  today_fare: 9800, median_30d_fare: 8900 },
+    ],
+    sources_comparison: [
+      { source_name: 'Airline Direct (IndiGo & Vistara)', source_type: 'Airline Direct', median_fare: 6050, min_fare: 5500, observations: 195, freshness: '2m ago', agreement_status: 'Agreement', reliability_score: 0.99 },
+      { source_name: 'OTA Source 01 (MakeMyTrip)', source_type: 'OTA', median_fare: 6120, min_fare: 5580, observations: 155, freshness: '4m ago', agreement_status: 'Agreement', reliability_score: 0.98 },
+      { source_name: 'OTA Source 02 (EaseMyTrip)', source_type: 'OTA', median_fare: 6080, min_fare: 5520, observations: 130, freshness: '5m ago', agreement_status: 'Agreement', reliability_score: 0.95 },
+      { source_name: 'OTA Source 03 (Cleartrip)', source_type: 'OTA', median_fare: 6180, min_fare: 5620, observations: 105, freshness: '7m ago', agreement_status: 'Agreement', reliability_score: 0.93 },
+    ]
+  },
+};
+
+export function getMockRouteDetail(code: string): RouteInsightDetail {
+  return mockRouteDetails[code] || mockRouteDetailDelBom;
+}
+
 export const mockAnomalyList: AnomalyItem[] = [
   {
     id: 'anm-1842',

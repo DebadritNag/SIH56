@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { AlertCircle, ArrowRight, Loader2, Lock, Mail } from "lucide-react";
 
 import { AuthShell } from "@/components/auth/AuthShell";
+import { Captcha, captchaEnabled } from "@/components/auth/Captcha";
 import { useAuth } from "@/lib/providers/AuthProvider";
 
 export default function LoginPage() {
@@ -15,6 +16,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const needsCaptcha = captchaEnabled();
 
   // Already authenticated → straight to the dashboard.
   useEffect(() => {
@@ -24,11 +27,16 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    if (needsCaptcha && !captchaToken) {
+      setError("Please complete the captcha.");
+      return;
+    }
     setSubmitting(true);
-    const { error: signInError } = await signIn(email.trim(), password);
+    const { error: signInError } = await signIn(email.trim(), password, captchaToken ?? undefined);
     setSubmitting(false);
     if (signInError) {
       setError(signInError);
+      setCaptchaToken(null); // force a fresh captcha on retry
       return;
     }
     router.replace("/overview");
@@ -94,6 +102,12 @@ export default function LoginPage() {
           </div>
         </div>
 
+        <Captcha
+          onVerify={(token) => setCaptchaToken(token)}
+          onExpire={() => setCaptchaToken(null)}
+          onError={() => setCaptchaToken(null)}
+        />
+
         {error && (
           <div className="flex items-start gap-2 rounded-lg border border-rose-400/30 bg-rose-500/10 p-3 text-xs text-rose-200">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -103,7 +117,7 @@ export default function LoginPage() {
 
         <button
           type="submit"
-          disabled={submitting || !configured}
+          disabled={submitting || !configured || (needsCaptcha && !captchaToken)}
           className="flex w-full items-center justify-center gap-2 rounded-lg bg-sky-500 py-2.5 text-sm font-bold text-white shadow-lg shadow-sky-500/20 transition-colors hover:bg-sky-400 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
         >
           {submitting ? (

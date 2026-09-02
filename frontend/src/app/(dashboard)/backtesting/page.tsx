@@ -1,11 +1,63 @@
 'use client';
 
-import React from 'react';
-import { History, TrendingUp, Download, CheckCircle2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { History, TrendingUp, Download, CheckCircle2, RotateCw } from 'lucide-react';
 import { BacktestComparisonChart } from '@/components/charts/BacktestComparisonChart';
+import { ExportDialog } from '@/components/dialogs/ExportDialog';
 import { mockBacktestPoints } from '@/lib/mock-data/dashboard';
+import { useExports, useCreateExport, useDownloadExport } from '@/lib/hooks/useExports';
+import { notify } from '@/lib/notify';
 
 export default function BacktestingPage() {
+  const [showExport, setShowExport] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const { data: exportsList = [] } = useExports({ export_type: 'BACKTEST_AUDIT_PDF' });
+  const createExportMutation = useCreateExport();
+  const downloadMutation = useDownloadExport();
+
+  // Find most recent ready backtest audit dossier
+  const existingReadyJob = exportsList.find(
+    (e) => e.export_type === 'BACKTEST_AUDIT_PDF' && e.status === 'READY'
+  );
+
+  const handleDownloadDossier = async () => {
+    if (existingReadyJob) {
+      notify.info('Preparing statistical audit dossier...', { description: existingReadyJob.filename });
+      await downloadMutation.mutateAsync(existingReadyJob);
+      return;
+    }
+
+    setIsGenerating(true);
+    notify.info('Preparing statistical audit dossier...', { description: 'Calling backend ReportLab engine...' });
+
+    createExportMutation.mutate(
+      {
+        export_type: 'BACKTEST_AUDIT_PDF',
+        format: 'PDF',
+        title: 'MoSPI Transport CPI 12-Month Backtest Audit',
+        filters: {
+          period: '12M',
+          methodology: 'APIx Matched-Basket v1.2',
+          benchmark: 'MoSPI Transport CPI & DGCA',
+        },
+      },
+      {
+        onSuccess: async (newJob) => {
+          setIsGenerating(false);
+          notify.success('Audit dossier generated', { description: newJob.filename });
+          await downloadMutation.mutateAsync(newJob);
+        },
+        onError: (err: any) => {
+          setIsGenerating(false);
+          notify.error('Statistical audit dossier could not be generated', {
+            description: err?.message || 'Please retry in a moment.',
+          });
+        },
+      }
+    );
+  };
+
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -22,12 +74,45 @@ export default function BacktestingPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#D0D5DD] text-xs font-semibold text-[#101828] rounded shadow-2xs hover:bg-slate-50">
-            <Download className="w-3.5 h-3.5" />
-            <span>Download Statistical Audit Dossier</span>
+          <button
+            onClick={handleDownloadDossier}
+            disabled={isGenerating || downloadMutation.isPending}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-xs font-semibold text-white rounded shadow-2xs transition-colors cursor-pointer"
+          >
+            {isGenerating || downloadMutation.isPending ? (
+              <>
+                <RotateCw className="w-3.5 h-3.5 animate-spin" />
+                <span>Preparing Dossier...</span>
+              </>
+            ) : (
+              <>
+                <Download className="w-3.5 h-3.5" />
+                <span>Download Statistical Audit Dossier</span>
+              </>
+            )}
+          </button>
+          <button
+            onClick={() => setShowExport(true)}
+            className="px-2 py-1.5 bg-white border border-[#D0D5DD] hover:bg-slate-50 text-[#344054] text-xs font-semibold rounded shadow-2xs transition-colors cursor-pointer"
+            title="Configure custom export format (XLSX, ZIP)"
+          >
+            Options
           </button>
         </div>
       </div>
+
+      <ExportDialog
+        open={showExport}
+        onClose={() => setShowExport(false)}
+        exportType="BACKTEST_AUDIT_PDF"
+        defaultFormat="PDF"
+        title="MoSPI Transport CPI 12-Month Backtest Audit"
+        filterSummary={[
+          { label: 'Evaluation Period', value: '12 Months (2025-2026)' },
+          { label: 'Benchmark', value: 'MoSPI Transport CPI & DGCA' },
+          { label: 'Correlation', value: 'r = 0.942 (Strong)' },
+        ]}
+      />
 
       {/* KPI Validation Metrics */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -54,7 +139,7 @@ export default function BacktestingPage() {
       </div>
 
       {/* Main Chart */}
-      <div className="bg-white border border-[#E4E7EC] rounded-lg p-5 shadow-xs">
+      <div className="bg-white border border-[#E4E7EC] rounded-lg p-5 shadow-xs min-w-0">
         <div className="flex items-center justify-between mb-3">
           <div>
             <h3 className="text-sm font-bold text-[#101828]">Daily APIx vs Official MoSPI Transport CPI &amp; DGCA Reference (12 Months)</h3>

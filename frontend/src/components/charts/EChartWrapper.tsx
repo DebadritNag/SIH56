@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import type { EChartsOption } from 'echarts';
+import type { ECharts, EChartsOption } from 'echarts';
 
 interface EChartWrapperProps {
   option: EChartsOption;
@@ -17,7 +17,8 @@ export const EChartWrapper: React.FC<EChartWrapperProps> = ({
   loading = false,
 }) => {
   const chartRef = useRef<HTMLDivElement>(null);
-  const chartInstanceRef = useRef<any>(null);
+  const chartInstanceRef = useRef<ECharts | null>(null);
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
@@ -27,14 +28,16 @@ export const EChartWrapper: React.FC<EChartWrapperProps> = ({
   useEffect(() => {
     if (!isClient || !chartRef.current) return;
 
-    let echartsModule: any;
+    let isDisposed = false;
 
     const initChart = async () => {
-      echartsModule = await import('echarts');
-      if (!chartRef.current) return;
+      const echartsModule = await import('echarts');
+      if (isDisposed || !chartRef.current) return;
 
       if (!chartInstanceRef.current) {
-        chartInstanceRef.current = echartsModule.init(chartRef.current);
+        chartInstanceRef.current = echartsModule.init(chartRef.current, undefined, {
+          renderer: 'canvas',
+        });
       }
 
       chartInstanceRef.current.setOption(option, true);
@@ -49,20 +52,39 @@ export const EChartWrapper: React.FC<EChartWrapperProps> = ({
       } else {
         chartInstanceRef.current.hideLoading();
       }
+
+      // ResizeObserver handles window resizing, sidebar collapse/expand, drawer opening, etc.
+      if (!resizeObserverRef.current && chartRef.current) {
+        resizeObserverRef.current = new ResizeObserver(() => {
+          if (chartInstanceRef.current && !chartInstanceRef.current.isDisposed()) {
+            chartInstanceRef.current.resize();
+          }
+        });
+        resizeObserverRef.current.observe(chartRef.current);
+      }
     };
 
     initChart();
 
-    const handleResize = () => {
-      chartInstanceRef.current?.resize();
+    const handleWindowResize = () => {
+      if (chartInstanceRef.current && !chartInstanceRef.current.isDisposed()) {
+        chartInstanceRef.current.resize();
+      }
     };
 
-    window.addEventListener('resize', handleResize);
+    window.addEventListener('resize', handleWindowResize);
 
     return () => {
-      window.removeEventListener('resize', handleResize);
-      chartInstanceRef.current?.dispose();
-      chartInstanceRef.current = null;
+      isDisposed = true;
+      window.removeEventListener('resize', handleWindowResize);
+      if (resizeObserverRef.current) {
+        resizeObserverRef.current.disconnect();
+        resizeObserverRef.current = null;
+      }
+      if (chartInstanceRef.current) {
+        chartInstanceRef.current.dispose();
+        chartInstanceRef.current = null;
+      }
     };
   }, [isClient, option, loading]);
 
@@ -70,12 +92,18 @@ export const EChartWrapper: React.FC<EChartWrapperProps> = ({
     return (
       <div
         style={style}
-        className="flex items-center justify-center bg-slate-50 border border-[#E4E7EC] rounded text-xs text-[#667085]"
+        className="flex items-center justify-center bg-slate-50 border border-[#E4E7EC] rounded text-xs text-[#667085] min-w-0"
       >
         Initializing analytical chart renderer...
       </div>
     );
   }
 
- return <div ref={chartRef} style={style} className={className} />;
+  return (
+    <div
+      ref={chartRef}
+      style={style}
+      className={`min-w-0 w-full ${className || ''}`}
+    />
+  );
 };

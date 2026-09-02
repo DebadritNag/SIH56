@@ -33,6 +33,7 @@ IMPORTED_DATASETS = "imported-datasets"
 REFERENCE_DATASETS = "reference-datasets"
 BACKTEST_REPORTS = "backtest-reports"
 MODEL_ARTIFACTS = "model-artifacts"
+GENERATED_EXPORTS = "generated-exports"
 
 ALL_BUCKETS = (
     RAW_RESPONSES,
@@ -40,6 +41,7 @@ ALL_BUCKETS = (
     REFERENCE_DATASETS,
     BACKTEST_REPORTS,
     MODEL_ARTIFACTS,
+    GENERATED_EXPORTS,
 )
 
 
@@ -84,6 +86,12 @@ class StorageService:
     @staticmethod
     def model_artifact_path(model_name: str, version: str, filename: str = "model.bin") -> str:
         return f"{model_name}/{version}/{filename}"
+
+    @staticmethod
+    def export_storage_path(user_id: Optional[str], export_id: str, filename: str) -> str:
+        now = datetime.now(timezone.utc)
+        owner = user_id if user_id and user_id != "anonymous" else "system"
+        return f"exports/{owner}/{now:%Y}/{now:%m}/{export_id}/{filename}"
 
     # -- operations ---------------------------------------------------------
     async def upload(

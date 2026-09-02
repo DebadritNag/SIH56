@@ -24,6 +24,9 @@ export const config = {
    * Supabase auth session is wired. Empty string disables it.
    */
   devBearerToken: process.env.NEXT_PUBLIC_DEV_BEARER_TOKEN || "",
+
+  /** Public hCaptcha sitekey for auth-form bot protection. Empty string disables the widget. */
+  hcaptchaSitekey: process.env.NEXT_PUBLIC_HCAPTCHA_SITEKEY || "",
 } as const;
 
 export type AppConfig = typeof config;

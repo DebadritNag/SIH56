@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Database, Search, ShieldCheck, Download, Filter } from 'lucide-react';
 import { FareObservation } from '@/types';
 import { FareProvenanceDrawer } from '@/components/drawers/FareProvenanceDrawer';
+import { ExportDialog } from '@/components/dialogs/ExportDialog';
 import { OriginBadge } from '@/components/ui/Badge';
 import { formatINR } from '@/lib/formatters';
 import { notify } from '@/lib/notify';
@@ -121,6 +122,7 @@ const MOCK_FARES: FareObservation[] = [
 
 export default function FaresPage() {
   const [selectedFare, setSelectedFare] = useState<FareObservation | null>(null);
+  const [showExportModal, setShowExportModal] = useState(false);
 
   return (
     <div className="space-y-5">
@@ -139,23 +141,29 @@ export default function FaresPage() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => {
-              notify.loading('Preparing fare export...', { id: 'fare-export' });
-              setTimeout(() => {
-                notify.download(
-                  'airpulse-fares-DEL-BOM-2026-09-02.csv',
-                  '28,452 observations • 4.8 MB',
-                  () => notify.info('Download started')
-                );
-              }, 600);
-            }}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#D0D5DD] text-xs font-semibold text-[#101828] rounded shadow-2xs hover:bg-slate-50 transition-colors"
+            onClick={() => setShowExportModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#D0D5DD] text-xs font-semibold text-[#101828] rounded shadow-2xs hover:bg-slate-50 transition-colors cursor-pointer"
           >
             <Download className="w-3.5 h-3.5 text-blue-600" />
             <span>Export Verified Quotes</span>
           </button>
         </div>
       </div>
+
+      <ExportDialog
+        open={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        exportType="FARE_OBSERVATIONS"
+        defaultFormat="CSV"
+        title="National Fare Observations (Validated)"
+        filters={{ origin: 'DEL', destination: 'BOM', validation_status: 'VALID' }}
+        filterSummary={[
+          { label: 'Corridor', value: 'DEL → BOM' },
+          { label: 'Validation', value: 'VALID' },
+          { label: 'Booking Windows', value: 'T+1, T+7, T+15, T+30, T+45' },
+        ]}
+        estimatedRows={28452}
+      />
 
       {/* Table */}
       <div className="bg-white border border-[#E4E7EC] rounded-lg shadow-xs overflow-hidden">

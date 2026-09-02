@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState } from 'react';
-import { AlertTriangle, Search } from 'lucide-react';
+import { AlertTriangle, Search, Download } from 'lucide-react';
 import { AnomalyItem, AnomalySeverity } from '@/types';
 import { SeverityBadge } from '@/components/ui/Badge';
 import { AnomalyDetailDrawer } from '@/components/drawers/AnomalyDetailDrawer';
+import { ExportDialog } from '@/components/dialogs/ExportDialog';
 import { formatINR } from '@/lib/formatters';
 import { useAnomalies } from '@/lib/hooks/useResources';
 import { useDashboardSummary } from '@/lib/hooks/useDashboard';
@@ -14,6 +15,7 @@ export default function AnomaliesPage() {
   const [selectedAnomaly, setSelectedAnomaly] = useState<AnomalyItem | null>(null);
   const [severityFilter, setSeverityFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showExportModal, setShowExportModal] = useState(false);
 
   // Real anomalies from FastAPI (falls back to mock while the backend has no rows).
   const { data: anomalyPage } = useAnomalies({
@@ -62,11 +64,33 @@ export default function AnomaliesPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 text-xs">
+          <button
+            onClick={() => setShowExportModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#D0D5DD] text-xs font-semibold text-[#101828] rounded shadow-2xs hover:bg-slate-50 transition-colors cursor-pointer"
+          >
+            <Download className="w-3.5 h-3.5 text-blue-600" />
+            <span>Export Anomalies</span>
+          </button>
           <span className="px-2.5 py-1 bg-rose-50 text-rose-700 font-bold rounded border border-rose-200">
             PriceGuard Active (Contamination: 0.04)
           </span>
         </div>
       </div>
+
+      <ExportDialog
+        open={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        exportType="ANOMALIES"
+        defaultFormat="CSV"
+        title="Multi-Source Anomaly Extract (PriceGuard)"
+        filters={{ severity: severityFilter }}
+        filterSummary={[
+          { label: 'Severity Filter', value: severityFilter },
+          { label: 'Model', value: 'PriceGuard Isolation Forest' },
+          { label: 'Contamination Threshold', value: '0.04 (Calibrated)' },
+        ]}
+        estimatedRows={openCount}
+      />
 
       {/* KPI Summary Strip */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3.5">

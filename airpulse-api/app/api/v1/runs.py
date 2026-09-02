@@ -4,12 +4,12 @@ from app.core.pagination import PaginatedResponse, PaginationMeta, PaginationPar
 from app.core.security import require_analyst, UserContext
 from app.db.repositories.runs import RunRepository
 from app.db.session import get_db
-from app.schemas.runs import CollectionRunResponse, PipelineRunResponse
+from app.schemas.runs import CollectionRunDetail, PipelineRunDetail
 
 router = APIRouter(prefix="/runs", tags=["Pipeline Runs"])
 
 
-@router.get("/collections", response_model=PaginatedResponse[CollectionRunResponse])
+@router.get("/collections", response_model=PaginatedResponse[CollectionRunDetail])
 async def list_collection_runs(
     pagination: PaginationParams = Depends(),
     db: AsyncSession = Depends(get_db),
@@ -33,7 +33,7 @@ async def list_collection_runs(
     )
 
 
-@router.get("/pipelines", response_model=PaginatedResponse[PipelineRunResponse])
+@router.get("/pipelines", response_model=PaginatedResponse[PipelineRunDetail])
 async def list_pipeline_runs(
     pagination: PaginationParams = Depends(),
     db: AsyncSession = Depends(get_db),

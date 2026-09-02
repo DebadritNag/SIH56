@@ -45,6 +45,15 @@ class Settings(BaseSettings):
     # a demo bearer token is accepted. Never disable in production.
     AUTH_STRICT: bool = False
 
+    # hCaptcha (bot protection on auth forms). HCAPTCHA_SECRET is a BACKEND-ONLY secret
+    # used to call siteverify; the sitekey is public (safe for the browser).
+    HCAPTCHA_SECRET: str = ""
+    HCAPTCHA_SITEKEY: str = ""
+    HCAPTCHA_VERIFY_URL: str = "https://api.hcaptcha.com/siteverify"
+    # When false, captcha verification is skipped (local dev convenience). Set true to
+    # require a valid captcha token. Automatically enforced in production if a secret is set.
+    HCAPTCHA_ENABLED: bool = False
+
     # Redis & Celery
     REDIS_URL: str = "redis://localhost:6379/0"
     CELERY_BROKER_URL: str = "redis://localhost:6379/0"

@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   MapPin,
   TrendingUp,
@@ -9,16 +10,45 @@ import {
   ShieldCheck,
   Calendar,
   Layers,
-  ChevronDown
+  ChevronDown,
+  Download,
 } from 'lucide-react';
-import { mockRouteDetailDelBom } from '@/lib/mock-data/dashboard';
+import { useRouteInsights } from '@/lib/hooks/useResources';
+import { getMockRouteDetail } from '@/lib/mock-data/dashboard';
 import { MarketPressureBadge } from '@/components/ui/Badge';
 import { RouteAdvancePurchaseChart } from '@/components/charts/RouteAdvancePurchaseChart';
+import { ExportDialog } from '@/components/dialogs/ExportDialog';
 import { formatINR, formatPercent } from '@/lib/formatters';
 
+const AVAILABLE_ROUTES = [
+  { code: 'DEL-BOM', label: 'DEL → BOM (Delhi - Mumbai)' },
+  { code: 'DEL-BLR', label: 'DEL → BLR (Delhi - Bengaluru)' },
+  { code: 'BOM-BLR', label: 'BOM → BLR (Mumbai - Bengaluru)' },
+  { code: 'DEL-CCU', label: 'DEL → CCU (Delhi - Kolkata)' },
+  { code: 'HYD-DEL', label: 'HYD → DEL (Hyderabad - Delhi)' },
+];
+
 export default function RoutesPage() {
-  const [selectedRouteCode, setSelectedRouteCode] = useState('DEL-BOM');
-  const route = mockRouteDetailDelBom;
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const urlRoute = searchParams.get('route');
+
+  const [selectedRouteCode, setSelectedRouteCode] = useState(urlRoute || 'DEL-BOM');
+  const [showExport, setShowExport] = useState(false);
+
+  useEffect(() => {
+    if (urlRoute && urlRoute !== selectedRouteCode) {
+      setSelectedRouteCode(urlRoute);
+    }
+  }, [urlRoute]);
+
+  const handleRouteChange = (newCode: string) => {
+    setSelectedRouteCode(newCode);
+    router.push(`/routes?route=${newCode}`, { scroll: false });
+  };
+
+  const { data: routeData, isFetching } = useRouteInsights(selectedRouteCode);
+  const route = routeData || getMockRouteDetail(selectedRouteCode);
 
   return (
     <div className="space-y-5">
@@ -29,6 +59,11 @@ export default function RoutesPage() {
             <span className="text-xl font-black text-[#101828] tracking-tight">{route.route_code}</span>
             <span className="text-sm font-semibold text-[#475467]">• {route.origin} → {route.destination}</span>
             <MarketPressureBadge pressure={route.market_status} />
+            {isFetching && (
+              <span className="text-[10px] text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded font-mono animate-pulse">
+                Updating...
+              </span>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-3 text-xs text-[#667085]">
             <span>Flight Distance: <strong className="text-[#101828] font-mono">{route.distance_km} km</strong></span>
@@ -42,27 +77,48 @@ export default function RoutesPage() {
           </div>
         </div>
 
-        {/* Route Selector Dropdown */}
-        <div className="flex items-center gap-2">
+        {/* Route Selector & Export Controls */}
+        <div className="flex flex-wrap items-center gap-2">
           <label className="text-xs text-[#667085] font-semibold">Select Route:</label>
           <select
             value={selectedRouteCode}
-            onChange={(e) => setSelectedRouteCode(e.target.value)}
-            className="bg-[#F8FAFC] border border-[#D0D5DD] font-semibold text-xs text-[#101828] rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+            onChange={(e) => handleRouteChange(e.target.value)}
+            className="bg-[#F8FAFC] border border-[#D0D5DD] font-semibold text-xs text-[#101828] rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer min-w-[200px]"
           >
-            <option value="DEL-BOM">DEL → BOM (Delhi - Mumbai)</option>
-            <option value="DEL-BLR">DEL → BLR (Delhi - Bengaluru)</option>
-            <option value="BOM-BLR">BOM → BLR (Mumbai - Bengaluru)</option>
-            <option value="DEL-CCU">DEL → CCU (Delhi - Kolkata)</option>
-            <option value="HYD-DEL">HYD → DEL (Hyderabad - Delhi)</option>
+            {AVAILABLE_ROUTES.map((r) => (
+              <option key={r.code} value={r.code}>
+                {r.label}
+              </option>
+            ))}
           </select>
+          <button
+            onClick={() => setShowExport(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#D0D5DD] text-xs font-semibold text-[#101828] rounded shadow-2xs hover:bg-slate-50 transition-colors cursor-pointer"
+          >
+            <Download className="w-3.5 h-3.5 text-blue-600" />
+            <span>Export Route Report</span>
+          </button>
         </div>
       </div>
 
+      <ExportDialog
+        open={showExport}
+        onClose={() => setShowExport(false)}
+        exportType="ROUTE_INTELLIGENCE"
+        defaultFormat="PDF"
+        title={`Corridor Performance Report (${selectedRouteCode})`}
+        filters={{ route: selectedRouteCode }}
+        filterSummary={[
+          { label: 'Corridor', value: selectedRouteCode },
+          { label: 'DGCA Passenger Traffic Weight', value: `${route.traffic_weight_pct}%` },
+          { label: 'Market Status', value: route.market_status },
+        ]}
+      />
+
       {/* Hero Section: Current Representative Fare & Advance Purchase Curve */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 min-w-0">
         {/* Current Representative Fare Card (approx 35% / 4 cols) */}
-        <div className="lg:col-span-4 bg-white border border-[#E4E7EC] rounded-lg p-5 shadow-xs flex flex-col justify-between">
+        <div className="lg:col-span-4 bg-white border border-[#E4E7EC] rounded-lg p-5 shadow-xs flex flex-col justify-between min-w-0">
           <div>
             <span className="text-xs font-semibold text-[#475467] uppercase tracking-wider block">
               Current Representative Fare (Median)
@@ -89,23 +145,33 @@ export default function RoutesPage() {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-[#667085]">Base Reference Fare (Aug 2026):</span>
-                <span className="font-mono text-[#101828]">₹6,280</span>
+                <span className="font-mono text-[#101828]">
+                  {formatINR(Math.round(route.current_median_fare / (1 + route.change_30d_pct / 100)))}
+                </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-[#667085]">Current Route Relative:</span>
-                <span className="font-mono font-bold text-blue-700">118.15</span>
+                <span className="font-mono font-bold text-blue-700">
+                  {(100 + route.change_30d_pct).toFixed(2)}
+                </span>
               </div>
             </div>
           </div>
 
           <div className="mt-4 pt-3 border-t border-[#F1F5F9] text-[11px] text-[#667085] flex items-center justify-between">
-            <span>APIx Contribution: <strong className="text-[#101828]">+0.38 pts</strong></span>
-            <span className="text-blue-600 font-medium">Rank #1 in Weight</span>
+            <span>
+              APIx Contribution:{' '}
+              <strong className={route.change_7d_pct >= 0 ? 'text-emerald-700' : 'text-rose-600'}>
+                {route.change_7d_pct >= 0 ? '+' : ''}
+                {((route.change_7d_pct * route.traffic_weight_pct) / 100).toFixed(2)} pts
+              </strong>
+            </span>
+            <span className="text-blue-600 font-medium">Weight: {route.traffic_weight_pct}%</span>
           </div>
         </div>
 
         {/* Advance Purchase Curve Chart (approx 65% / 8 cols) */}
-        <div className="lg:col-span-8 bg-white border border-[#E4E7EC] rounded-lg p-5 shadow-xs">
+        <div className="lg:col-span-8 bg-white border border-[#E4E7EC] rounded-lg p-5 shadow-xs min-w-0">
           <div className="flex items-center justify-between mb-3">
             <div>
               <h3 className="text-sm font-bold text-[#101828]">Advance Purchase Curve (Yield Curve)</h3>

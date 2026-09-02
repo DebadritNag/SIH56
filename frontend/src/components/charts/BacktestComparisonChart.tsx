@@ -29,6 +29,16 @@ export const BacktestComparisonChart: React.FC<BacktestComparisonChartProps> = (
   const benchmarkSeries = data ? data.map((d) => d.cpi_transport) : (initialBenchmarkSeries || [
     100.0, 100.4, 100.9, 101.4, 101.8, 102.1, 102.5, 102.8, 103.1
   ]);
+
+  // Data-driven dynamic domain calculation with headroom
+  const allValues = [...apixSeries, ...benchmarkSeries].filter((v) => typeof v === 'number' && !isNaN(v));
+  const rawMin = allValues.length > 0 ? Math.min(...allValues) : 95;
+  const rawMax = allValues.length > 0 ? Math.max(...allValues) : 115;
+  const range = Math.max(rawMax - rawMin, 5);
+  const padding = Math.max(range * 0.12, 2.5);
+  const yMin = Math.floor(rawMin - padding);
+  const yMax = Math.ceil(rawMax + padding);
+
   const option = {
     tooltip: {
       trigger: 'axis',
@@ -45,10 +55,10 @@ export const BacktestComparisonChart: React.FC<BacktestComparisonChartProps> = (
       textStyle: { color: '#475467', fontSize: 11 },
     },
     grid: {
-      left: '3%',
-      right: '4%',
-      top: '8%',
-      bottom: '12%',
+      left: 48,
+      right: 32,
+      top: 36,
+      bottom: 48,
       containLabel: true,
     },
     xAxis: {
@@ -59,11 +69,15 @@ export const BacktestComparisonChart: React.FC<BacktestComparisonChartProps> = (
     },
     yAxis: {
       type: 'value',
-      min: 98,
-      max: 110,
+      min: yMin,
+      max: yMax,
       axisLine: { show: false },
       splitLine: { lineStyle: { color: '#F1F5F9' } },
-      axisLabel: { color: '#667085', fontSize: 11 },
+      axisLabel: {
+        color: '#667085',
+        fontSize: 11,
+        formatter: (val: number) => val.toFixed(1),
+      },
     },
     series: [
       {
@@ -71,6 +85,8 @@ export const BacktestComparisonChart: React.FC<BacktestComparisonChartProps> = (
         type: 'line',
         data: apixSeries,
         smooth: true,
+        showSymbol: true,
+        symbolSize: 6,
         itemStyle: { color: '#2563EB' },
         lineStyle: { width: 2.5, color: '#2563EB' },
       },
@@ -79,11 +95,17 @@ export const BacktestComparisonChart: React.FC<BacktestComparisonChartProps> = (
         type: 'line',
         data: benchmarkSeries,
         smooth: true,
+        showSymbol: true,
+        symbolSize: 5,
         itemStyle: { color: '#64748B' },
         lineStyle: { width: 2, type: 'dashed', color: '#64748B' },
       },
     ],
   };
 
-  return <EChartWrapper option={option as any} style={{ height: '320px', width: '100%' }} />;
+  return (
+    <div className="w-full min-w-0 min-h-[360px]">
+      <EChartWrapper option={option as any} style={{ height: '360px', width: '100%' }} />
+    </div>
+  );
 };

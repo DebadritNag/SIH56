@@ -205,3 +205,80 @@ export interface ScrapingTestResult {
     recommended_action: string;
   };
 }
+
+// ---------------------------------------------------------------------------
+// Export & Download Center Types
+// ---------------------------------------------------------------------------
+export type ExportType =
+  | 'FARE_OBSERVATIONS'
+  | 'APIX_INDEX'
+  | 'APIX_COMPONENTS'
+  | 'ROUTE_INTELLIGENCE'
+  | 'ANOMALIES'
+  | 'PRICE_SHOCKS'
+  | 'SOURCE_HEALTH'
+  | 'COLLECTION_RUN'
+  | 'PIPELINE_RUN'
+  | 'DATA_QUALITY'
+  | 'BACKTEST_DATA'
+  | 'BACKTEST_AUDIT_PDF'
+  | 'METHODOLOGY_REPORT'
+  | 'PROVENANCE_REPORT'
+  | 'REFERENCE_DATASET'
+  | 'BASKET_DEFINITION'
+  | 'SYSTEM_DIAGNOSTICS_REPORT'
+  | 'CHART_IMAGE';
+
+export type ExportFormat = 'CSV' | 'XLSX' | 'PDF' | 'PNG' | 'JSON' | 'ZIP';
+export type ExportStatus = 'QUEUED' | 'GENERATING' | 'UPLOADING' | 'READY' | 'FAILED' | 'EXPIRED' | 'CANCELLED';
+
+export interface ExportJob {
+  id: string;
+  requested_by?: string;
+  export_type: ExportType;
+  export_format: ExportFormat;
+  title: string;
+  description?: string;
+  filename: string;
+  status: ExportStatus;
+  progress_percent?: number;
+  current_stage?: string;
+  filters?: Record<string, unknown>;
+  parameters?: Record<string, unknown>;
+  storage_bucket?: string;
+  storage_path?: string;
+  mime_type?: string;
+  file_size_bytes?: number;
+  row_count?: number;
+  page_count?: number;
+  checksum_sha256?: string;
+  data_origin: string;
+  generated_at?: string;
+  expires_at?: string;
+  started_at?: string;
+  completed_at?: string;
+  failed_at?: string;
+  error_code?: string;
+  error_message?: string;
+  created_at: string;
+  updated_at: string;
+  job_metadata?: Record<string, unknown>;
+}
+
+export interface CreateExportInput {
+  export_type: ExportType;
+  format: ExportFormat;
+  title?: string;
+  description?: string;
+  filters?: Record<string, unknown>;
+  parameters?: Record<string, unknown>;
+}
+
+export interface ExportDownloadInfo {
+  download_url: string;
+  filename: string;
+  mime_type: string;
+  file_size_bytes?: number;
+  checksum_sha256?: string;
+  expires_at?: string;
+}

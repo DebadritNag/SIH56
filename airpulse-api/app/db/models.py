@@ -524,3 +524,38 @@ class CalendarEvent(Base):
     impact_level = Column(String(20), default="medium", nullable=False)
     source = Column(String(100), default="GOV_CALENDAR_2026", nullable=False)
     version = Column(String(50), default="v1.0", nullable=False)
+
+
+class ExportJob(Base):
+    __tablename__ = "export_jobs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    requested_by = Column(String(100), nullable=True, index=True)
+    export_type = Column(String(50), nullable=False, index=True)
+    export_format = Column(String(20), nullable=False, index=True)
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    filename = Column(String(255), nullable=False)
+    status = Column(String(30), default="QUEUED", nullable=False, index=True)  # QUEUED, GENERATING, UPLOADING, READY, FAILED, EXPIRED, CANCELLED
+    progress_percent = Column(Float, nullable=True)
+    current_stage = Column(String(100), nullable=True)
+    filters = Column(JSONB, nullable=True)
+    parameters = Column(JSONB, nullable=True)
+    storage_bucket = Column(String(100), nullable=True)
+    storage_path = Column(String(500), nullable=True)
+    mime_type = Column(String(100), nullable=True)
+    file_size_bytes = Column(Integer, nullable=True)
+    row_count = Column(Integer, nullable=True)
+    page_count = Column(Integer, nullable=True)
+    checksum_sha256 = Column(String(64), nullable=True)
+    data_origin = Column(String(50), default="LIVE", nullable=False)
+    generated_at = Column(DateTime(timezone=True), nullable=True)
+    expires_at = Column(DateTime(timezone=True), nullable=True)
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    failed_at = Column(DateTime(timezone=True), nullable=True)
+    error_code = Column(String(50), nullable=True)
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False, index=True)
+    updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
+    job_metadata = Column(JSONB, nullable=True)

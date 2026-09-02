@@ -3,6 +3,7 @@ from app.api.v1 import (
     alerts,
     anomalies,
     audit,
+    auth,
     backtest,
     dashboard,
     fares,
@@ -14,11 +15,13 @@ from app.api.v1 import (
     runs,
     sources,
     system,
+    exports,
 )
 
 api_router = APIRouter()
 
 api_router.include_router(health.router)
+api_router.include_router(auth.router)
 api_router.include_router(system.router)
 api_router.include_router(ingestion.router)
 api_router.include_router(dashboard.router)
@@ -32,3 +35,4 @@ api_router.include_router(backtest.router)
 api_router.include_router(methodology.router)
 api_router.include_router(runs.router)
 api_router.include_router(audit.router)
+api_router.include_router(exports.router)

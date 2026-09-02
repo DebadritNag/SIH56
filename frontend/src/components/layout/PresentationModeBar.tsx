@@ -35,7 +35,7 @@ export const PresentationModeBar: React.FC<PresentationModeBarProps> = ({ onClos
       </div>
 
       {/* Steps list */}
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5 px-2">
         {DEMO_STEPS.map((s, idx) => {
           const isActive = pathname === s.href;
           return (
@@ -43,14 +43,14 @@ export const PresentationModeBar: React.FC<PresentationModeBarProps> = ({ onClos
               <Link
                 href={s.href}
                 className={clsx(
-                  'flex items-center gap-1.5 px-2.5 py-1 rounded text-xs transition-all',
+                  'flex items-center gap-1.5 px-2.5 py-1 rounded text-xs transition-all whitespace-nowrap shrink-0',
                   isActive
                     ? 'bg-blue-600 text-white font-bold shadow-xs'
                     : 'text-[#94A3B8] hover:text-white hover:bg-slate-800/80 font-medium'
                 )}
               >
                 <span className={clsx(
-                  'w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-mono',
+                  'w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-mono shrink-0',
                   isActive ? 'bg-white text-blue-600' : 'bg-slate-700 text-slate-300'
                 )}>
                   {s.step}
@@ -58,7 +58,7 @@ export const PresentationModeBar: React.FC<PresentationModeBarProps> = ({ onClos
                 <span className="hidden md:inline">{s.label}</span>
               </Link>
               {idx < DEMO_STEPS.length - 1 && (
-                <ArrowRight className="w-3 h-3 text-[#475467] hidden lg:inline" />
+                <ArrowRight className="w-3 h-3 text-[#475467] hidden lg:inline shrink-0" />
               )}
             </React.Fragment>
           );

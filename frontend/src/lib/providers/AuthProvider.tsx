@@ -33,11 +33,12 @@ interface AuthContextValue {
   loading: boolean;
   /** True when a Supabase client is configured (env vars present). */
   configured: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: string | null }>;
+  signIn: (email: string, password: string, captchaToken?: string) => Promise<{ error: string | null }>;
   signUp: (
     email: string,
     password: string,
     meta?: { full_name?: string; organization?: string },
+    captchaToken?: string,
   ) => Promise<{ error: string | null; needsConfirmation: boolean }>;
   signOut: () => Promise<void>;
 }
@@ -88,9 +89,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [supabase]);
 
   const signIn = useCallback(
-    async (email: string, password: string) => {
+    async (email: string, password: string, captchaToken?: string) => {
       if (!supabase) return { error: "Authentication is not configured." };
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+        options: captchaToken ? { captchaToken } : undefined,
+      });
       return { error: error?.message ?? null };
     },
     [supabase],
@@ -101,12 +106,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email: string,
       password: string,
       meta?: { full_name?: string; organization?: string },
+      captchaToken?: string,
     ) => {
       if (!supabase) return { error: "Authentication is not configured.", needsConfirmation: false };
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { full_name: meta?.full_name, organization: meta?.organization } },
+        options: {
+          data: { full_name: meta?.full_name, organization: meta?.organization },
+          ...(captchaToken ? { captchaToken } : {}),
+        },
       });
       // If email confirmation is enabled, there is a user but no active session yet.
       const needsConfirmation = Boolean(data.user) && !data.session;

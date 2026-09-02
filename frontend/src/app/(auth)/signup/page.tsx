@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 
 import { AuthShell } from "@/components/auth/AuthShell";
+import { Captcha, captchaEnabled } from "@/components/auth/Captcha";
 import { useAuth } from "@/lib/providers/AuthProvider";
 
 export default function SignupPage() {
@@ -27,6 +28,8 @@ export default function SignupPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [confirmSent, setConfirmSent] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const needsCaptcha = captchaEnabled();
 
   useEffect(() => {
     if (!loading && session) router.replace("/overview");
@@ -41,14 +44,24 @@ export default function SignupPage() {
       setError("Password must be at least 8 characters.");
       return;
     }
+    if (needsCaptcha && !captchaToken) {
+      setError("Please complete the captcha.");
+      return;
+    }
     setSubmitting(true);
-    const { error: signUpError, needsConfirmation } = await signUp(email.trim(), password, {
-      full_name: fullName.trim() || undefined,
-      organization: organization.trim() || undefined,
-    });
+    const { error: signUpError, needsConfirmation } = await signUp(
+      email.trim(),
+      password,
+      {
+        full_name: fullName.trim() || undefined,
+        organization: organization.trim() || undefined,
+      },
+      captchaToken ?? undefined,
+    );
     setSubmitting(false);
     if (signUpError) {
       setError(signUpError);
+      setCaptchaToken(null);
       return;
     }
     if (needsConfirmation) {
@@ -179,6 +192,12 @@ export default function SignupPage() {
           )}
         </div>
 
+        <Captcha
+          onVerify={(token) => setCaptchaToken(token)}
+          onExpire={() => setCaptchaToken(null)}
+          onError={() => setCaptchaToken(null)}
+        />
+
         {error && (
           <div className="flex items-start gap-2 rounded-lg border border-rose-400/30 bg-rose-500/10 p-3 text-xs text-rose-200">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -188,7 +207,7 @@ export default function SignupPage() {
 
         <button
           type="submit"
-          disabled={submitting || !configured}
+          disabled={submitting || !configured || (needsCaptcha && !captchaToken)}
           className="flex w-full items-center justify-center gap-2 rounded-lg bg-sky-500 py-2.5 text-sm font-bold text-white shadow-lg shadow-sky-500/20 transition-colors hover:bg-sky-400 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
         >
           {submitting ? (

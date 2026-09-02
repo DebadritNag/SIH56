@@ -125,3 +125,25 @@ export function useIngestionStatus() {
     staleTime: 15_000,
   });
 }
+
+import { RouteInsightDetail } from "@/types";
+
+export function useRouteInsights(routeCode: string) {
+  return useQuery<RouteInsightDetail>({
+    queryKey: ["route-intelligence", routeCode],
+    queryFn: async ({ signal }): Promise<RouteInsightDetail> => {
+      try {
+        const res = await endpoints.routeInsights(routeCode, signal);
+        if (res && typeof res === "object" && (res as any).route_code) {
+          return res as RouteInsightDetail;
+        }
+        const { getMockRouteDetail } = await import("@/lib/mock-data/dashboard");
+        return getMockRouteDetail(routeCode);
+      } catch {
+        const { getMockRouteDetail } = await import("@/lib/mock-data/dashboard");
+        return getMockRouteDetail(routeCode);
+      }
+    },
+    placeholderData: keepPreviousData,
+  });
+}

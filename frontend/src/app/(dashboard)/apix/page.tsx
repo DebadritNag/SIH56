@@ -1,8 +1,9 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { TrendingUp, Layers, CheckCircle2, Download } from 'lucide-react';
 import { formatINR, formatPercent } from '@/lib/formatters';
+import { ExportDialog } from '@/components/dialogs/ExportDialog';
 
 const BASKET_COMPONENTS = [
   { route: 'DEL → BOM', window: 'T+1', current_fare: 11840, base_fare: 9850, relative: 120.20, weight: 0.042, contribution: 0.85, obs: 240, cov: 98 },
@@ -17,6 +18,7 @@ const BASKET_COMPONENTS = [
 ];
 
 export default function ApixPage() {
+  const [showExport, setShowExport] = useState(false);
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -33,12 +35,29 @@ export default function ApixPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#D0D5DD] text-xs font-semibold text-[#101828] rounded shadow-2xs hover:bg-slate-50">
-            <Download className="w-3.5 h-3.5" />
-            <span>Export MoSPI CSV Basket</span>
+          <button
+            onClick={() => setShowExport(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#D0D5DD] text-xs font-semibold text-[#101828] rounded shadow-2xs hover:bg-slate-50 transition-colors cursor-pointer"
+          >
+            <Download className="w-3.5 h-3.5 text-blue-600" />
+            <span>Export MoSPI XLSX / CSV Basket</span>
           </button>
         </div>
       </div>
+
+      <ExportDialog
+        open={showExport}
+        onClose={() => setShowExport(false)}
+        exportType="APIX_COMPONENTS"
+        defaultFormat="XLSX"
+        title="Official APIx Matched Basket Decomposition"
+        filterSummary={[
+          { label: 'Basket Version', value: 'domestic-basket-2026Q3' },
+          { label: 'Corridors', value: '81 Monitored Corridors' },
+          { label: 'Methodology', value: 'Matched Laspeyres v1.2' },
+        ]}
+        estimatedRows={405}
+      />
 
       {/* KPI Decomposition Strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
