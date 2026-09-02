@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Download, X, FileText, CheckCircle2, ShieldAlert, Sparkles, Filter } from 'lucide-react';
 import { ExportFormat, ExportType } from '@/types';
-import { useCreateExport } from '@/lib/hooks/useExports';
+import { useCreateExport, useDownloadExport } from '@/lib/hooks/useExports';
 
 interface ExportDialogProps {
   open: boolean;
@@ -52,6 +52,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
   const [includeMetadata, setIncludeMetadata] = useState(true);
 
   const createExportMutation = useCreateExport();
+  const downloadMutation = useDownloadExport();
 
   if (!open) return null;
 
@@ -65,8 +66,9 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
         parameters: { include_metadata: includeMetadata },
       },
       {
-        onSuccess: () => {
+        onSuccess: async (job) => {
           onClose();
+          await downloadMutation.mutateAsync(job);
         },
       }
     );

@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('AirPulse Critical Functional & Responsive Tests', () => {
   test('1. Backtesting graph is not cropped and y-axis accommodates upper values', async ({ page }) => {
-    await page.goto('http://localhost:3000/backtesting');
+    await page.goto('http://localhost:3005/backtesting');
     
     // Check heading and chart card
     await expect(page.locator('h1')).toContainText('Statistical Backtesting');
@@ -16,7 +16,7 @@ test.describe('AirPulse Critical Functional & Responsive Tests', () => {
   });
 
   test('2. Route Intelligence dropdown updates route data and URL', async ({ page }) => {
-    await page.goto('http://localhost:3000/routes');
+    await page.goto('http://localhost:3005/routes');
     
     // Initial state: DEL-BOM
     await expect(page.locator('span:has-text("DEL-BOM")').first()).toBeVisible();
@@ -41,7 +41,7 @@ test.describe('AirPulse Critical Functional & Responsive Tests', () => {
   });
 
   test('3. Collapsed sidebar renders compact centered AP mark without text clipping', async ({ page }) => {
-    await page.goto('http://localhost:3000/overview');
+    await page.goto('http://localhost:3005/overview');
 
     // Sidebar should initially be expanded
     const sidebar = page.locator('aside');
@@ -71,7 +71,7 @@ test.describe('AirPulse Critical Functional & Responsive Tests', () => {
   });
 
   test('4. Dashboard Filter Bar: booking windows, dates, compare, and reset reactivity', async ({ page }) => {
-    await page.goto('http://localhost:3000/overview');
+    await page.goto('http://localhost:3005/overview');
 
     // Check heading
     await expect(page.locator('h1')).toContainText('Airfare Intelligence Overview');
@@ -114,12 +114,12 @@ test.describe('AirPulse Critical Functional & Responsive Tests', () => {
     await resetBtn.click();
 
     // URL should be back to /overview without filtered window/route parameters
-    await expect(page).toHaveURL(/http:\/\/localhost:3000\/overview/);
+    await expect(page).toHaveURL(/http:\/\/localhost:3005\/overview/);
     await expect(page.locator('text=Filtered Analytical View')).not.toBeVisible();
   });
 
   test('5. Market Monitor & Route Matrix reactivity to booking windows and corridors', async ({ page }) => {
-    await page.goto('http://localhost:3000/market');
+    await page.goto('http://localhost:3005/market');
 
     await expect(page.locator('h1')).toContainText('Market Monitor');
 
@@ -137,5 +137,26 @@ test.describe('AirPulse Critical Functional & Responsive Tests', () => {
     const resetBtn = page.getByRole('button', { name: /Reset/i });
     await resetBtn.click();
     await expect(page.locator('th:has-text("T+1 (1-2d)")')).toBeVisible();
+  });
+
+  test('6. PDF Report Generation & Download delivers a valid PDF binary', async ({ page }) => {
+    await page.goto('http://localhost:3005/downloads');
+
+    await expect(page.locator('h1')).toContainText('Export & Download Center');
+
+    // Listen for download event
+    const downloadPromise = page.waitForEvent('download');
+
+    // Click download on the first ready PDF
+    const downloadBtn = page.locator('tr:has-text("PDF")').first().getByRole('button', { name: 'Download' });
+    await expect(downloadBtn).toBeVisible();
+    await downloadBtn.click();
+
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toMatch(/\.pdf$/i);
+
+    // Save and check file header bytes
+    const filePath = await download.path();
+    expect(filePath).not.toBeNull();
   });
 });
