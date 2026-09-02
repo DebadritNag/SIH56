@@ -103,14 +103,19 @@ export default function ScrapingTestPage() {
         return;
       }
 
-      const fares = (res.quotes || []).map((q) => ({
-        airline: String(q.airline ?? 'UNKNOWN'),
-        flight_number: String(q.flight_no ?? 'LIVE'),
-        departure_time: '—',
-        base_fare: Number(q.total_fare ?? 0) * 0.88,
-        total: Number(q.total_fare ?? 0),
-        validation_status: 'VALID',
-      }));
+      // Real live-flight telemetry from OpenSky (no fabricated fares).
+      const fares = (res.quotes || []).map((q) => {
+        const alt = q.altitude_m != null ? `${Math.round(Number(q.altitude_m))} m` : '—';
+        const vel = q.velocity_ms != null ? `${Math.round(Number(q.velocity_ms))} m/s` : '—';
+        return {
+          airline: String(q.airline ?? q.origin_country ?? 'LIVE'),
+          flight_number: String(q.flight_no ?? 'LIVE'),
+          departure_time: alt,
+          base_fare: vel as unknown as number,
+          total: Number(q.total_fare ?? 0),
+          validation_status: 'VALID',
+        };
+      });
 
       setTestResult({
         success: true,
@@ -127,7 +132,7 @@ export default function ScrapingTestPage() {
       setIsRunning(false);
       notify.success('Live scraping verified', {
         id: 'scrape-probe',
-        description: `${res.quotes_validated} valid quotes captured · SHA-256 evidence stored.`,
+        description: `${res.quotes_validated} live flights detected on corridor · SHA-256 evidence stored.`,
       });
     } catch (err) {
       setIsRunning(false);
@@ -409,17 +414,16 @@ export default function ScrapingTestPage() {
                 {/* Extracted Fares Table */}
                 <div>
                   <h4 className="text-xs font-bold text-[#101828] uppercase tracking-wide mb-2">
-                    Extracted Airfare Quotes ({testResult.extracted_fares.length})
+                    Live Flight Activity on Corridor ({testResult.extracted_fares.length})
                   </h4>
                   <div className="border border-[#E4E7EC] rounded overflow-hidden text-xs">
                     <table className="w-full text-left">
                       <thead className="bg-[#F8FAFC] text-[#475467] font-semibold border-b border-[#E4E7EC] text-[11px]">
                         <tr>
-                          <th className="p-2">Carrier</th>
+                          <th className="p-2">Callsign / Country</th>
                           <th className="p-2">Flight</th>
-                          <th className="p-2">Dep Time</th>
-                          <th className="p-2 text-right">Base</th>
-                          <th className="p-2 text-right">Total Fare</th>
+                          <th className="p-2 text-right">Altitude</th>
+                          <th className="p-2 text-right">Velocity</th>
                           <th className="p-2 text-center">Status</th>
                         </tr>
                       </thead>
@@ -428,9 +432,8 @@ export default function ScrapingTestPage() {
                           <tr key={idx}>
                             <td className="p-2 font-medium text-[#101828]">{f.airline}</td>
                             <td className="p-2 font-mono text-[#667085]">{f.flight_number}</td>
-                            <td className="p-2 tabular-nums text-[#475467]">{f.departure_time}</td>
-                            <td className="p-2 text-right tabular-nums text-[#667085]">{formatINR(f.base_fare)}</td>
-                            <td className="p-2 text-right tabular-nums font-bold text-[#101828]">{formatINR(f.total)}</td>
+                            <td className="p-2 text-right tabular-nums text-[#475467]">{f.departure_time}</td>
+                            <td className="p-2 text-right tabular-nums font-bold text-[#101828]">{String(f.base_fare)}</td>
                             <td className="p-2 text-center">
                               <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded uppercase ${
                                 f.validation_status.includes('VALID')
