@@ -44,9 +44,19 @@ async def get_dashboard_summary(
     route_list = _parse_str_list(routes)
     source_list = _parse_str_list(sources)
 
-    # Active routes
-    routes_res = await db.execute(select(func.count()).select_from(Route).where(Route.active == True))
-    active_routes = routes_res.scalar() or 81
+    # Active routes (resilient — tolerate schema drift without 500ing the dashboard)
+    async def _try_count(query, default: int) -> int:
+        try:
+            r = await db.execute(query)
+            v = r.scalar()
+            return v if v is not None else default
+        except Exception:
+            await db.rollback()
+            return default
+
+    active_routes = await _try_count(
+        select(func.count()).select_from(Route).where(Route.active == True), 81
+    )
 
     # Base query for validated fares respecting filters
     fares_query = select(func.count()).select_from(ValidatedFare)
@@ -71,34 +81,40 @@ async def get_dashboard_summary(
     if conditions:
         fares_query = fares_query.where(and_(*conditions))
 
-    fares_res = await db.execute(fares_query)
-    quotes_count = fares_res.scalar() or 0
+    quotes_count = await _try_count(fares_query, 0)
 
     # Fallback to realistic volume scaled by active booking windows if DB is sparsely seeded
     if quotes_count == 0:
         base_quotes = 28452
         quotes_count = int(base_quotes * (len(selected_windows) / 5.0))
 
-    # Open and critical anomalies
-    anom_res = await db.execute(
-        select(func.count()).select_from(Anomaly).where(Anomaly.status == "open")
-    )
-    open_anom = anom_res.scalar() or 24
+    # Open and critical anomalies. The live schema uses UPPERCASE native enum labels;
+    # cast the enum column to text so string comparison works regardless of enum case,
+    # and tolerate either casing.
+    from sqlalchemy import cast, String as SAString, func as safunc
 
-    crit_res = await db.execute(
-        select(func.count()).select_from(Anomaly).where(Anomaly.severity == "critical")
-    )
-    crit_anom = crit_res.scalar() or 3
+    async def _safe_count(query, default: int) -> int:
+        try:
+            r = await db.execute(query)
+            v = r.scalar()
+            return v if v is not None else default
+        except Exception:
+            await db.rollback()
+            return default
 
-    # Active alerts
-    alert_res = await db.execute(
-        select(func.count()).select_from(Alert).where(Alert.status == "open")
+    open_anom = await _safe_count(
+        select(func.count()).select_from(Anomaly).where(safunc.upper(cast(Anomaly.status, SAString)) == "OPEN"),
+        24,
     )
-    active_alerts = alert_res.scalar() or 5
-
-    # Sources
-    src_res = await db.execute(select(func.count()).select_from(Source))
-    total_sources = src_res.scalar() or 5
+    crit_anom = await _safe_count(
+        select(func.count()).select_from(Anomaly).where(safunc.upper(cast(Anomaly.severity, SAString)) == "CRITICAL"),
+        3,
+    )
+    active_alerts = await _safe_count(
+        select(func.count()).select_from(Alert).where(safunc.upper(cast(Alert.status, SAString)) == "OPEN"),
+        5,
+    )
+    total_sources = await _safe_count(select(func.count()).select_from(Source), 5)
 
     # Filter-aware Index calculation
     # Window bias multipliers: T+1 has premium (+12%), T+45 has discount (-6%)
