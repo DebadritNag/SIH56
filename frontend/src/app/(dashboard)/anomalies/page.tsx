@@ -10,6 +10,9 @@ import { formatINR } from '@/lib/formatters';
 import { useAnomalies } from '@/lib/hooks/useResources';
 import { useDashboardSummary } from '@/lib/hooks/useDashboard';
 import { EmptyAnomaliesState, EmptySearchResultsState } from '@/components/states/EmptyState';
+import { GenerateReportButton } from '@/components/data/GenerateReportButton';
+import { MockBadge } from '@/components/data/DataBadge';
+import { useDataMode } from '@/lib/providers/DataModeProvider';
 
 export default function AnomaliesPage() {
   const [selectedAnomaly, setSelectedAnomaly] = useState<AnomalyItem | null>(null);
@@ -22,7 +25,8 @@ export default function AnomaliesPage() {
     severity: severityFilter === 'ALL' ? undefined : severityFilter,
     page_size: 50,
   });
-  const { data: summary } = useDashboardSummary();
+  const { summary } = useDashboardSummary();
+  const { mode: dataMode } = useDataMode();
 
   const [localStatuses, setLocalStatuses] = useState<Record<string, string>>({});
   const anomalies: AnomalyItem[] = (anomalyPage?.items ?? []).map((a) =>
@@ -71,6 +75,8 @@ export default function AnomaliesPage() {
             <Download className="w-3.5 h-3.5 text-blue-600" />
             <span>Export Anomalies</span>
           </button>
+          <GenerateReportButton exportType={'ANOMALIES' as never} format={'PDF' as never} title="PriceGuard Anomaly Report" />
+          {dataMode === 'mock' && <MockBadge />}
           <span className="px-2.5 py-1 bg-rose-50 text-rose-700 font-bold rounded border border-rose-200">
             PriceGuard Active (Contamination: 0.04)
           </span>

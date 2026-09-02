@@ -6,6 +6,7 @@ import { HealthBadge } from '@/components/ui/Badge';
 import { SourceStatus } from '@/types';
 import { useSources } from '@/lib/hooks/useResources';
 import type { BackendSource } from '@/lib/api/endpoints';
+import { GenerateReportButton } from '@/components/data/GenerateReportButton';
 
 interface SourceRow {
   name: string;
@@ -73,6 +74,7 @@ export default function SourcesPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <GenerateReportButton exportType={'SOURCE_HEALTH' as never} format={'XLSX' as never} title="Source Health Report" />
           <span className="px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-300 font-bold text-xs rounded">
             {SOURCES.length} Sources Active • {healthy} Healthy • {degraded} Degraded
           </span>

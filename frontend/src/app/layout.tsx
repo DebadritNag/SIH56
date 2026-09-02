@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { QueryProvider } from "@/lib/providers/QueryProvider";
 import { AuthProvider } from "@/lib/providers/AuthProvider";
+import { DataModeProvider } from "@/lib/providers/DataModeProvider";
 import { NotificationProvider } from "@/components/notifications/NotificationProvider";
 
 const geistSans = Geist({
@@ -29,7 +30,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-full flex flex-col">
         <QueryProvider>
           <AuthProvider>
-            <NotificationProvider>{children}</NotificationProvider>
+            <DataModeProvider>
+              <NotificationProvider>{children}</NotificationProvider>
+            </DataModeProvider>
           </AuthProvider>
         </QueryProvider>
       </body>

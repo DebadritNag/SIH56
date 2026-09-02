@@ -20,40 +20,29 @@ import { MetricCard } from '@/components/ui/MetricCard';
 import { NationalIndexChart } from '@/components/charts/NationalIndexChart';
 import { WaterfallContributionChart } from '@/components/charts/WaterfallContributionChart';
 import { RoutePressureHeatmap } from '@/components/charts/RoutePressureHeatmap';
-import {
-  mockMarketSignals,
-  mockDashboardSummary,
-  mockNationalTrend,
-  mockUpwardContributors,
-  mockDownwardContributors,
-  mockSystemTrustMetrics,
-} from '@/lib/mock-data/dashboard';
+import { mockMarketSignals } from '@/lib/mock-data/dashboard';
 import {
   useDashboardSummary,
   useNationalTrend,
   useRouteContributors,
   useSystemTrust,
 } from '@/lib/hooks/useDashboard';
+import { DataSourceMeta } from '@/components/data/DataBadge';
+import { GenerateReportButton } from '@/components/data/GenerateReportButton';
 import { formatPercent, formatINR } from '@/lib/formatters';
 
 export default function OverviewPage() {
   const [contributorDirection, setContributorDirection] = useState<'up' | 'down'>('up');
   const [selectedWindow, setSelectedWindow] = useState('All');
 
-  // Real data from FastAPI. Hooks provide placeholderData, but guard against undefined
-  // on the very first render with explicit mock fallbacks so the UI never crashes.
-  const { data: summary } = useDashboardSummary();
-  const { data: nationalTrend } = useNationalTrend();
-  const { data: contributorSets } = useRouteContributors();
-  const { data: systemTrust } = useSystemTrust();
+  // Real data from FastAPI (LIVE by default). Falls back to mock — flagged via meta.isMock.
+  const { summary: dashboardSummary, meta } = useDashboardSummary();
+  const { trend: trendData } = useNationalTrend();
+  const { contributors: contributorSets } = useRouteContributors();
+  const { trust: trustMetrics } = useSystemTrust();
 
-  const dashboardSummary = summary ?? mockDashboardSummary;
-  const trendData = nationalTrend ?? mockNationalTrend;
-  const trustMetrics = systemTrust ?? mockSystemTrustMetrics;
   const contributors =
-    contributorDirection === 'up'
-      ? contributorSets?.up ?? mockUpwardContributors
-      : contributorSets?.down ?? mockDownwardContributors;
+    contributorDirection === 'up' ? contributorSets.up : contributorSets.down;
 
   return (
     <div className="space-y-5">
@@ -66,13 +55,12 @@ export default function OverviewPage() {
           <p className="text-xs text-[#475467] mt-0.5">
             Real-time domestic airfare inflation, index velocity, and market pressure across India&apos;s monitored aviation network.
           </p>
+          <DataSourceMeta className="mt-1.5" isMock={meta.isMock} source={meta.source} lastUpdated={meta.lastUpdated} />
         </div>
         <div className="flex items-center gap-2 text-xs">
+          <GenerateReportButton exportType={'APIX_INDEX' as never} format={'PDF' as never} title="Airfare Intelligence Overview Report" />
           <span className="px-2.5 py-1 bg-slate-100 text-[#475467] font-medium rounded border border-slate-200">
             Base Period: Aug 2026 = 100.0
-          </span>
-          <span className="px-2.5 py-1 bg-blue-50 text-blue-700 font-semibold rounded border border-blue-200">
-            Laspeyres-Type Route Basket
           </span>
         </div>
       </div>

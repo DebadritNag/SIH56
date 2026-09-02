@@ -7,6 +7,7 @@ import { FareProvenanceDrawer } from '@/components/drawers/FareProvenanceDrawer'
 import { ExportDialog } from '@/components/dialogs/ExportDialog';
 import { OriginBadge } from '@/components/ui/Badge';
 import { formatINR } from '@/lib/formatters';
+import { GenerateReportButton } from '@/components/data/GenerateReportButton';
 import { notify } from '@/lib/notify';
 
 const MOCK_FARES: FareObservation[] = [
@@ -147,6 +148,7 @@ export default function FaresPage() {
             <Download className="w-3.5 h-3.5 text-blue-600" />
             <span>Export Verified Quotes</span>
           </button>
+          <GenerateReportButton exportType={'FARE_OBSERVATIONS' as never} format={'CSV' as never} title="Validated Fare Observations Report" />
         </div>
       </div>
 

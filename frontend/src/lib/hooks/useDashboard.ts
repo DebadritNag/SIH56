@@ -1,9 +1,13 @@
 "use client";
 
 /**
- * Dashboard data hooks. Each fetches real data from FastAPI and maps it to the frontend
- * UI types. On network/backend error the mapped mock is returned so the UI degrades
- * gracefully (real data where the backend is complete, mock where it is not).
+ * Mode-aware dashboard hooks.
+ *
+ * REAL mode: fetch from FastAPI. On error, fall back to mock (explicitly flagged isMock).
+ * MOCK mode: return the built-in demo dataset (always flagged isMock=true).
+ *
+ * Each hook returns the React Query result PLUS { isMock, source, lastUpdated } so the UI
+ * can render a MOCK/LIVE badge and source + last-updated timestamp.
  */
 import { useQuery } from "@tanstack/react-query";
 
@@ -21,35 +25,89 @@ import {
   mockDownwardContributors,
   mockSystemTrustMetrics,
 } from "@/lib/mock-data/dashboard";
+import { useDataMode } from "@/lib/providers/DataModeProvider";
+
+export interface DataMeta {
+  isMock: boolean;
+  source: string;
+  lastUpdated: string | null;
+}
+
+const REAL_SOURCE = "AirPulse backend (live)";
+const MOCK_SOURCE = "Demo dataset (offline)";
 
 export function useDashboardSummary() {
-  return useQuery({
-    queryKey: ["dashboard-summary"],
-    queryFn: async ({ signal }) => mapDashboardSummary(await endpoints.dashboardSummary(signal)),
-    placeholderData: mockDashboardSummary,
+  const { mode } = useDataMode();
+  const q = useQuery({
+    queryKey: ["dashboard-summary", mode],
+    queryFn: async ({ signal }) => {
+      if (mode === "mock") return { data: mockDashboardSummary, isMock: true };
+      try {
+        return { data: mapDashboardSummary(await endpoints.dashboardSummary(signal)), isMock: false };
+      } catch {
+        return { data: mockDashboardSummary, isMock: true };
+      }
+    },
+    placeholderData: { data: mockDashboardSummary, isMock: true },
   });
+  const isMock = q.data?.isMock ?? true;
+  return {
+    ...q,
+    summary: q.data?.data ?? mockDashboardSummary,
+    meta: { isMock, source: isMock ? MOCK_SOURCE : REAL_SOURCE, lastUpdated: q.dataUpdatedAt ? new Date(q.dataUpdatedAt).toISOString() : null } as DataMeta,
+  };
 }
 
 export function useNationalTrend() {
-  return useQuery({
-    queryKey: ["apix-trend"],
-    queryFn: async ({ signal }) => mapNationalTrend(await endpoints.indexTrend(signal)),
-    placeholderData: mockNationalTrend,
+  const { mode } = useDataMode();
+  const q = useQuery({
+    queryKey: ["apix-trend", mode],
+    queryFn: async ({ signal }) => {
+      if (mode === "mock") return { data: mockNationalTrend, isMock: true };
+      try {
+        return { data: mapNationalTrend(await endpoints.indexTrend(signal)), isMock: false };
+      } catch {
+        return { data: mockNationalTrend, isMock: true };
+      }
+    },
+    placeholderData: { data: mockNationalTrend, isMock: true },
   });
+  const isMock = q.data?.isMock ?? true;
+  return {
+    ...q,
+    trend: q.data?.data ?? mockNationalTrend,
+    meta: { isMock, source: isMock ? MOCK_SOURCE : REAL_SOURCE, lastUpdated: q.dataUpdatedAt ? new Date(q.dataUpdatedAt).toISOString() : null } as DataMeta,
+  };
 }
 
 export function useRouteContributors() {
-  return useQuery({
-    queryKey: ["top-route-movements"],
-    queryFn: async ({ signal }) => mapRouteContributors(await endpoints.topRouteMovements(signal)),
-    placeholderData: { up: mockUpwardContributors, down: mockDownwardContributors },
+  const { mode } = useDataMode();
+  const fallback = { up: mockUpwardContributors, down: mockDownwardContributors };
+  const q = useQuery({
+    queryKey: ["top-route-movements", mode],
+    queryFn: async ({ signal }) => {
+      if (mode === "mock") return { data: fallback, isMock: true };
+      try {
+        return { data: mapRouteContributors(await endpoints.topRouteMovements(signal)), isMock: false };
+      } catch {
+        return { data: fallback, isMock: true };
+      }
+    },
+    placeholderData: { data: fallback, isMock: true },
   });
+  const isMock = q.data?.isMock ?? true;
+  return {
+    ...q,
+    contributors: q.data?.data ?? fallback,
+    meta: { isMock, source: isMock ? MOCK_SOURCE : REAL_SOURCE, lastUpdated: q.dataUpdatedAt ? new Date(q.dataUpdatedAt).toISOString() : null } as DataMeta,
+  };
 }
 
 export function useBookingWindowSummary() {
+  const { mode } = useDataMode();
   return useQuery({
-    queryKey: ["booking-window-summary"],
-    queryFn: async ({ signal }) => endpoints.bookingWindowSummary(signal),
+    queryKey: ["booking-window-summary", mode],
+    queryFn: async ({ signal }) => (mode === "mock" ? [] : endpoints.bookingWindowSummary(signal)),
   });
 }
 
@@ -62,9 +120,23 @@ export function useSystemDiagnostics() {
 }
 
 export function useSystemTrust() {
-  return useQuery({
-    queryKey: ["system-trust"],
-    queryFn: async ({ signal }) => mapSystemTrust(await endpoints.systemDiagnostics(signal)),
-    placeholderData: mockSystemTrustMetrics,
+  const { mode } = useDataMode();
+  const q = useQuery({
+    queryKey: ["system-trust", mode],
+    queryFn: async ({ signal }) => {
+      if (mode === "mock") return { data: mockSystemTrustMetrics, isMock: true };
+      try {
+        return { data: mapSystemTrust(await endpoints.systemDiagnostics(signal)), isMock: false };
+      } catch {
+        return { data: mockSystemTrustMetrics, isMock: true };
+      }
+    },
+    placeholderData: { data: mockSystemTrustMetrics, isMock: true },
   });
+  const isMock = q.data?.isMock ?? true;
+  return {
+    ...q,
+    trust: q.data?.data ?? mockSystemTrustMetrics,
+    meta: { isMock, source: isMock ? MOCK_SOURCE : REAL_SOURCE, lastUpdated: q.dataUpdatedAt ? new Date(q.dataUpdatedAt).toISOString() : null } as DataMeta,
+  };
 }

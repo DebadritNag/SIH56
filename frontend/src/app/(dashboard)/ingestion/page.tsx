@@ -5,6 +5,7 @@ import { DownloadCloud, Play, CheckCircle2, RotateCw, Server, ArrowRight, Layers
 import { formatINR } from '@/lib/formatters';
 import { useDashboardSummary } from '@/lib/hooks/useDashboard';
 import { useRuns } from '@/lib/hooks/useResources';
+import { GenerateReportButton } from '@/components/data/GenerateReportButton';
 
 const PIPELINE_STAGES = [
   { name: 'COLLECT', count: '8,412', status: 'completed', desc: 'Raw HTTP & Browser extraction' },
@@ -59,7 +60,7 @@ export default function IngestionPage() {
   const [showRunConfirm, setShowRunConfirm] = React.useState(false);
   const [isTriggering, setIsTriggering] = React.useState(false);
 
-  const { data: summary } = useDashboardSummary();
+  const { summary } = useDashboardSummary();
   const { data: runsPage } = useRuns({ page_size: 10 });
 
   // Prefer real run history; fall back to the static demo runs when none exist yet.
@@ -107,6 +108,7 @@ export default function IngestionPage() {
             <Play className="w-3.5 h-3.5 fill-current" />
             <span>Run Collection Now</span>
           </button>
+          <GenerateReportButton exportType={'PIPELINE_RUN' as never} format={'CSV' as never} title="Data Ingestion Pipeline Report" />
           <span className="px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-300 font-bold text-xs rounded">
             ● SCHEDULER: RUNNING (Every 3 Hours)
           </span>

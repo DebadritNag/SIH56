@@ -91,12 +91,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = useCallback(
     async (email: string, password: string, captchaToken?: string) => {
       if (!supabase) return { error: "Authentication is not configured." };
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
         options: captchaToken ? { captchaToken } : undefined,
       });
-      return { error: error?.message ?? null };
+      if (error) return { error: error.message };
+      // Set session synchronously from the response so the redirect has it immediately,
+      // instead of waiting for the async onAuthStateChange event (fixes "sometimes it
+      // forgets and doesn't sign in").
+      if (data.session) {
+        setSession(data.session);
+        persistToken(data.session.access_token);
+      }
+      return { error: null };
     },
     [supabase],
   );
@@ -117,9 +125,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           ...(captchaToken ? { captchaToken } : {}),
         },
       });
+      if (error) return { error: error.message, needsConfirmation: false };
+
+      // Supabase does NOT error for an already-registered email (anti-enumeration). It
+      // returns an obfuscated user whose `identities` array is empty. Detect that and
+      // surface a clear "email already exists" instead of creating a duplicate.
+      const identities = data.user?.identities;
+      if (data.user && Array.isArray(identities) && identities.length === 0) {
+        return {
+          error: "An account with this email already exists. Please sign in instead.",
+          needsConfirmation: false,
+        };
+      }
+
+      // A real new signup with an active session → set it immediately.
+      if (data.session) {
+        setSession(data.session);
+        persistToken(data.session.access_token);
+      }
+
       // If email confirmation is enabled, there is a user but no active session yet.
       const needsConfirmation = Boolean(data.user) && !data.session;
-      return { error: error?.message ?? null, needsConfirmation };
+      return { error: null, needsConfirmation };
     },
     [supabase],
   );

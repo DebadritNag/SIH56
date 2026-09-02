@@ -6,6 +6,8 @@ import { Search, Bell, BookOpen, ShieldCheck, Presentation, Download, LogOut, Us
 import Link from 'next/link';
 import { DownloadCenterModal } from '../notifications/DownloadCenterModal';
 import { useAuth } from '@/lib/providers/AuthProvider';
+import { useDataMode } from '@/lib/providers/DataModeProvider';
+import { Database, FlaskConical } from 'lucide-react';
 
 interface TopCommandBarProps {
   onOpenCommandPalette?: () => void;
@@ -23,6 +25,7 @@ export const TopCommandBar: React.FC<TopCommandBarProps> = ({
   const pathname = usePathname();
   const router = useRouter();
   const { user, signOut } = useAuth();
+  const { mode, toggle: toggleDataMode } = useDataMode();
 
   const handleSignOut = async () => {
     await signOut();
@@ -65,6 +68,20 @@ export const TopCommandBar: React.FC<TopCommandBarProps> = ({
 
       {/* Right Telemetry & Status */}
       <div className="flex items-center gap-3.5">
+        {/* Real / Mock data mode toggle */}
+        <button
+          onClick={toggleDataMode}
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-bold border transition-all cursor-pointer ${
+            mode === 'real'
+              ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+              : 'bg-amber-100 text-amber-900 border-amber-400'
+          }`}
+          title={mode === 'real' ? 'Live data. Click to switch to demo (MOCK) data.' : 'MOCK demo data. Click to switch to Live data.'}
+        >
+          {mode === 'real' ? <Database className="w-3.5 h-3.5" /> : <FlaskConical className="w-3.5 h-3.5" />}
+          <span>{mode === 'real' ? 'LIVE DATA' : 'MOCK DATA'}</span>
+        </button>
+
         {/* Presentation Mode Toggle for SIH Judges */}
         {onTogglePresentationMode && (
           <button
