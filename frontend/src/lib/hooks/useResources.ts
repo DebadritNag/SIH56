@@ -1,14 +1,18 @@
 "use client";
 
 /**
- * Resource list hooks (anomalies, sources, fares, alerts, runs). Real data from FastAPI
- * with mock fallback where noted, plus pagination passthrough.
+ * Resource list hooks (anomalies, sources, fares, alerts, runs). Mode-aware:
+ *  - LIVE mode: fetch real data from FastAPI (returns exactly what the backend has —
+ *    empty if there are no rows; the page then shows its empty state). Falls back to
+ *    mock only on a hard network error.
+ *  - MOCK mode: return the built-in demo dataset (clearly labelled via the toggle).
  */
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 
 import { endpoints } from "@/lib/api/endpoints";
 import { mapAnomaly } from "@/lib/api/mappers";
 import { mockAnomalyList } from "@/lib/mock-data/dashboard";
+import { useDataMode } from "@/lib/providers/DataModeProvider";
 
 const MOCK_ANOMALY_META = {
   page: 1,
@@ -23,9 +27,11 @@ export function useAnomalies(params?: {
   page?: number;
   page_size?: number;
 }) {
+  const { mode } = useDataMode();
   return useQuery({
-    queryKey: ["anomalies", params],
+    queryKey: ["anomalies", mode, params],
     queryFn: async ({ signal }) => {
+      if (mode === "mock") return { items: mockAnomalyList, meta: MOCK_ANOMALY_META };
       try {
         const res = await endpoints.listAnomalies(
           {
@@ -36,27 +42,25 @@ export function useAnomalies(params?: {
           },
           signal,
         );
-        const items = res.items.map(mapAnomaly);
-        // The backend has no anomaly rows yet — fall back to the mock dataset so the
-        // UI shows representative data (real data replaces it once the backend has rows).
-        if (items.length === 0) {
-          return { items: mockAnomalyList, meta: MOCK_ANOMALY_META };
-        }
-        return { items, meta: res.meta };
+        // LIVE: return exactly what the backend has (may be empty → empty state shown).
+        return { items: res.items.map(mapAnomaly), meta: res.meta };
       } catch {
-        // Backend unreachable → keep showing the mock dataset instead of an empty list.
+        // Hard error only → show mock so the UI never breaks.
         return { items: mockAnomalyList, meta: MOCK_ANOMALY_META };
       }
     },
-    placeholderData: { items: mockAnomalyList, meta: MOCK_ANOMALY_META },
+    placeholderData: mode === "mock" ? { items: mockAnomalyList, meta: MOCK_ANOMALY_META } : undefined,
   });
 }
 
 export function useSources(params?: { page?: number; page_size?: number }) {
+  const { mode } = useDataMode();
   return useQuery({
-    queryKey: ["sources", params],
-    queryFn: async ({ signal }) =>
-      endpoints.listSources({ page: params?.page ?? 1, page_size: params?.page_size ?? 50 }, signal),
+    queryKey: ["sources", mode, params],
+    queryFn: async ({ signal }) => {
+      if (mode === "mock") return { items: [], meta: { page: 1, page_size: 50, total: 0, total_pages: 0 } };
+      return endpoints.listSources({ page: params?.page ?? 1, page_size: params?.page_size ?? 50 }, signal);
+    },
     placeholderData: keepPreviousData,
   });
 }
@@ -69,6 +73,8 @@ export function useSourceHealth(sourceId: string | undefined) {
   });
 }
 
+const EMPTY_PAGE = { items: [] as never[], meta: { page: 1, page_size: 25, total: 0, total_pages: 0 } };
+
 export function useFares(params?: {
   origin?: string;
   destination?: string;
@@ -78,10 +84,12 @@ export function useFares(params?: {
   page?: number;
   page_size?: number;
 }) {
+  const { mode } = useDataMode();
   return useQuery({
-    queryKey: ["fares", params],
-    queryFn: async ({ signal }) =>
-      endpoints.listFares(
+    queryKey: ["fares", mode, params],
+    queryFn: async ({ signal }) => {
+      if (mode === "mock") return EMPTY_PAGE as never;
+      return endpoints.listFares(
         {
           origin: params?.origin,
           destination: params?.destination,
@@ -92,46 +100,60 @@ export function useFares(params?: {
           page_size: params?.page_size ?? 25,
         },
         signal,
-      ),
+      );
+    },
     placeholderData: keepPreviousData,
   });
 }
 
 export function useAlerts(params?: { status?: string; page?: number; page_size?: number }) {
+  const { mode } = useDataMode();
   return useQuery({
-    queryKey: ["alerts", params],
-    queryFn: async ({ signal }) =>
-      endpoints.listAlerts(
+    queryKey: ["alerts", mode, params],
+    queryFn: async ({ signal }) => {
+      if (mode === "mock") return EMPTY_PAGE as never;
+      return endpoints.listAlerts(
         { status: params?.status, page: params?.page ?? 1, page_size: params?.page_size ?? 25 },
         signal,
-      ),
+      );
+    },
     placeholderData: keepPreviousData,
   });
 }
 
 export function useRuns(params?: { page?: number; page_size?: number }) {
+  const { mode } = useDataMode();
   return useQuery({
-    queryKey: ["runs", params],
-    queryFn: async ({ signal }) =>
-      endpoints.listRuns({ page: params?.page ?? 1, page_size: params?.page_size ?? 25 }, signal),
+    queryKey: ["runs", mode, params],
+    queryFn: async ({ signal }) => {
+      if (mode === "mock") return EMPTY_PAGE as never;
+      return endpoints.listRuns({ page: params?.page ?? 1, page_size: params?.page_size ?? 25 }, signal);
+    },
     placeholderData: keepPreviousData,
   });
 }
 
 export function useIngestionStatus() {
+  const { mode } = useDataMode();
   return useQuery({
-    queryKey: ["ingestion-status"],
+    queryKey: ["ingestion-status", mode],
     queryFn: async ({ signal }) => endpoints.ingestionStatus(signal),
     staleTime: 15_000,
+    enabled: mode === "real",
   });
 }
 
 import { RouteInsightDetail } from "@/types";
 
 export function useRouteInsights(routeCode: string) {
+  const { mode } = useDataMode();
   return useQuery<RouteInsightDetail>({
-    queryKey: ["route-intelligence", routeCode],
+    queryKey: ["route-intelligence", mode, routeCode],
     queryFn: async ({ signal }): Promise<RouteInsightDetail> => {
+      if (mode === "mock") {
+        const { getMockRouteDetail } = await import("@/lib/mock-data/dashboard");
+        return getMockRouteDetail(routeCode);
+      }
       try {
         const res = await endpoints.routeInsights(routeCode, signal);
         if (res && typeof res === "object" && (res as any).route_code) {
