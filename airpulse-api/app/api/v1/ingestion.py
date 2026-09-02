@@ -50,7 +50,7 @@ class ScrapingTestRequest(BaseModel):
 async def run_scraping_test(
     payload: ScrapingTestRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: UserContext = Depends(require_analyst),
+    current_user: UserContext = Depends(require_viewer),
 ):
     """
     Run a REAL live scraping verification against a source with the given filter.

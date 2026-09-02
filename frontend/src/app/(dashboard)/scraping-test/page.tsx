@@ -21,7 +21,6 @@ import { ScrapingTestStep, ScrapingTestResult } from '@/types';
 import { formatINR } from '@/lib/formatters';
 import { notify } from '@/lib/notify';
 import { endpoints } from '@/lib/api/endpoints';
-import { useDataMode } from '@/lib/providers/DataModeProvider';
 
 const INITIAL_STEPS: ScrapingTestStep[] = [
   { step_number: 1, title: 'Collector Initialized', status: 'pending', detail: 'ota01-v1.4.2 instance instantiated with ethical rate limiter (60 req/min)' },
@@ -48,15 +47,14 @@ export default function ScrapingTestPage() {
   const [steps, setSteps] = useState<ScrapingTestStep[]>(INITIAL_STEPS);
   const [testResult, setTestResult] = useState<ScrapingTestResult | null>(null);
   const [showRawJson, setShowRawJson] = useState(false);
-  const { mode: dataMode } = useDataMode();
 
   const STATUS_MAP: Record<string, ScrapingTestStep['status']> = {
     passed: 'completed', warning: 'completed', failed: 'failed',
   };
 
   const handleRunLiveTest = async () => {
-    // MOCK mode (or explicit failure simulation) uses the demo dataset, clearly labelled.
-    if (dataMode === 'mock' || simulateFailure) {
+    // Explicit failure simulation still uses the mock failure path.
+    if (simulateFailure) {
       runSimulated();
       return;
     }
@@ -187,12 +185,8 @@ export default function ScrapingTestPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <span className={`px-2.5 py-1 font-bold text-xs rounded uppercase tracking-wide border ${
-            dataMode === 'mock'
-              ? 'bg-amber-100 text-amber-900 border-amber-400'
-              : 'bg-emerald-50 text-emerald-800 border-emerald-300'
-          }`}>
-            {dataMode === 'mock' ? 'MOCK DATA • SIMULATED' : 'LIVE WEB REQUEST • REAL FETCH'}
+          <span className="px-2.5 py-1 font-bold text-xs rounded uppercase tracking-wide border bg-emerald-50 text-emerald-800 border-emerald-300">
+            LIVE WEB REQUEST • REAL FETCH
           </span>
         </div>
       </div>
@@ -258,7 +252,7 @@ export default function ScrapingTestPage() {
             </select>
           </div>
 
-          <div className="flex flex-col justify-end">
+          <div className="flex flex-col justify-end gap-1.5">
             <button
               onClick={handleRunLiveTest}
               disabled={isRunning}
@@ -275,6 +269,15 @@ export default function ScrapingTestPage() {
                   <span>RUN LIVE TEST</span>
                 </>
               )}
+            </button>
+            <button
+              onClick={runSimulated}
+              disabled={isRunning}
+              className="w-full h-[28px] flex items-center justify-center gap-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 text-[11px] font-bold rounded transition-colors disabled:opacity-50"
+              title="Run the demonstration probe using MOCK data"
+            >
+              <Layers className="w-3 h-3" />
+              <span>RUN DEMO (MOCK)</span>
             </button>
           </div>
         </div>
