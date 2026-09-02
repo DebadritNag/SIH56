@@ -130,6 +130,30 @@ async def _load_profile(db: AsyncSession, user_id: uuid.UUID) -> Optional[Profil
     return result.scalar_one_or_none()
 
 
+def _anonymous_viewer() -> AuthenticatedUser:
+    """Read-only anonymous principal for public dashboards when PUBLIC_READ is enabled.
+    Has viewer rank only — analyst/admin guards still reject it."""
+    return AuthenticatedUser(
+        user_id=uuid.UUID("00000000-0000-0000-0000-0000000000ff"),
+        email=None,
+        role=AppRole.VIEWER,
+        full_name="Anonymous Viewer",
+        active=True,
+    )
+
+
+def _anonymous_viewer() -> AuthenticatedUser:
+    """Read-only anonymous principal (viewer rank) for public dashboards when PUBLIC_READ
+    is enabled. Analyst/admin guards still reject it."""
+    return AuthenticatedUser(
+        user_id=uuid.UUID("00000000-0000-0000-0000-0000000000ff"),
+        email=None,
+        role=AppRole.VIEWER,
+        full_name="Anonymous Viewer",
+        active=True,
+    )
+
+
 def _demo_user() -> AuthenticatedUser:
     return AuthenticatedUser(
         user_id=uuid.UUID("00000000-0000-0000-0000-0000000000aa"),
@@ -154,30 +178,34 @@ async def get_current_user(
         if authorization and authorization.split(" ", 1)[-1].strip() == "demo-token":
             return _demo_user()
 
-    token = _extract_bearer(authorization)
-    claims = verify_supabase_jwt(token)
-
     try:
-        user_id = uuid.UUID(claims.sub)
-    except (ValueError, TypeError) as exc:
-        raise UnauthorizedException("Token 'sub' is not a valid UUID.") from exc
+        token = _extract_bearer(authorization)
+        claims = verify_supabase_jwt(token)
+        try:
+            user_id = uuid.UUID(claims.sub)
+        except (ValueError, TypeError) as exc:
+            raise UnauthorizedException("Token 'sub' is not a valid UUID.") from exc
 
-    profile = await _load_profile(db, user_id)
-    if profile is None:
-        # The auth trigger creates a profile row on signup; a missing row means the
-        # user is not provisioned in this system.
-        raise UnauthorizedException("No profile found for authenticated user.")
-    if not profile.active:
-        raise ForbiddenException("User profile is inactive.")
+        profile = await _load_profile(db, user_id)
+        if profile is None:
+            raise UnauthorizedException("No profile found for authenticated user.")
+        if not profile.active:
+            raise ForbiddenException("User profile is inactive.")
 
-    return AuthenticatedUser(
-        user_id=profile.id,
-        email=claims.email,
-        role=profile.role,
-        full_name=profile.full_name,
-        organization=profile.organization,
-        active=profile.active,
-    )
+        return AuthenticatedUser(
+            user_id=profile.id,
+            email=claims.email,
+            role=profile.role,
+            full_name=profile.full_name,
+            organization=profile.organization,
+            active=profile.active,
+        )
+    except (UnauthorizedException, ForbiddenException):
+        # Public read mode: allow anonymous read-only access to viewer endpoints.
+        # Analyst/admin dependencies still reject the anonymous viewer.
+        if settings.PUBLIC_READ:
+            return _anonymous_viewer()
+        raise
 
 
 async def get_optional_user(

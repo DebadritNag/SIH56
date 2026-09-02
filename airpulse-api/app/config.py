@@ -54,6 +54,10 @@ class Settings(BaseSettings):
     # require a valid captcha token. Automatically enforced in production if a secret is set.
     HCAPTCHA_ENABLED: bool = False
 
+    # When true, read-only endpoints (require_viewer) accept anonymous requests as a
+    # read-only viewer. Analyst/admin actions still require a real authenticated user.
+    PUBLIC_READ: bool = True
+
     # Redis & Celery
     REDIS_URL: str = "redis://localhost:6379/0"
     CELERY_BROKER_URL: str = "redis://localhost:6379/0"
