@@ -326,6 +326,5 @@ async def sync_reference_dataset(
     current_user: UserContext = Depends(require_analyst),
 ):
     service = ReferenceDataService(db)
-    mospi_ds = await service.sync_mospi_dataset()
-    dgca_ds = await service.sync_dgca_traffic()
-    return APIResponse(success=True, data={"synced_datasets": [str(mospi_ds.id), str(dgca_ds.id)]})
+    result = await service.sync_mospi_datasets(trigger_type="manual", actor_id=getattr(current_user, "user_id", None))
+    return APIResponse(success=True, data=result)

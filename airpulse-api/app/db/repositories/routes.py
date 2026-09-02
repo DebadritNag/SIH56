@@ -19,7 +19,7 @@ class RouteRepository:
 
     async def get_by_origin_dest(self, origin: str, dest: str) -> Optional[Route]:
         result = await self.session.execute(
-            select(Route).where(Route.origin_code == origin, Route.destination_code == dest)
+            select(Route).where(Route.route_code == f"{origin.upper()}-{dest.upper()}")
         )
         return result.scalars().first()
 

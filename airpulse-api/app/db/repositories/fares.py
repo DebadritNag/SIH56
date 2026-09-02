@@ -39,11 +39,11 @@ class FareRepository:
     ) -> Tuple[List[ValidatedFare], int]:
         conditions = []
         if filters.origin:
-            conditions.append(ValidatedFare.origin_code == filters.origin.upper())
+            conditions.append(ValidatedFare.origin == filters.origin.upper())
         if filters.destination:
-            conditions.append(ValidatedFare.destination_code == filters.destination.upper())
+            conditions.append(ValidatedFare.destination == filters.destination.upper())
         if filters.airline:
-            conditions.append(ValidatedFare.airline_code == filters.airline.upper())
+            conditions.append(ValidatedFare.airline == filters.airline.upper())
         if filters.date_from:
             conditions.append(func.date(ValidatedFare.departure_at) >= filters.date_from)
         if filters.date_to:

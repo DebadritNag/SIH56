@@ -16,7 +16,17 @@ from sqlalchemy import (
     UniqueConstraint,
     Index,
 )
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import ENUM as PGEnum, JSONB, UUID
+
+# Bind to the EXISTING Postgres enum type (do not let SQLAlchemy try to CREATE it).
+_DataOriginType = PGEnum(
+    "LIVE", "REPLAY", "SYNTHETIC", "IMPORTED", "REFERENCE",
+    name="data_origin", create_type=False,
+)
+_ValidationStatusType = PGEnum(
+    "VALID", "WARNING", "REJECTED",
+    name="validation_status", create_type=False,
+)
 from sqlalchemy.orm import declarative_base, relationship
 
 from app.core.utils import utc_now
@@ -45,20 +55,12 @@ class Route(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     origin_airport_id = Column(UUID(as_uuid=True), ForeignKey("airports.id"), nullable=True, index=True)
     destination_airport_id = Column(UUID(as_uuid=True), ForeignKey("airports.id"), nullable=True, index=True)
-    origin_code = Column(String(3), nullable=False, index=True)
-    destination_code = Column(String(3), nullable=False, index=True)
-    route_code = Column(String(10), unique=True, nullable=False, index=True)  # Directional: DEL-BOM
-    market_code = Column(String(10), nullable=False, index=True)  # Undirected city pair: BOM-DEL
-    distance_km = Column(Float, nullable=False)
-    domestic = Column(Boolean, default=True, nullable=False)
+    route_code = Column(Text, unique=True, nullable=False, index=True)  # Directional: DEL-BOM
+    market_code = Column(Text, nullable=True, index=True)  # Undirected city pair: BOM-DEL
+    distance_km = Column(Float, nullable=True)
     active = Column(Boolean, default=True, nullable=False)
-    weight = Column(Float, nullable=True)  # Traffic share from official DGCA data
     created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
-
-    __table_args__ = (
-        UniqueConstraint("origin_code", "destination_code", name="uq_origin_destination"),
-    )
 
 
 class Source(Base):
@@ -173,19 +175,21 @@ class RawFare(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     collection_run_id = Column(UUID(as_uuid=True), ForeignKey("collection_runs.id"), nullable=True, index=True)
-    source_id = Column(UUID(as_uuid=True), ForeignKey("sources.id"), nullable=False, index=True)
-    request_id = Column(UUID(as_uuid=True), nullable=False, index=True)
-    origin_requested = Column(String(3), nullable=False)
-    destination_requested = Column(String(3), nullable=False)
-    departure_requested = Column(Date, nullable=False)
-    booking_window_requested = Column(Integer, nullable=False)
+    scraping_test_run_id = Column(UUID(as_uuid=True), nullable=True, index=True)
+    source_id = Column(UUID(as_uuid=True), ForeignKey("sources.id"), nullable=True, index=True)
+    request_id = Column(UUID(as_uuid=True), nullable=True, index=True)
+    data_origin = Column(_DataOriginType, nullable=True)
+    origin_requested = Column(String(3), nullable=True)
+    destination_requested = Column(String(3), nullable=True)
+    departure_requested = Column(Date, nullable=True)
+    booking_window_requested = Column(Integer, nullable=True)
     collected_at = Column(DateTime(timezone=True), default=utc_now, nullable=False, index=True)
     http_status = Column(Integer, nullable=True)
-    raw_payload = Column(JSONB, nullable=False)  # IMMUTABLE after insert
-    raw_html_storage_path = Column(String(500), nullable=True)
-    response_hash = Column(String(64), nullable=False)  # SHA-256
-    collector_version = Column(String(50), default="1.0.0", nullable=False)
-    parser_version = Column(String(50), default="1.0.0", nullable=False)
+    raw_payload = Column(JSONB, nullable=True)  # IMMUTABLE after insert
+    raw_storage_path = Column(Text, nullable=True)
+    response_hash = Column(Text, nullable=True)  # SHA-256
+    collector_version = Column(Text, default="1.0.0", nullable=True)
+    parser_version = Column(Text, default="1.0.0", nullable=True)
     created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
 
 
@@ -193,34 +197,35 @@ class ValidatedFare(Base):
     __tablename__ = "validated_fares"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    raw_fare_id = Column(UUID(as_uuid=True), ForeignKey("raw_fares.id"), nullable=False, index=True)
+    raw_fare_id = Column(UUID(as_uuid=True), ForeignKey("raw_fares.id"), nullable=True, index=True)
     collection_run_id = Column(UUID(as_uuid=True), ForeignKey("collection_runs.id"), nullable=True, index=True)
-    source_id = Column(UUID(as_uuid=True), ForeignKey("sources.id"), nullable=False, index=True)
-    route_id = Column(UUID(as_uuid=True), ForeignKey("routes.id"), nullable=False, index=True)
-    airline = Column(String(10), nullable=False, index=True)
-    flight_number = Column(String(20), nullable=True)
+    source_id = Column(UUID(as_uuid=True), ForeignKey("sources.id"), nullable=True, index=True)
+    route_id = Column(UUID(as_uuid=True), ForeignKey("routes.id"), nullable=True, index=True)
+    fare_product_id = Column(UUID(as_uuid=True), ForeignKey("fare_products.id"), nullable=True)
+    data_origin = Column(_DataOriginType, nullable=True)
+    airline = Column(Text, nullable=False, index=True)
+    flight_number = Column(Text, nullable=True)
     origin = Column(String(3), nullable=False, index=True)
     destination = Column(String(3), nullable=False, index=True)
     departure_at = Column(DateTime(timezone=True), nullable=False, index=True)
     arrival_at = Column(DateTime(timezone=True), nullable=True)
-    booking_window_days = Column(Integer, nullable=False, index=True)
-    cabin = Column(String(20), default="economy", nullable=False)
-    fare_class = Column(String(20), nullable=True)
-    fare_product_id = Column(UUID(as_uuid=True), ForeignKey("fare_products.id"), nullable=True)
+    booking_window_days = Column(Integer, nullable=True, index=True)
+    cabin = Column(Text, default="economy", nullable=True)
+    fare_class = Column(Text, nullable=True)
     refundable = Column(Boolean, default=False, nullable=True)
-    baggage_allowance = Column(Float, default=15.0, nullable=True)
-    base_fare = Column(Numeric(10, 2), nullable=False)
-    taxes = Column(Numeric(10, 2), nullable=False)
-    mandatory_fees = Column(Numeric(10, 2), nullable=False)
+    baggage_allowance = Column(Text, nullable=True)
+    base_fare = Column(Numeric(10, 2), nullable=True)
+    taxes = Column(Numeric(10, 2), nullable=True)
+    mandatory_fees = Column(Numeric(10, 2), nullable=True)
     convenience_fee = Column(Numeric(10, 2), nullable=True, default=0.0)
     total_fare = Column(Numeric(10, 2), nullable=False)
     normalized_total_fare = Column(Numeric(10, 2), nullable=False)  # base + taxes + mandatory fees
     currency = Column(String(3), default="INR", nullable=False)
-    validation_status = Column(String(20), nullable=False, index=True)  # valid, warning, rejected
+    validation_status = Column(_ValidationStatusType, nullable=False, index=True)  # VALID, WARNING, REJECTED
     validation_errors = Column(JSONB, nullable=True)
     duplicate_group_id = Column(UUID(as_uuid=True), nullable=True, index=True)
     is_duplicate = Column(Boolean, default=False, nullable=False, index=True)
-    quote_hash = Column(String(64), unique=True, nullable=False, index=True)  # Deterministic SHA-256
+    quote_hash = Column(Text, unique=True, nullable=False, index=True)  # Deterministic SHA-256
     collected_at = Column(DateTime(timezone=True), nullable=False)
     created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
 
@@ -243,16 +248,79 @@ class ReferenceDataset(Base):
     source_id = Column(UUID(as_uuid=True), ForeignKey("sources.id"), nullable=True, index=True)
     dataset_name = Column(String(255), nullable=False)
     dataset_code = Column(String(100), nullable=True, index=True)
+    external_dataset_id = Column(String(200), nullable=True)
     dataset_version = Column(String(50), nullable=False)
-    reference_period_start = Column(Date, nullable=False)
-    reference_period_end = Column(Date, nullable=False)
+    reference_period_start = Column(Date, nullable=True)
+    reference_period_end = Column(Date, nullable=True)
     retrieved_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
-    source_url = Column(String(500), nullable=True)
-    checksum = Column(String(64), nullable=False)  # SHA-256
-    file_path = Column(String(500), nullable=True)
-    format = Column(String(20), default="json", nullable=False)  # json, csv, xlsx
-    status = Column(String(20), default="verified", nullable=False)
-    dataset_metadata = Column(JSONB, nullable=True)
+    source_url = Column(Text, nullable=True)
+    download_url = Column(Text, nullable=True)
+    api_url = Column(Text, nullable=True)
+    landing_page_url = Column(Text, nullable=True)
+    product_name = Column(Text, nullable=True)
+    dataset_type = Column(Text, nullable=True)
+    frequency = Column(Text, nullable=True)
+    relevance = Column(Text, default="MEDIUM", nullable=True)
+    checksum = Column(Text, nullable=False)  # SHA-256
+    storage_bucket = Column(Text, default="reference-datasets", nullable=True)
+    storage_path = Column(Text, nullable=True)
+    file_format = Column(Text, default="json", nullable=True)  # json, csv, xlsx
+    status = Column(Text, default="DISCOVERED", nullable=False)
+    row_count = Column(Integer, nullable=True)
+    column_count = Column(Integer, nullable=True)
+    schema_fingerprint = Column(Text, nullable=True)
+    current_version_id = Column(UUID(as_uuid=True), nullable=True)
+    dataset_metadata = Column("metadata", JSONB, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=True)
+
+
+class ReferenceDatasetVersion(Base):
+    __tablename__ = "reference_dataset_versions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    reference_dataset_id = Column(UUID(as_uuid=True), ForeignKey("reference_datasets.id"), nullable=False, index=True)
+    version_label = Column(Text, nullable=False)
+    version_sequence = Column(Integer, default=1, nullable=False)
+    reference_period = Column(Text, nullable=True)
+    source_url = Column(Text, nullable=True)
+    download_url = Column(Text, nullable=True)
+    api_url = Column(Text, nullable=True)
+    retrieved_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
+    published_at = Column(DateTime(timezone=True), nullable=True)
+    checksum_sha256 = Column(Text, nullable=False)
+    file_size_bytes = Column(Integer, nullable=True)
+    row_count = Column(Integer, nullable=True)
+    column_count = Column(Integer, nullable=True)
+    schema_fingerprint = Column(Text, nullable=True)
+    storage_bucket = Column(Text, default="reference-datasets", nullable=True)
+    storage_path = Column(Text, nullable=True)
+    file_format = Column(Text, nullable=True)
+    status = Column(Text, default="SYNCED", nullable=False)
+    version_metadata = Column("metadata", JSONB, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
+class ReferenceSyncRun(Base):
+    __tablename__ = "reference_sync_runs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    official_source_id = Column(UUID(as_uuid=True), ForeignKey("sources.id"), nullable=True, index=True)
+    reference_dataset_id = Column(UUID(as_uuid=True), ForeignKey("reference_datasets.id"), nullable=True)
+    trigger_type = Column(Text, default="manual", nullable=False)
+    triggered_by = Column(UUID(as_uuid=True), nullable=True)
+    started_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
+    finished_at = Column(DateTime(timezone=True), nullable=True)
+    status = Column(Text, default="RUNNING", nullable=False)
+    datasets_discovered = Column(Integer, default=0, nullable=True)
+    datasets_checked = Column(Integer, default=0, nullable=True)
+    datasets_downloaded = Column(Integer, default=0, nullable=True)
+    datasets_updated = Column(Integer, default=0, nullable=True)
+    datasets_unchanged = Column(Integer, default=0, nullable=True)
+    datasets_failed = Column(Integer, default=0, nullable=True)
+    bytes_downloaded = Column(Integer, default=0, nullable=True)
+    error_summary = Column(Text, nullable=True)
+    run_metadata = Column("metadata", JSONB, nullable=True)
     created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
 
 
@@ -262,11 +330,11 @@ class RouteTrafficWeight(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     reference_dataset_id = Column(UUID(as_uuid=True), ForeignKey("reference_datasets.id"), nullable=True, index=True)
     route_id = Column(UUID(as_uuid=True), ForeignKey("routes.id"), nullable=False, index=True)
-    period = Column(String(50), nullable=False)
+    period_start = Column(Date, nullable=True)
+    period_end = Column(Date, nullable=True)
     passenger_count = Column(Integer, nullable=True)
     traffic_share = Column(Float, nullable=False)
     weight = Column(Float, nullable=False)
-    source = Column(String(100), default="DGCA", nullable=False)
     created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
 
 
@@ -278,12 +346,11 @@ class BenchmarkFare(Base):
     route_id = Column(UUID(as_uuid=True), ForeignKey("routes.id"), nullable=True, index=True)
     period_start = Column(Date, nullable=False)
     period_end = Column(Date, nullable=False)
-    average_fare = Column(Float, nullable=True)
-    median_fare = Column(Float, nullable=True)
     benchmark_type = Column(String(50), nullable=False)  # dgca_route_avg, mospi_cpi_transport
     value = Column(Float, nullable=False)
     unit = Column(String(20), default="INR", nullable=False)
-    benchmark_metadata = Column(JSONB, nullable=True)
+    benchmark_metadata = Column("metadata", JSONB, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=utc_now, nullable=True)
 
 
 class FareFeature(Base):
@@ -446,14 +513,14 @@ class AuditEvent(Base):
     __tablename__ = "audit_events"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    actor_id = Column(String(100), nullable=True, index=True)
+    actor_id = Column(UUID(as_uuid=True), nullable=True, index=True)
     action = Column(String(100), nullable=False, index=True)
     entity_type = Column(String(50), nullable=False, index=True)
     entity_id = Column(String(100), nullable=False, index=True)
     request_id = Column(String(100), nullable=True)
     before_state = Column(JSONB, nullable=True)
     after_state = Column(JSONB, nullable=True)
-    event_metadata = Column(JSONB, nullable=True)
+    event_metadata = Column("metadata", JSONB, nullable=True)
     created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False, index=True)
 
 
@@ -478,15 +545,20 @@ class BacktestRun(Base):
     __tablename__ = "backtest_runs"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name = Column(String(255), nullable=False)
-    start_date = Column(Date, nullable=False)
-    end_date = Column(Date, nullable=False)
-    benchmark_source = Column(String(100), nullable=False)
-    methodology_version = Column(String(50), nullable=False)
-    status = Column(String(20), default="running", nullable=False)
+    started_by = Column(UUID(as_uuid=True), nullable=True)
+    started_at = Column(DateTime(timezone=True), default=utc_now, nullable=True)
+    finished_at = Column(DateTime(timezone=True), nullable=True)
+    status = Column(Text, default="running", nullable=False)
+    period_start = Column(Date, nullable=True)
+    period_end = Column(Date, nullable=True)
+    benchmark_dataset_id = Column(UUID(as_uuid=True), nullable=True)
+    methodology_version = Column(Text, nullable=True)
+    basket_version = Column(Text, nullable=True)
+    fareguard_version = Column(Text, nullable=True)
+    priceguard_version = Column(Text, nullable=True)
     metrics = Column(JSONB, nullable=True)
+    error_summary = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
-    completed_at = Column(DateTime(timezone=True), nullable=True)
 
 
 class SourceHealthLog(Base):

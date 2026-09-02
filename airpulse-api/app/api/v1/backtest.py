@@ -22,11 +22,12 @@ async def run_backtest(
 ):
     service = BacktestService(db)
     run = await service.execute_backtest(
-        name=req.name,
         start_date=req.start_date,
         end_date=req.end_date,
-        benchmark_source=req.benchmark_source,
+        benchmark_dataset_id=req.benchmark_dataset_id,
+        benchmark_type=req.benchmark_type,
         methodology_version=req.methodology_version or "apix-v1.2",
+        actor_id=getattr(current_user, "user_id", None),
     )
     await db.commit()
     return APIResponse(success=True, data=BacktestResponse.model_validate(run))

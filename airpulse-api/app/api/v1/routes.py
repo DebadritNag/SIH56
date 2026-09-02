@@ -61,11 +61,12 @@ async def get_route_insights(
     if not route:
         raise EntityNotFoundException("Route", route_id)
 
+    _rc = (route.route_code or "-").split("-")
     insights = RouteInsights(
         route_code=route.route_code,
-        origin_code=route.origin_code,
-        destination_code=route.destination_code,
-        distance_km=route.distance_km,
+        origin_code=_rc[0] if len(_rc) > 0 else "",
+        destination_code=_rc[1] if len(_rc) > 1 else "",
+        distance_km=route.distance_km or 0.0,
         current_median_fare=5420.0,
         previous_day_change_pct=0.85,
         previous_week_change_pct=2.40,

@@ -13,26 +13,38 @@ class AuditService:
     def __init__(self, session: AsyncSession):
         self.session = session
 
+    @staticmethod
+    def _coerce_actor(actor_id: Optional[str]) -> Optional[UUID]:
+        """actor_id is a uuid column; anonymous/system actors are recorded as NULL."""
+        if not actor_id:
+            return None
+        try:
+            return UUID(str(actor_id))
+        except (ValueError, TypeError):
+            return None
+
     async def log_event(
         self,
-        actor_id: str,
+        actor_id: Optional[str],
         action: str,
         entity_type: str,
         entity_id: str,
         before_state: Optional[Dict[str, Any]] = None,
         after_state: Optional[Dict[str, Any]] = None,
         request_id: Optional[str] = None,
+        event_metadata: Optional[Dict[str, Any]] = None,
     ) -> AuditEvent:
         event = AuditEvent(
             id=uuid4(),
-            actor_id=actor_id,
+            actor_id=self._coerce_actor(actor_id),
             action=action,
             entity_type=entity_type,
             entity_id=entity_id,
             before_state=before_state,
             after_state=after_state,
             request_id=request_id,
-            timestamp=utc_now(),
+            event_metadata=event_metadata,
+            created_at=utc_now(),
         )
         self.session.add(event)
         await self.session.flush()

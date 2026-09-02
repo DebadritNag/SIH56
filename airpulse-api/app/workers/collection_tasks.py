@@ -46,12 +46,6 @@ def sync_all_government_references():
     async def _async_run():
         async with AsyncSessionLocal() as session:
             ref_srv = ReferenceDataService(session)
-            mospi = await ref_srv.sync_mospi_dataset()
-            dgca = await ref_srv.sync_dgca_traffic()
-            return {
-                "mospi_dataset_id": str(mospi.id),
-                "dgca_dataset_id": str(dgca.id),
-                "status": "completed",
-            }
+            return await ref_srv.sync_mospi_datasets(trigger_type="scheduled")
 
     return asyncio.run(_async_run())
