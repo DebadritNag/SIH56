@@ -27,7 +27,10 @@ export function DataModeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const saved = typeof window !== "undefined" ? window.localStorage.getItem(STORAGE_KEY) : null;
-    if (saved === "mock" || saved === "real") setModeState(saved);
+    if (saved === "mock" || saved === "real") {
+      const t = setTimeout(() => setModeState(saved), 0);
+      return () => clearTimeout(t);
+    }
   }, []);
 
   const setMode = (m: DataMode) => {
