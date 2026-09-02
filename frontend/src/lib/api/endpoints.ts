@@ -127,14 +127,14 @@ export interface BackendIngestionStatus {
 // --- Endpoint functions ------------------------------------------------------
 export const endpoints = {
   // Dashboard
-  dashboardSummary: (signal?: AbortSignal) =>
-    getData<BackendDashboardSummary>("/dashboard/summary", undefined, signal),
-  indexTrend: (signal?: AbortSignal) =>
-    getData<BackendIndexTrendPoint[]>("/dashboard/index-trend", undefined, signal),
-  topRouteMovements: (signal?: AbortSignal) =>
-    getData<BackendRouteMovement[]>("/dashboard/top-route-movements", undefined, signal),
-  bookingWindowSummary: (signal?: AbortSignal) =>
-    getData<BackendBookingWindow[]>("/dashboard/booking-window-summary", undefined, signal),
+  dashboardSummary: (query?: Record<string, string | number | undefined>, signal?: AbortSignal) =>
+    getData<BackendDashboardSummary>("/dashboard/summary", query, signal),
+  indexTrend: (query?: Record<string, string | number | undefined>, signal?: AbortSignal) =>
+    getData<BackendIndexTrendPoint[]>("/dashboard/index-trend", query, signal),
+  topRouteMovements: (query?: Record<string, string | number | undefined>, signal?: AbortSignal) =>
+    getData<BackendRouteMovement[]>("/dashboard/top-route-movements", query, signal),
+  bookingWindowSummary: (query?: Record<string, string | number | undefined>, signal?: AbortSignal) =>
+    getData<BackendBookingWindow[]>("/dashboard/booking-window-summary", query, signal),
 
   // Index (APIx)
   latestIndex: (signal?: AbortSignal) => getData<unknown>("/index/latest", undefined, signal),

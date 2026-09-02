@@ -8,6 +8,7 @@ interface EChartWrapperProps {
   style?: React.CSSProperties;
   className?: string;
   loading?: boolean;
+  notMerge?: boolean;
 }
 
 export const EChartWrapper: React.FC<EChartWrapperProps> = ({
@@ -15,6 +16,7 @@ export const EChartWrapper: React.FC<EChartWrapperProps> = ({
   style = { height: '320px', width: '100%' },
   className,
   loading = false,
+  notMerge = true,
 }) => {
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstanceRef = useRef<ECharts | null>(null);
@@ -40,7 +42,7 @@ export const EChartWrapper: React.FC<EChartWrapperProps> = ({
         });
       }
 
-      chartInstanceRef.current.setOption(option, true);
+      chartInstanceRef.current.setOption(option, notMerge);
 
       if (loading) {
         chartInstanceRef.current.showLoading({

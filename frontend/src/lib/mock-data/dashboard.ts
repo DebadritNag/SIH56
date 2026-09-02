@@ -438,3 +438,107 @@ export const mockBacktestPoints = [
   { month: 'Aug 24', apix: 108.4, cpi_transport: 107.1, dgca_fare: 108.0 },
 ];
 
+export function getFilteredMockDashboardSummary(filters?: {
+  bookingWindows?: number[];
+  routeIds?: string[];
+  sourceIds?: string[];
+  dateRange?: { from: string; to: string; preset?: string };
+}): DashboardSummary {
+  const windows = filters?.bookingWindows?.length ? filters.bookingWindows : [1, 7, 15, 30, 45];
+  const windowBias: Record<number, number> = { 1: 3.8, 7: 1.2, 15: 0.1, 30: -1.2, 45: -2.8 };
+  const biasOffset = windows.reduce((acc, w) => acc + (windowBias[w] ?? 0), 0) / windows.length;
+
+  let routeBias = 0;
+  if (filters?.routeIds?.length) {
+    if (filters.routeIds.includes('DEL-BOM')) routeBias += 2.4;
+    else if (filters.routeIds.includes('BOM-GOI')) routeBias -= 4.2;
+  }
+
+  const computedIndex = Number((108.43 + biasOffset + routeBias).toFixed(2));
+  const dailyChange = Number((1.24 + biasOffset * 0.15).toFixed(2));
+  const monthlyChange = Number((4.82 + biasOffset * 0.4).toFixed(2));
+
+  let pressure: DashboardSummary['market_pressure'] = 'ELEVATED';
+  if (computedIndex > 111.0) pressure = 'HIGH PRESSURE';
+  else if (computedIndex > 107.0) pressure = 'ELEVATED';
+  else if (computedIndex < 103.0) pressure = 'STABLE';
+
+  const baseQuotes = 28452;
+  const quotesCount = Math.round(baseQuotes * (windows.length / 5.0));
+
+  return {
+    ...mockDashboardSummary,
+    latest_index: computedIndex,
+    daily_change_pct: dailyChange,
+    monthly_change_pct: monthlyChange,
+    quotes_24h: quotesCount,
+    active_routes: filters?.routeIds?.length ? filters.routeIds.length : 81,
+    healthy_sources: filters?.sourceIds?.length ? filters.sourceIds.length : 4,
+    coverage_quality_score: Number(Math.max(0.70, Math.min(0.99, 0.948 - (5 - windows.length) * 0.03)).toFixed(3)),
+    market_pressure: pressure,
+    data_confidence_pct: Number(Math.max(70.0, Math.min(99.0, 94.8 - (5 - windows.length) * 3.0)).toFixed(1)),
+  };
+}
+
+export function getFilteredMockNationalTrend(filters?: {
+  bookingWindows?: number[];
+  routeIds?: string[];
+  sourceIds?: string[];
+  compareMode?: string | null;
+  dateRange?: { from: string; to: string; preset?: string };
+}): NationalTrendPoint[] {
+  const windows = filters?.bookingWindows?.length ? filters.bookingWindows : [1, 7, 15, 30, 45];
+  const windowBias: Record<number, number> = { 1: 3.8, 7: 1.2, 15: 0.1, 30: -1.2, 45: -2.8 };
+  const biasOffset = windows.reduce((acc, w) => acc + (windowBias[w] ?? 0), 0) / windows.length;
+
+  let routeBias = 0;
+  if (filters?.routeIds?.length) {
+    if (filters.routeIds.includes('DEL-BOM')) routeBias += 1.8;
+    else if (filters.routeIds.includes('BOM-GOI')) routeBias -= 3.0;
+  }
+
+  // Subset points based on preset
+  let points = [...mockNationalTrend];
+  if (filters?.dateRange?.preset === '7D') {
+    points = points.slice(-7);
+  }
+
+  return points.map((p) => {
+    const adjApix = Number((p.apix + biasOffset + routeBias).toFixed(2));
+    const coverage = Number(Math.max(75, p.coverage_pct - (5 - windows.length) * 2.5).toFixed(1));
+    return {
+      ...p,
+      apix: adjApix,
+      coverage_pct: coverage,
+    };
+  });
+}
+
+export function getFilteredMockRouteContributors(filters?: {
+  bookingWindows?: number[];
+  routeIds?: string[];
+}): { up: RouteContributor[]; down: RouteContributor[] } {
+  const windows = filters?.bookingWindows?.length ? filters.bookingWindows : [1, 7, 15, 30, 45];
+  const windowMult = windows.reduce((acc, w) => acc + w, 0) / (1 + 7 + 15 + 30 + 45);
+
+  let up = mockUpwardContributors.map((c) => ({
+    ...c,
+    change_pct: Number((c.change_pct * windowMult).toFixed(1)),
+    apix_contribution: Number((c.apix_contribution * windowMult).toFixed(2)),
+  }));
+
+  let down = mockDownwardContributors.map((c) => ({
+    ...c,
+    change_pct: Number((c.change_pct * windowMult).toFixed(1)),
+    apix_contribution: Number((c.apix_contribution * windowMult).toFixed(2)),
+  }));
+
+  if (filters?.routeIds?.length) {
+    const rSet = new Set(filters.routeIds);
+    up = up.filter((c) => rSet.has(c.route));
+    down = down.filter((c) => rSet.has(c.route));
+  }
+
+  return { up, down };
+}
+

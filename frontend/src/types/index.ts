@@ -282,3 +282,17 @@ export interface ExportDownloadInfo {
   checksum_sha256?: string;
   expires_at?: string;
 }
+
+export type DateRangePreset = '7D' | '30D' | '3M' | '6M' | '1Y' | 'BASE_AUG2026';
+
+export interface DashboardFilters {
+  dateRange: {
+    from: string;
+    to: string;
+    preset?: DateRangePreset | string;
+  };
+  routeIds: string[];
+  sourceIds: string[];
+  bookingWindows: number[];
+  compareMode?: string | null;
+}

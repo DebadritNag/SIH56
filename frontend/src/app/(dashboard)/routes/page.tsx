@@ -34,6 +34,7 @@ export default function RoutesPage() {
   const urlRoute = searchParams.get('route');
 
   const [selectedRouteCode, setSelectedRouteCode] = useState(urlRoute || 'DEL-BOM');
+  const [selectedWindows, setSelectedWindows] = useState<number[]>([1, 7, 15, 30, 45]);
   const [showExport, setShowExport] = useState(false);
 
   useEffect(() => {
@@ -91,6 +92,34 @@ export default function RoutesPage() {
               </option>
             ))}
           </select>
+
+          {/* T+ Booking Window Buttons */}
+          <div className="flex items-center gap-1 bg-[#F1F5F9] p-0.5 rounded border border-[#E2E8F0]">
+            {[1, 7, 15, 30, 45].map((w) => {
+              const active = selectedWindows.includes(w);
+              return (
+                <button
+                  key={w}
+                  type="button"
+                  onClick={() => {
+                    if (active) {
+                      if (selectedWindows.length === 1) return;
+                      setSelectedWindows(selectedWindows.filter((x) => x !== w));
+                    } else {
+                      setSelectedWindows([...selectedWindows, w].sort((a, b) => a - b));
+                    }
+                  }}
+                  className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-all cursor-pointer ${
+                    active ? 'bg-white text-blue-700 shadow-2xs border border-blue-200' : 'text-[#94A3B8] hover:text-[#475467]'
+                  }`}
+                  title={`Toggle T+${w} window`}
+                >
+                  T+{w}
+                </button>
+              );
+            })}
+          </div>
+
           <button
             onClick={() => setShowExport(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#D0D5DD] text-xs font-semibold text-[#101828] rounded shadow-2xs hover:bg-slate-50 transition-colors cursor-pointer"
@@ -184,7 +213,10 @@ export default function RoutesPage() {
             </span>
           </div>
 
-          <RouteAdvancePurchaseChart curveData={route.advance_purchase_curve} />
+          <RouteAdvancePurchaseChart
+            curveData={route.advance_purchase_curve}
+            selectedWindows={selectedWindows}
+          />
         </div>
       </div>
 
