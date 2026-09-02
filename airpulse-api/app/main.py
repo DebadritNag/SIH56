@@ -20,8 +20,14 @@ async def lifespan(app: FastAPI):
     # Schema is owned exclusively by Alembic migrations (single source of truth) —
     # the application never runs create_all against Supabase PostgreSQL.
     setup_logging(settings.LOG_LEVEL)
-    async with engine.connect() as conn:
-        await conn.execute(text("SELECT 1"))
+    # Verify DB connectivity but never block startup on a transient DB hiccup
+    # (Render health checks must be able to reach the app immediately).
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+    except Exception as exc:  # noqa: BLE001
+        import logging
+        logging.getLogger("airpulse").warning("DB not reachable at startup: %s", exc)
     yield
     # Shutdown
     await engine.dispose()

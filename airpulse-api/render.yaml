@@ -1,0 +1,51 @@
+services:
+  - type: web
+    name: airpulse-api
+    runtime: python
+    region: singapore
+    plan: free
+    rootDir: airpulse-api
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: ENVIRONMENT
+        value: production
+      - key: APP_ENV
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: LOG_LEVEL
+        value: INFO
+      - key: AUTH_STRICT
+        value: "true"
+      # CORS: set to your deployed frontend origin(s), comma-separated
+      - key: CORS_ORIGINS
+        value: '["http://localhost:3000"]'
+      # ---- Secrets: set these in the Render dashboard (sync:false = not in repo) ----
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_POOL_URL
+        sync: false
+      - key: DATABASE_URL_SYNC
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_PROJECT_REF
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: HCAPTCHA_SECRET
+        sync: false
+      - key: HCAPTCHA_SITEKEY
+        sync: false
+      - key: HCAPTCHA_ENABLED
+        value: "true"
+      - key: REDIS_URL
+        sync: false
