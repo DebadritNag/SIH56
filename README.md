@@ -16,7 +16,9 @@ AirPulse is **not** a flight-booking app. It is a government-grade analytics pla
 
 ## What it does
 
-1. Automatically collects domestic airfare quotes across configured airlines and OTAs.
+1. Ingests domestic airfare quotes from OTA/airline sources. *(Today: real scraped CSV
+   exports imported via scripts; automated Playwright collectors are scaffolded for future
+   scheduled runs — see "Current implementation status" below.)*
 2. Preserves cryptographic, immutable raw provenance (SHA-256) before any parsing.
 3. Normalizes fragmented fare components into a canonical standard product.
 4. Enforces strict schema and physical-sanity validation.
@@ -271,12 +273,70 @@ Browser signs in (Supabase Auth)  →  receives JWT
 
 ```
 Analyst triggers a live test for a source
-   → PlaywrightCollector runs the actual configured collector (no fallback to fake data)
+   → the scraper performs a REAL network fetch (no fallback to fake data)
    → each stage is tracked; on failure the exact ScrapeFailureStage is recorded
      (DNS / CONNECTION / TIMEOUT / HTTP_ERROR / BLOCKED / CAPTCHA_DETECTED /
       EMPTY_RESPONSE / SELECTOR_NOT_FOUND / PARSE_ERROR / NO_AVAILABILITY / ...)
-   → passes ONLY if ≥1 fare is collected, parsed, validated, and stored with provenance
+   → passes ONLY if real records are collected, parsed, validated, and stored with provenance
 ```
+
+---
+
+## Current implementation status (dataset-driven)
+
+> This section reflects **what the deployed system does today**, so the flow above is not
+> misread as fully-automated live scraping.
+
+**What is real and working now**
+
+- **Fare data is ingested from real scraped CSV exports** (e.g. Goibibo listings) rather than
+  a fully-automated headless-browser crawler. CSVs are imported via
+  `scripts/import_goibibo_csvs.py` → `GoibiboCsvImporter`, which parses the OTA's raw
+  column layout, normalizes fares, matches real routes/sources, dedups by `quote_hash`, and
+  writes `validated_fares` rows tagged `data_origin = IMPORTED`.
+- **Official reference data is real**: the MoSPI CPI (General) Annexure is ingested via
+  `scripts/ingest_mospi_annexure.py` → `ReferenceDataService.ingest_official_file` with
+  immutable versioning, SHA-256 checksum, schema fingerprint, Supabase-Storage original, and
+  `benchmark_fares` series.
+- **Live mode is genuinely data-driven**: every `/dashboard/*` aggregation (summary,
+  index-trend, top-route-movements, booking-window-summary), the sidebar monitoring badges,
+  and the Market/Alerts/Shocks pages compute from the real `validated_fares`/`benchmark_fares`
+  rows. When a selection has no matching data, the API/UI shows an **honest empty state** —
+  never fabricated numbers. **Mock mode** is a clearly-labelled demo fallback.
+- **Reports/PDF** pull the real MoSPI benchmark series, real per-route medians, and the actual
+  dataset name/version/checksum into the dossier.
+- **FareGuard training** runs on the real accumulated fares and reports `insufficient_data`
+  (with the real fare summary) instead of emitting fake metrics when data is too small.
+
+**Effective current data flow**
+
+```
+Manual scrape (analyst exports OTA listing CSV / downloads MoSPI Annexure)
+        │
+        ▼
+Import script  →  parse + normalize + checksum  →  validated_fares (IMPORTED)
+                                                     benchmark_fares (mospi_cpi_general)
+        │
+        ▼
+FastAPI /dashboard/* + /exports compute REAL aggregates  →  Live-mode UI + PDF dossier
+```
+
+**Deferred to future implementation**
+
+- **Fully-automated Playwright collectors** for airline/OTA portals on scheduled Celery Beat
+  runs (the collectors and `ScrapeFailureStage` tracking exist; production selector
+  maintenance + anti-throttle scheduling are not yet enabled on the free hosting tier).
+- **Documented MoSPI CPI API auto-polling** (`api.mospi.gov.in/api/cpi/getCPIData`): the
+  adapter can call it, but it requires validated parameter sets and is not auto-polled yet —
+  official press-release files are ingested by upload instead.
+- **Multi-snapshot per-window fare curves**: current imports are single-snapshot, so per
+  booking-window (T+1…T+45) term structures and 7d/30d change deltas are shown as `—` in Live
+  until repeated scrapes accumulate history.
+- **PriceGuard shock/anomaly detection at scale + APIx daily index generation**: these need a
+  larger longitudinal fare history than a few manual snapshots provide; Live currently shows
+  the honest empty/zero state for detected shocks until enough data accrues.
+- **DGCA route-weight sync** for fully weighted Laspeyres APIx (reference plumbing exists;
+  automated sync pending).
 
 ---
 
