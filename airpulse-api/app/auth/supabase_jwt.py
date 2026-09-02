@@ -26,6 +26,9 @@ import uuid
 from typing import Optional
 
 from fastapi import Depends, Header
+import time
+
+import httpx
 from jose import JWTError, jwt
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -39,6 +42,44 @@ from app.db.session import get_db
 
 # Role hierarchy for permission checks (higher number => more privilege).
 _ROLE_RANK = {AppRole.VIEWER: 1, AppRole.ANALYST: 2, AppRole.ADMIN: 3}
+
+# --- JWKS cache for asymmetric (ES256/RS256) Supabase signing keys -----------
+# Newer Supabase projects sign access tokens with rotating asymmetric keys
+# (JWT Signing Keys) instead of the legacy shared HS256 secret. We fetch the
+# project's public JWKS and cache it, so both signing schemes work.
+_jwks_cache: dict = {"keys": [], "fetched_at": 0.0}
+_JWKS_TTL = 3600  # seconds
+
+
+def _jwks_url() -> str:
+    return f"{settings.SUPABASE_URL.rstrip('/')}/auth/v1/.well-known/jwks.json"
+
+
+def _get_jwks(force: bool = False) -> list:
+    now = time.time()
+    if not force and _jwks_cache["keys"] and (now - _jwks_cache["fetched_at"] < _JWKS_TTL):
+        return _jwks_cache["keys"]
+    try:
+        resp = httpx.get(_jwks_url(), timeout=10.0)
+        resp.raise_for_status()
+        keys = resp.json().get("keys", [])
+        if keys:
+            _jwks_cache["keys"] = keys
+            _jwks_cache["fetched_at"] = now
+    except Exception:
+        # Keep any previously cached keys on transient failure.
+        pass
+    return _jwks_cache["keys"]
+
+
+def _jwk_for_kid(kid: Optional[str], force: bool = False) -> Optional[dict]:
+    keys = _get_jwks(force=force)
+    if not kid:
+        return keys[0] if keys else None
+    for k in keys:
+        if k.get("kid") == kid:
+            return k
+    return None
 
 
 class AuthenticatedUser(BaseModel):
@@ -93,18 +134,32 @@ def verify_supabase_jwt(token: str) -> SupabaseTokenClaims:
         "verify_exp": True,
         "verify_aud": verify_aud,
     }
-    decode_kwargs = {
-        "key": settings.SUPABASE_JWT_SECRET,
-        "algorithms": ["HS256"],
-        "options": options,
-    }
+    common_kwargs = {"options": options}
     if verify_aud:
-        decode_kwargs["audience"] = settings.SUPABASE_JWT_AUD
+        common_kwargs["audience"] = settings.SUPABASE_JWT_AUD
     if verify_iss:
-        decode_kwargs["issuer"] = settings.jwt_issuer
+        common_kwargs["issuer"] = settings.jwt_issuer
+
+    # Determine the signing algorithm from the token header (Supabase issues either
+    # legacy HS256 shared-secret tokens or newer ES256/RS256 asymmetric tokens).
+    try:
+        header = jwt.get_unverified_header(token)
+    except JWTError as exc:
+        raise UnauthorizedException(f"Malformed token header: {exc}") from exc
+    alg = (header or {}).get("alg", "HS256")
 
     try:
-        payload = jwt.decode(token, **decode_kwargs)
+        if alg == "HS256":
+            payload = jwt.decode(
+                token, key=settings.SUPABASE_JWT_SECRET, algorithms=["HS256"], **common_kwargs
+            )
+        else:
+            # Asymmetric: verify against the project's published JWKS public key.
+            kid = (header or {}).get("kid")
+            jwk = _jwk_for_kid(kid) or _jwk_for_kid(kid, force=True)
+            if not jwk:
+                raise UnauthorizedException("No matching JWKS key for token.")
+            payload = jwt.decode(token, key=jwk, algorithms=[alg], **common_kwargs)
     except JWTError as exc:
         raise UnauthorizedException(f"Invalid or expired Supabase token: {exc}") from exc
 

@@ -53,7 +53,8 @@ class AnomalyRepository:
     async def update_status(self, anomaly_id: UUID, status: str) -> Optional[Anomaly]:
         anomaly = await self.get_by_id(anomaly_id)
         if anomaly:
-            anomaly.status = status
+            # Live enum values are UPPERCASE (OPEN/UNDER_REVIEW/CONFIRMED/DISMISSED/RESOLVED).
+            anomaly.status = (status or "").upper()
             await self.session.flush()
         return anomaly
 

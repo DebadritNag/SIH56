@@ -27,18 +27,22 @@ class AnomalyResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    fare_id: UUID
-    prediction_id: Optional[UUID]
-    detector_version: str
-    isolation_score: float
-    anomaly_percentile: float
+    fare_id: Optional[UUID] = None
+    prediction_id: Optional[UUID] = None
+    route_id: Optional[UUID] = None
+    source_id: Optional[UUID] = None
+    isolation_score: Optional[float] = None
+    anomaly_percentile: Optional[float] = None
     severity: AnomalySeverity
-    anomaly_type: AnomalyType
-    is_anomaly: bool
+    anomaly_type: Optional[str] = None
     status: AnomalyStatus
-    explanation: Optional[Dict[str, Any]]
+    actual_fare: Optional[float] = None
+    expected_fare: Optional[float] = None
+    residual: Optional[float] = None
+    residual_pct: Optional[float] = None
+    explanation: Optional[Dict[str, Any]] = None
     created_at: datetime
-    updated_at: datetime
+    updated_at: Optional[datetime] = None
 
 
 class AnomalyReviewRequest(BaseModel):

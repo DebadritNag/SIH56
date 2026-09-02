@@ -27,6 +27,14 @@ _ValidationStatusType = PGEnum(
     "VALID", "WARNING", "REJECTED",
     name="validation_status", create_type=False,
 )
+_AnomalySeverityType = PGEnum(
+    "LOW", "MEDIUM", "HIGH", "CRITICAL",
+    name="anomaly_severity", create_type=False,
+)
+_AnomalyStatusType = PGEnum(
+    "OPEN", "UNDER_REVIEW", "CONFIRMED", "DISMISSED", "RESOLVED",
+    name="anomaly_status", create_type=False,
+)
 from sqlalchemy.orm import declarative_base, relationship
 
 from app.core.utils import utc_now
@@ -394,18 +402,25 @@ class Anomaly(Base):
     __tablename__ = "anomalies"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    fare_id = Column(UUID(as_uuid=True), ForeignKey("validated_fares.id"), nullable=False, index=True)
-    prediction_id = Column(UUID(as_uuid=True), ForeignKey("fare_predictions.id"), nullable=True, index=True)
-    detector_version = Column(String(50), nullable=False)
-    isolation_score = Column(Float, nullable=False)
-    anomaly_percentile = Column(Float, nullable=False, index=True)
-    severity = Column(String(20), nullable=False, index=True)
-    anomaly_type = Column(String(30), nullable=False, index=True)
-    is_anomaly = Column(Boolean, default=False, nullable=False, index=True)
-    status = Column(String(20), default="open", nullable=False, index=True)
-    explanation = Column(JSONB, nullable=True)
-    created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
-    updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
+    fare_id = Column(UUID(as_uuid=True), ForeignKey("validated_fares.id"), nullable=True, index=True)
+    prediction_id = Column(UUID(as_uuid=True), nullable=True, index=True)
+    route_id = Column(UUID(as_uuid=True), nullable=True, index=True)
+    source_id = Column(UUID(as_uuid=True), nullable=True, index=True)
+    # Live column is anomaly_score; keep isolation_score attr for existing code.
+    isolation_score = Column("anomaly_score", Float, nullable=True)
+    anomaly_percentile = Column(Float, nullable=True, index=True)
+    severity = Column(_AnomalySeverityType, nullable=False, index=True)
+    status = Column(_AnomalyStatusType, default="OPEN", nullable=False, index=True)
+    anomaly_type = Column(Text, nullable=True, index=True)
+    actual_fare = Column(Numeric(10, 2), nullable=True)
+    expected_fare = Column(Numeric(10, 2), nullable=True)
+    residual = Column(Numeric(10, 2), nullable=True)
+    residual_pct = Column(Numeric(10, 2), nullable=True)
+    # Live column is evidence; keep explanation attr for existing code.
+    explanation = Column("evidence", JSONB, nullable=True)
+    # Live column is detected_at; keep created_at attr for existing code.
+    created_at = Column("detected_at", DateTime(timezone=True), default=utc_now, nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=True)
 
 
 class ShapExplanation(Base):
