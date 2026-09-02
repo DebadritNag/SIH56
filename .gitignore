@@ -1,0 +1,58 @@
+# ---------------------------------------------------------------------------
+# Project-Specific Ignored Directories & Documents
+# ---------------------------------------------------------------------------
+.agent/
+BRAIN.md
+Brain.md
+STARTUP_MANUAL.md
+
+# ---------------------------------------------------------------------------
+# Node / Frontend
+# ---------------------------------------------------------------------------
+node_modules/
+frontend/node_modules/
+.next/
+frontend/.next/
+out/
+frontend/out/
+*.tsbuildinfo
+frontend/*.tsbuildinfo
+next-env.d.ts
+frontend/next-env.d.ts
+
+# ---------------------------------------------------------------------------
+# Python / Backend
+# ---------------------------------------------------------------------------
+__pycache__/
+*/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.venv/
+venv/
+env/
+airpulse-api/venv/
+airpulse-api/.venv/
+.pytest_cache/
+.coverage
+
+# ---------------------------------------------------------------------------
+# Secrets & Environment Variables — NEVER commit real credentials
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.env
+.envrc
+
+# ---------------------------------------------------------------------------
+# OS / Editor Artifacts
+# ---------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+*.pem
+*.log

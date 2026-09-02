@@ -1,0 +1,110 @@
+@import "tailwindcss";
+
+:root {
+ --bg-canvas: #F5F7FA;
+ --surface-primary: #FFFFFF;
+ --surface-secondary: #F8FAFC;
+ --surface-muted: #F1F5F9;
+ --sidebar-bg: #081426;
+ --sidebar-border: #132238;
+ --sidebar-text: #94A3B8;
+ --sidebar-text-active: #F8FAFC;
+ --text-primary: #101828;
+ --text-secondary: #475467;
+ --text-muted: #667085;
+ --border-subtle: #E4E7EC;
+ --border-strong: #D0D5DD;
+ --accent-blue: #2563EB;
+ --accent-sky: #0EA5E9;
+ --accent-indigo: #4F46E5;
+ --status-positive: #16A34A;
+ --status-warning: #D97706;
+ --status-critical: #DC2626;
+}
+
+body {
+  background-color: var(--bg-canvas);
+  color: var(--text-primary);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  -webkit-font-smoothing: antialiased;
+}
+
+.tabular-nums {
+ font-variant-numeric: tabular-nums;
+}
+
+::-webkit-scrollbar {
+ width: 6px;
+ height: 6px;
+}
+::-webkit-scrollbar-track {
+ background: #F1F5F9;
+}
+::-webkit-scrollbar-thumb {
+ background: #CBD5E1;
+ border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+ background: #94A3B8;
+}
+
+/* ---------------------------------------------------------------------------
+   Landing page motion (respects prefers-reduced-motion)
+   --------------------------------------------------------------------------- */
+@keyframes ap-fade-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes ap-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes ap-grid-pan {
+  from { background-position: 0 0; }
+  to { background-position: 48px 48px; }
+}
+@keyframes ap-pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgba(14, 165, 233, 0.35); }
+  70% { box-shadow: 0 0 0 12px rgba(14, 165, 233, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(14, 165, 233, 0); }
+}
+@keyframes ap-ticker {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@keyframes ap-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+.ap-fade-up { animation: ap-fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.ap-fade-in { animation: ap-fade-in 0.9s ease both; }
+.ap-delay-1 { animation-delay: 0.08s; }
+.ap-delay-2 { animation-delay: 0.16s; }
+.ap-delay-3 { animation-delay: 0.24s; }
+.ap-delay-4 { animation-delay: 0.32s; }
+.ap-delay-5 { animation-delay: 0.40s; }
+.ap-pulse-ring { animation: ap-pulse-ring 2.4s ease-out infinite; }
+.ap-float { animation: ap-float 6s ease-in-out infinite; }
+
+.ap-grid-bg {
+  background-image:
+    linear-gradient(to right, rgba(148, 163, 184, 0.08) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
+  background-size: 48px 48px;
+  animation: ap-grid-pan 18s linear infinite;
+}
+
+.ap-ticker-track {
+  display: inline-flex;
+  animation: ap-ticker 32s linear infinite;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ap-fade-up, .ap-fade-in, .ap-pulse-ring, .ap-float, .ap-grid-bg, .ap-ticker-track {
+    animation: none !important;
+  }
+  .ap-fade-up, .ap-fade-in { opacity: 1 !important; transform: none !important; }
+}
+

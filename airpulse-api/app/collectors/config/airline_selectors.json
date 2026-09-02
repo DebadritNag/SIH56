@@ -1,0 +1,102 @@
+{
+  "_comment": "Config-driven Playwright selectors for Indian airline portals. These are MAINTENANCE POINTS: airline sites change their DOM frequently, so update the selectors here (no code change needed). Each airline entry drives PlaywrightCollector. Set 'enabled': false to force a source to report NOT_CONFIGURED instead of attempting a live scrape. NEVER add anti-bot evasion, CAPTCHA solving, or auth bypass here.",
+  "_version": "1.0.0",
+  "_updated": "2026-09-02",
+  "defaults": {
+    "wait_until": "networkidle",
+    "nav_timeout_ms": 30000,
+    "selector_timeout_ms": 15000,
+    "user_agent": "AirPulse-Price-Intelligence/1.0 (+https://airpulse.gov.in/bot; MoSPI-CPI-Augmentation)",
+    "block_resource_types": ["image", "media", "font"],
+    "captcha_markers": ["captcha", "recaptcha", "hcaptcha", "are you a robot", "verify you are human"],
+    "blocked_markers": ["access denied", "request blocked", "unusual traffic", "forbidden", "rate limit"],
+    "empty_markers": ["no flights found", "no results", "sold out", "no availability"]
+  },
+  "airlines": {
+    "indigo": {
+      "carrier_code": "6E",
+      "display_name": "IndiGo",
+      "enabled": false,
+      "base_url": "https://www.goindigo.in",
+      "search_url_template": "https://www.goindigo.in/booking/search-flights?origin={origin}&destination={destination}&departure={departure_date}&adults={adults}&class={cabin}",
+      "selectors": {
+        "results_container": "[data-test='flight-results'], .flight-results, #searchResultsContainer",
+        "flight_row": "[data-test='flight-card'], .flight-card, .fare-row",
+        "flight_number": "[data-test='flight-number'], .flight-number",
+        "departure_time": "[data-test='depart-time'], .depart-time",
+        "arrival_time": "[data-test='arrive-time'], .arrive-time",
+        "base_fare": "[data-test='base-fare'], .base-fare",
+        "total_fare": "[data-test='total-fare'], .total-price, .fare-amount",
+        "cabin_label": "[data-test='cabin'], .cabin-class"
+      }
+    },
+    "air_india": {
+      "carrier_code": "AI",
+      "display_name": "Air India",
+      "enabled": false,
+      "base_url": "https://www.airindia.com",
+      "search_url_template": "https://www.airindia.com/in/en/booking/flight-search?from={origin}&to={destination}&departDate={departure_date}&adult={adults}&cabin={cabin}",
+      "selectors": {
+        "results_container": ".flight-search-results, [data-testid='results']",
+        "flight_row": ".flight-option, [data-testid='flight-row']",
+        "flight_number": ".flight-no, [data-testid='flight-number']",
+        "departure_time": ".dep-time, [data-testid='dep-time']",
+        "arrival_time": ".arr-time, [data-testid='arr-time']",
+        "base_fare": ".base-amount",
+        "total_fare": ".total-amount, [data-testid='total-fare']",
+        "cabin_label": ".cabin-name"
+      }
+    },
+    "air_india_express": {
+      "carrier_code": "IX",
+      "display_name": "Air India Express",
+      "enabled": false,
+      "base_url": "https://www.airindiaexpress.com",
+      "search_url_template": "https://www.airindiaexpress.com/booking/select?origin={origin}&destination={destination}&date={departure_date}&pax={adults}",
+      "selectors": {
+        "results_container": ".availability-results",
+        "flight_row": ".journey-row, .flight-row",
+        "flight_number": ".flight-number",
+        "departure_time": ".departure",
+        "arrival_time": ".arrival",
+        "base_fare": ".base-fare",
+        "total_fare": ".total-fare",
+        "cabin_label": ".cabin"
+      }
+    },
+    "akasa_air": {
+      "carrier_code": "QP",
+      "display_name": "Akasa Air",
+      "enabled": false,
+      "base_url": "https://www.akasaair.com",
+      "search_url_template": "https://www.akasaair.com/search?from={origin}&to={destination}&depart={departure_date}&adults={adults}&cabin={cabin}",
+      "selectors": {
+        "results_container": "[data-qa='search-results']",
+        "flight_row": "[data-qa='flight-card']",
+        "flight_number": "[data-qa='flight-number']",
+        "departure_time": "[data-qa='depart-time']",
+        "arrival_time": "[data-qa='arrive-time']",
+        "base_fare": "[data-qa='base-fare']",
+        "total_fare": "[data-qa='total-fare']",
+        "cabin_label": "[data-qa='cabin']"
+      }
+    },
+    "spicejet": {
+      "carrier_code": "SG",
+      "display_name": "SpiceJet",
+      "enabled": false,
+      "base_url": "https://www.spicejet.com",
+      "search_url_template": "https://www.spicejet.com/search?o1={origin}&d1={destination}&dd1={departure_date}&ADT={adults}&cabin={cabin}",
+      "selectors": {
+        "results_container": ".search-results, #flight-results",
+        "flight_row": ".flight-select-block, .flight-row",
+        "flight_number": ".flight-number",
+        "departure_time": ".departure-time",
+        "arrival_time": ".arrival-time",
+        "base_fare": ".base-fare",
+        "total_fare": ".fare-price, .total-fare",
+        "cabin_label": ".cabin-type"
+      }
+    }
+  }
+}
