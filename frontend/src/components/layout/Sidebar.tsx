@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { clsx } from 'clsx';
+import { useDashboardSummary } from '@/lib/hooks/useDashboard';
 import {
   BarChart3,
   TrendingUp,
@@ -62,9 +63,9 @@ const NAV_SECTIONS: NavSection[] = [
   {
     title: 'MONITORING & RISK',
     items: [
-      { label: 'Anomaly Center', href: '/anomalies', icon: AlertTriangle, badge: '24' },
-      { label: 'Price Shocks', href: '/shocks', icon: Zap, badge: '1' },
-      { label: 'Alert Center', href: '/alerts', icon: Bell, badge: '5' },
+      { label: 'Anomaly Center', href: '/anomalies', icon: AlertTriangle },
+      { label: 'Price Shocks', href: '/shocks', icon: Zap },
+      { label: 'Alert Center', href: '/alerts', icon: Bell },
     ],
   },
   {
@@ -100,6 +101,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleCollapse,
 }) => {
   const pathname = usePathname();
+
+  // Live/Mock-aware monitoring counts (real numbers from the backend in Live mode).
+  const { summary } = useDashboardSummary();
+  const badgeByHref: Record<string, number | undefined> = {
+    '/anomalies': summary?.open_anomalies,
+    '/shocks': summary?.critical_anomalies,
+    '/alerts': summary?.active_alerts,
+  };
 
   return (
     <aside
@@ -204,16 +213,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     )}
                   />
                   {!collapsed && <span className="truncate">{item.label}</span>}
-                  {!collapsed && item.badge && (
+                  {!collapsed && badgeByHref[item.href] !== undefined && badgeByHref[item.href]! > 0 && (
                     <span
                       className={clsx(
                         'ml-auto text-[10px] font-bold px-1.5 py-0.2 rounded',
-                        item.badge === '24' || item.badge === '1'
+                        item.href === '/anomalies' || item.href === '/shocks'
                           ? 'bg-rose-950/70 text-rose-300 border border-rose-800/60'
                           : 'bg-slate-800 text-slate-300'
                       )}
                     >
-                      {item.badge}
+                      {badgeByHref[item.href]}
                     </span>
                   )}
                 </Link>
