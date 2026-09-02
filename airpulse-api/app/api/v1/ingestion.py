@@ -30,8 +30,51 @@ from app.services.ingestion_service import IngestionService
 from app.services.reference_data_service import ReferenceDataService
 from app.services.csv_import_service import CSVImportService
 from app.services.audit_service import AuditService
+from app.services.live_scraper import get_live_scraper
+from pydantic import BaseModel
 
 router = APIRouter(prefix="/ingestion", tags=["Data Ingestion & Collection Subsystem"])
+
+
+class ScrapingTestRequest(BaseModel):
+    source_name: Optional[str] = None
+    source_id: Optional[UUID] = None
+    origin: str
+    destination: str
+    departure_date: date
+    booking_window_days: int = 7
+    mode: str = "LIVE"
+
+
+@router.post("/scraping-test", response_model=APIResponse)
+async def run_scraping_test(
+    payload: ScrapingTestRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserContext = Depends(require_analyst),
+):
+    """
+    Run a REAL live scraping verification against a source with the given filter.
+    Performs an actual network fetch, stores raw evidence, and returns per-stage telemetry.
+    Never fakes success — reports the true failure stage if the source is unavailable.
+    """
+    # Resolve the source (by id or name), if provided.
+    src = None
+    if payload.source_id:
+        src = (await db.execute(select(Source).where(Source.id == payload.source_id))).scalars().first()
+    elif payload.source_name:
+        src = (await db.execute(select(Source).where(Source.name == payload.source_name))).scalars().first()
+
+    scraper = get_live_scraper()
+    result = await scraper.run(
+        source_name=(src.display_name if src else (payload.source_name or "OTA Source")),
+        source_type=str(getattr(src, "source_type", "OTA") if src else "OTA"),
+        base_url=getattr(src, "base_url", None) if src else None,
+        origin=payload.origin,
+        destination=payload.destination,
+        departure=payload.departure_date,
+        booking_window_days=payload.booking_window_days,
+    )
+    return APIResponse(success=(result["status"] in ("PASSED", "PARTIAL")), data=result)
 
 
 @router.get("/status", response_model=APIResponse)

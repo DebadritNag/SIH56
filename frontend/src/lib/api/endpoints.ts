@@ -198,4 +198,41 @@ export const endpoints = {
 
   // Mutations
   triggerCollection: () => postData<unknown>("/ingestion/collect"),
+
+  // Live scraping verification (real network fetch, per-filter)
+  runScrapingTest: (payload: {
+    source_name?: string;
+    origin: string;
+    destination: string;
+    departure_date: string;
+    booking_window_days: number;
+    mode?: string;
+  }) => postData<ScrapingTestApiResult>("/ingestion/scraping-test", payload),
 } as const;
+
+export interface ScrapingTestStageApi {
+  stage: string;
+  status: "passed" | "warning" | "failed";
+  detail?: string;
+  failure_stage?: string;
+  http_status?: number;
+  response_hash?: string;
+}
+
+export interface ScrapingTestApiResult {
+  status: "PASSED" | "PARTIAL" | "FAILED";
+  source?: string;
+  route?: string;
+  departure_date?: string;
+  http_status?: number | null;
+  response_hash?: string | null;
+  quotes_found: number;
+  quotes_validated: number;
+  quotes_rejected: number;
+  duration_ms: number;
+  failure_stage?: string;
+  failure_reason?: string;
+  stages: ScrapingTestStageApi[];
+  quotes: Array<Record<string, unknown>>;
+  is_live: boolean;
+}

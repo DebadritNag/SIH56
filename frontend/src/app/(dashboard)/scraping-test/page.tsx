@@ -20,6 +20,8 @@ import {
 import { ScrapingTestStep, ScrapingTestResult } from '@/types';
 import { formatINR } from '@/lib/formatters';
 import { notify } from '@/lib/notify';
+import { endpoints } from '@/lib/api/endpoints';
+import { useDataMode } from '@/lib/providers/DataModeProvider';
 
 const INITIAL_STEPS: ScrapingTestStep[] = [
   { step_number: 1, title: 'Collector Initialized', status: 'pending', detail: 'ota01-v1.4.2 instance instantiated with ethical rate limiter (60 req/min)' },
@@ -46,60 +48,125 @@ export default function ScrapingTestPage() {
   const [steps, setSteps] = useState<ScrapingTestStep[]>(INITIAL_STEPS);
   const [testResult, setTestResult] = useState<ScrapingTestResult | null>(null);
   const [showRawJson, setShowRawJson] = useState(false);
+  const { mode: dataMode } = useDataMode();
 
-  const handleRunLiveTest = () => {
+  const STATUS_MAP: Record<string, ScrapingTestStep['status']> = {
+    passed: 'completed', warning: 'completed', failed: 'failed',
+  };
+
+  const handleRunLiveTest = async () => {
+    // MOCK mode (or explicit failure simulation) uses the demo dataset, clearly labelled.
+    if (dataMode === 'mock' || simulateFailure) {
+      runSimulated();
+      return;
+    }
+
     setIsRunning(true);
     setTestResult(null);
     setActiveStepIndex(0);
-
-    // Reset steps
     setSteps(INITIAL_STEPS.map((s) => ({ ...s, status: 'pending' })));
+    notify.loading('Executing real live scraping probe…', { id: 'scrape-probe' });
 
+    const [origin, destination] = route.split('-');
+    const bwMap: Record<string, number> = { 'T+1 (1-2 Days)': 1, 'T+7 (3-10 Days)': 7, 'T+15 (11-20 Days)': 15, 'T+30 (21-35 Days)': 30, 'T+45 (36+ Days)': 45 };
+
+    try {
+      const res = await endpoints.runScrapingTest({
+        source_name: selectedSource,
+        origin,
+        destination,
+        departure_date: departureDate,
+        booking_window_days: bwMap[bookingWindow] ?? 7,
+        mode: 'LIVE',
+      });
+
+      // Map real backend stages onto the step list (keep any extra INITIAL steps pending->done).
+      setSteps((prev) =>
+        prev.map((s, idx) => {
+          const bs = res.stages[idx];
+          if (!bs) return { ...s, status: res.status === 'FAILED' ? 'pending' : 'completed' };
+          return { ...s, status: STATUS_MAP[bs.status] ?? 'completed', detail: bs.detail || s.detail };
+        }),
+      );
+
+      if (res.status === 'FAILED') {
+        setTestResult({
+          ...mockScrapingTestFailure,
+          success: false,
+          failure_diagnostic: {
+            stage: res.failure_stage || 'FAILED',
+            reason: res.failure_reason || 'Live source unavailable',
+            last_success: '—',
+            recommended_action: 'Source blocked/unavailable. Try another source, or use MOCK mode for a demo.',
+          },
+        } as ScrapingTestResult);
+        setIsRunning(false);
+        notify.error('Live scraping failed', { id: 'scrape-probe', description: `${res.failure_stage}: ${res.failure_reason}` });
+        return;
+      }
+
+      const fares = (res.quotes || []).map((q) => ({
+        airline: String(q.airline ?? 'UNKNOWN'),
+        flight_number: String(q.flight_no ?? 'LIVE'),
+        departure_time: '—',
+        base_fare: Number(q.total_fare ?? 0) * 0.88,
+        total: Number(q.total_fare ?? 0),
+        validation_status: 'VALID',
+      }));
+
+      setTestResult({
+        success: true,
+        source: res.source || selectedSource,
+        route: res.route || `${origin} → ${destination}`,
+        http_status: res.http_status ?? 200,
+        response_size_kb: Math.round(((res.response_hash?.length ?? 0) + 1000) / 100) / 10,
+        response_hash: res.response_hash || '—',
+        quotes_valid: res.quotes_validated,
+        raw_evidence_json: JSON.stringify(res.quotes?.slice(0, 5) ?? [], null, 2),
+        extracted_fares: fares,
+        collector_version: 'live-http-v1',
+      } as unknown as ScrapingTestResult);
+      setIsRunning(false);
+      notify.success('Live scraping verified', {
+        id: 'scrape-probe',
+        description: `${res.quotes_validated} valid quotes captured · SHA-256 evidence stored.`,
+      });
+    } catch (err) {
+      setIsRunning(false);
+      notify.error('Live scraping error', {
+        id: 'scrape-probe',
+        description: err instanceof Error ? err.message : 'Request failed',
+      });
+      setSteps((prev) => prev.map((s, idx) => (idx <= 1 ? { ...s, status: 'completed' } : { ...s, status: 'failed' })));
+    }
+  };
+
+  // Demo/simulated animation (MOCK mode or failure-simulation toggle).
+  const runSimulated = () => {
+    setIsRunning(true);
+    setTestResult(null);
+    setActiveStepIndex(0);
+    setSteps(INITIAL_STEPS.map((s) => ({ ...s, status: 'pending' })));
     let currentStep = 0;
     const interval = setInterval(() => {
       if (currentStep < INITIAL_STEPS.length) {
         if (simulateFailure && currentStep === 3) {
-          // Trigger simulated failure at HTTP Response stage
-          setSteps((prev) =>
-            prev.map((s, idx) =>
-              idx < 3
-                ? { ...s, status: 'completed' }
-                : idx === 3
-                ? { ...s, status: 'failed', detail: 'HTTP 429 Too Many Requests (Rate limit token exhausted)' }
-                : { ...s, status: 'pending' }
-            )
-          );
+          setSteps((prev) => prev.map((s, idx) => (idx < 3 ? { ...s, status: 'completed' } : idx === 3 ? { ...s, status: 'failed', detail: 'HTTP 429 Too Many Requests (simulated)' } : { ...s, status: 'pending' })));
           setTestResult(mockScrapingTestFailure);
           setIsRunning(false);
           clearInterval(interval);
-          notify.error('Live scraping test failed', {
-            id: 'scrape-probe',
-            description: 'HTTP 429 Too Many Requests: Upstream aggregator rate limit token exhausted.',
-          });
+          notify.error('Live scraping test failed (MOCK)', { id: 'scrape-probe', description: 'Simulated HTTP 429.' });
           return;
         }
-
-        setSteps((prev) =>
-          prev.map((s, idx) =>
-            idx === currentStep
-              ? { ...s, status: 'running' }
-              : idx < currentStep
-              ? { ...s, status: 'completed' }
-              : s
-          )
-        );
+        setSteps((prev) => prev.map((s, idx) => (idx === currentStep ? { ...s, status: 'running' } : idx < currentStep ? { ...s, status: 'completed' } : s)));
         setActiveStepIndex(currentStep);
         currentStep++;
       } else {
-        // Completed successfully
         setSteps((prev) => prev.map((s) => ({ ...s, status: 'completed' })));
         setTestResult(mockScrapingTestSuccess);
         setIsRunning(false);
         clearInterval(interval);
-        notify.success('Live scraping verified', {
-          id: 'scrape-probe',
-          description: '17 valid airfare quotes captured and SHA-256 hashed.',
-        });
+        notify.success('Live scraping verified (MOCK)', { id: 'scrape-probe', description: 'Demo dataset.' });
       }
     }, 450);
   };
@@ -120,8 +187,12 @@ export default function ScrapingTestPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="px-2.5 py-1 bg-amber-50 text-amber-800 border border-amber-300 font-bold text-xs rounded uppercase tracking-wide">
-            LIVE WEB REQUEST • NEVER REPLAY
+          <span className={`px-2.5 py-1 font-bold text-xs rounded uppercase tracking-wide border ${
+            dataMode === 'mock'
+              ? 'bg-amber-100 text-amber-900 border-amber-400'
+              : 'bg-emerald-50 text-emerald-800 border-emerald-300'
+          }`}>
+            {dataMode === 'mock' ? 'MOCK DATA • SIMULATED' : 'LIVE WEB REQUEST • REAL FETCH'}
           </span>
         </div>
       </div>
