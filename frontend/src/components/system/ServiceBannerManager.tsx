@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useDataMode } from '@/lib/providers/DataModeProvider';
 import {
   WifiOff,
   AlertTriangle,
@@ -33,6 +34,7 @@ export interface ServiceNotice {
 }
 
 export const ServiceBannerManager: React.FC = () => {
+  const { mode } = useDataMode();
   const [isOffline, setIsOffline] = useState(false);
   const [dismissedNotices, setDismissedNotices] = useState<string[]>([]);
   const [showAllNotices, setShowAllNotices] = useState(false);
@@ -65,15 +67,17 @@ export const ServiceBannerManager: React.FC = () => {
     });
   }
 
-  // Example degraded coverage notice
-  activeNotices.push({
-    id: 'source-degraded',
-    priority: 'DEGRADED',
-    title: 'DEGRADED SOURCE COVERAGE',
-    message: '1 of 5 collection sources (OTA Source 03) is degraded. APIx index remains available with 94.8% basket confidence.',
-    actionLabel: 'View Source Health',
-    actionHref: '/sources',
-  });
+  // Demo-only illustrative notice — never shown in Live mode
+  if (mode === 'mock') {
+    activeNotices.push({
+      id: 'source-degraded',
+      priority: 'DEGRADED',
+      title: 'DEGRADED SOURCE COVERAGE (MOCK DATA)',
+      message: '1 of 5 collection sources (OTA Source 03) is degraded. APIx index remains available with 94.8% basket confidence.',
+      actionLabel: 'View Source Health',
+      actionHref: '/sources',
+    });
+  }
 
   const visibleNotices = activeNotices.filter((n) => !dismissedNotices.includes(n.id));
 

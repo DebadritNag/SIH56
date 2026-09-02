@@ -1,7 +1,25 @@
 from enum import Enum
 
 
-class SourceType(str, Enum):
+class CIEnum(str, Enum):
+    """String enum that resolves values case-insensitively.
+
+    The live database stores enum values in UPPERCASE (e.g. "AIRLINE", "OTA",
+    "OPEN") while the Python members use lowercase values. This makes
+    SourceType("AIRLINE") resolve to SourceType.AIRLINE instead of raising.
+    """
+
+    @classmethod
+    def _missing_(cls, value):
+        if isinstance(value, str):
+            lowered = value.lower()
+            for member in cls:
+                if member.value.lower() == lowered:
+                    return member
+        return None
+
+
+class SourceType(CIEnum):
     AIRLINE = "airline"
     OTA = "ota"
     GOVERNMENT_API = "government_api"
@@ -10,7 +28,7 @@ class SourceType(str, Enum):
     SYNTHETIC = "synthetic"
 
 
-class CollectionMethod(str, Enum):
+class CollectionMethod(CIEnum):
     HTTP = "http"
     PLAYWRIGHT = "playwright"
     SCRAPY = "scrapy"
@@ -20,7 +38,7 @@ class CollectionMethod(str, Enum):
     SYNTHETIC = "synthetic"
 
 
-class CollectionRunStatus(str, Enum):
+class CollectionRunStatus(CIEnum):
     QUEUED = "queued"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -29,7 +47,7 @@ class CollectionRunStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-class TriggerType(str, Enum):
+class TriggerType(CIEnum):
     SCHEDULED = "scheduled"
     MANUAL = "manual"
     REPLAY = "replay"
@@ -37,7 +55,7 @@ class TriggerType(str, Enum):
     REFERENCE_SYNC = "reference_sync"
 
 
-class PipelineType(str, Enum):
+class PipelineType(CIEnum):
     COLLECTION = "collection"
     NORMALIZATION = "normalization"
     VALIDATION = "validation"
@@ -51,7 +69,7 @@ class PipelineType(str, Enum):
     BACKTEST = "backtest"
 
 
-class PipelineStatus(str, Enum):
+class PipelineStatus(CIEnum):
     QUEUED = "queued"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -59,7 +77,7 @@ class PipelineStatus(str, Enum):
     FAILED = "failed"
 
 
-class StepStatus(str, Enum):
+class StepStatus(CIEnum):
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -67,13 +85,13 @@ class StepStatus(str, Enum):
     SKIPPED = "skipped"
 
 
-class ValidationStatus(str, Enum):
+class ValidationStatus(CIEnum):
     VALID = "valid"
     WARNING = "warning"
     REJECTED = "rejected"
 
 
-class EligibilityReason(str, Enum):
+class EligibilityReason(CIEnum):
     VALID = "VALID"
     DUPLICATE = "DUPLICATE"
     REJECTED_VALIDATION = "REJECTED_VALIDATION"
@@ -84,7 +102,7 @@ class EligibilityReason(str, Enum):
     MISSING_COMPONENTS = "MISSING_COMPONENTS"
 
 
-class AnomalySeverity(str, Enum):
+class AnomalySeverity(CIEnum):
     NORMAL = "normal"
     LOW = "low"
     MEDIUM = "medium"
@@ -92,7 +110,7 @@ class AnomalySeverity(str, Enum):
     CRITICAL = "critical"
 
 
-class AnomalyType(str, Enum):
+class AnomalyType(CIEnum):
     UNUSUALLY_HIGH = "unusually_high"
     UNUSUALLY_LOW = "unusually_low"
     DATA_QUALITY = "data_quality"
@@ -100,14 +118,14 @@ class AnomalyType(str, Enum):
     UNKNOWN = "unknown"
 
 
-class AnomalyStatus(str, Enum):
+class AnomalyStatus(CIEnum):
     OPEN = "open"
     REVIEWED = "reviewed"
     CONFIRMED = "confirmed"
     DISMISSED = "dismissed"
 
 
-class ReviewDecision(str, Enum):
+class ReviewDecision(CIEnum):
     CONFIRM = "confirm"
     DISMISS = "dismiss"
     DATA_ERROR = "data_error"
@@ -115,7 +133,7 @@ class ReviewDecision(str, Enum):
     REQUIRES_FOLLOWUP = "requires_followup"
 
 
-class AlertType(str, Enum):
+class AlertType(CIEnum):
     PRICE_SHOCK = "price_shock"
     SOURCE_FAILURE = "source_failure"
     DATA_QUALITY = "data_quality"
@@ -123,38 +141,38 @@ class AlertType(str, Enum):
     INSUFFICIENT_COVERAGE = "insufficient_coverage"
 
 
-class AlertStatus(str, Enum):
+class AlertStatus(CIEnum):
     OPEN = "open"
     ACKNOWLEDGED = "acknowledged"
     RESOLVED = "resolved"
 
 
-class IndexFrequency(str, Enum):
+class IndexFrequency(CIEnum):
     DAILY = "daily"
     WEEKLY = "weekly"
     MONTHLY = "monthly"
 
 
-class IndexScope(str, Enum):
+class IndexScope(CIEnum):
     NATIONAL = "national"
     ROUTE = "route"
     AIRLINE = "airline"
 
 
-class UserRole(str, Enum):
+class UserRole(CIEnum):
     VIEWER = "viewer"
     ANALYST = "analyst"
     ADMIN = "admin"
 
 
-class CabinClass(str, Enum):
+class CabinClass(CIEnum):
     ECONOMY = "economy"
     PREMIUM_ECONOMY = "premium_economy"
     BUSINESS = "business"
     FIRST = "first"
 
 
-class ScrapeFailureStage(str, Enum):
+class ScrapeFailureStage(CIEnum):
     """Precise failure stages for live scraping, per BRAIN.md Live Scraping Test Protocol.
     A live scraper test must log the exact stage at which collection failed and never
     silently fall back to a replay/synthetic collector."""
