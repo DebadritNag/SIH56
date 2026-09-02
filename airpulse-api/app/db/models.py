@@ -35,6 +35,10 @@ _AnomalyStatusType = PGEnum(
     "OPEN", "UNDER_REVIEW", "CONFIRMED", "DISMISSED", "RESOLVED",
     name="anomaly_status", create_type=False,
 )
+_AlertStatusType = PGEnum(
+    "OPEN", "ACKNOWLEDGED", "RESOLVED",
+    name="alert_status", create_type=False,
+)
 from sqlalchemy.orm import declarative_base, relationship
 
 from app.core.utils import utc_now
@@ -501,16 +505,18 @@ class Alert(Base):
     __tablename__ = "alerts"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    alert_type = Column(String(30), nullable=False, index=True)
-    severity = Column(String(20), nullable=False, index=True)
-    title = Column(String(255), nullable=False)
+    alert_type = Column(Text, nullable=True, index=True)
+    severity = Column(_AnomalySeverityType, nullable=True, index=True)
+    status = Column(_AlertStatusType, default="OPEN", nullable=False, index=True)
+    title = Column(Text, nullable=False)
     message = Column(Text, nullable=False)
     route_id = Column(UUID(as_uuid=True), ForeignKey("routes.id"), nullable=True, index=True)
     source_id = Column(UUID(as_uuid=True), ForeignKey("sources.id"), nullable=True, index=True)
-    alert_metadata = Column(JSONB, nullable=True)
-    status = Column(String(20), default="open", nullable=False, index=True)
+    anomaly_id = Column(UUID(as_uuid=True), nullable=True, index=True)
+    alert_metadata = Column("metadata", JSONB, nullable=True)
     created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
-    resolved_at = Column(DateTime(timezone=True), nullable=True)
+    acknowledged_at = Column(DateTime(timezone=True), nullable=True)
+    acknowledged_by = Column(UUID(as_uuid=True), nullable=True)
 
 
 class AnomalyReview(Base):

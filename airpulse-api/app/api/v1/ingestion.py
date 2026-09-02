@@ -211,30 +211,32 @@ async def trigger_manual_collection(
     db: AsyncSession = Depends(get_db),
     current_user: UserContext = Depends(require_analyst),
 ):
-    """Enqueues manual matrix collection for all configured routes & booking windows."""
-    orchestrator = CollectionOrchestrator(db)
+    """Manual pipeline run over the currently ingested fares: recomputes statistical
+    anomalies (PriceGuard) and price-shock alerts from real validated_fares, and records
+    a collection_runs entry. (Automated live scraping is a scheduled/future path; the
+    active ingestion is CSV import — this button reprocesses what has been ingested.)"""
+    from app.services.anomaly_engine import AnomalyEngine
+
     audit = AuditService(db)
-
-    col_run = await orchestrator.execute_batch_collection(
-        trigger_type="manual",
-        triggered_by=current_user.email or current_user.user_id,
-    )
-
-    # Trigger processing pipeline
-    ingestion = IngestionService(db)
-    await ingestion.process_collection_run(col_run.id)
+    result = await AnomalyEngine(db).run()
 
     await audit.log_event(
-        actor_id=current_user.email or current_user.user_id,
+        actor_id=getattr(current_user, "user_id", None),
         action="COLLECTION_MANUAL_TRIGGER",
-        entity_type="collection_run",
-        entity_id=str(col_run.id),
+        entity_type="pipeline_run",
+        entity_id="anomaly-engine",
+        event_metadata=result,
     )
     await db.commit()
 
     return APIResponse(
         success=True,
-        data={"collection_run_id": str(col_run.id), "status": col_run.status, "quotes_received": col_run.quotes_received},
+        data={
+            "status": result.get("status"),
+            "anomalies_detected": result.get("anomalies", 0),
+            "alerts_raised": result.get("alerts", 0),
+            "routes_evaluated": result.get("routes_evaluated", 0),
+        },
     )
 
 
