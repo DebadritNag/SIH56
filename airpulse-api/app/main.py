@@ -86,7 +86,25 @@ async def airpulse_exception_handler(request: Request, exc: AirPulseException):
             },
             "request_id": req_id,
         },
+        headers=_cors_headers(request),
     )
+
+
+def _cors_headers(request: Request) -> dict:
+    """Echo CORS headers on error responses so the browser shows the real error
+    instead of a misleading 'No Access-Control-Allow-Origin' block."""
+    origin = request.headers.get("origin")
+    if not origin:
+        return {}
+    import re
+    allowed = origin in settings.CORS_ORIGINS or bool(re.match(r"https://.*\.vercel\.app", origin))
+    if not allowed:
+        return {}
+    return {
+        "Access-Control-Allow-Origin": origin,
+        "Access-Control-Allow-Credentials": "true",
+        "Vary": "Origin",
+    }
 
 
 @app.exception_handler(Exception)
@@ -103,6 +121,7 @@ async def general_exception_handler(request: Request, exc: Exception):
             },
             "request_id": req_id,
         },
+        headers=_cors_headers(request),
     )
 
 
