@@ -1,8 +1,11 @@
 'use client';
 
 import React from 'react';
-import { Zap, AlertTriangle, ShieldCheck, ArrowUpRight } from 'lucide-react';
+import { Zap } from 'lucide-react';
 import { formatINR } from '@/lib/formatters';
+import { useDataMode } from '@/lib/providers/DataModeProvider';
+import { DataSourceMeta } from '@/components/data/DataBadge';
+import { EmptyShocksState } from '@/components/states/EmptyState';
 
 const SHOCKS = [
   { id: 'SHOCK-2026-0902-A', route: 'DEL → BOM', window: 'T+1', surgePct: 42.8, medianFare: 11840, baselineFare: 8290, agreementCount: '4/4 Sources', carriers: 'IndiGo, Air India, Akasa', detectedAt: '15:10 IST Today', status: 'CONFIRMED' },
@@ -11,6 +14,13 @@ const SHOCKS = [
 ];
 
 export default function PriceShocksPage() {
+  const { mode } = useDataMode();
+  const isMock = mode === 'mock';
+  // Price shocks require synchronous multi-source surge verification. In Live mode
+  // only genuinely detected shocks are shown (none fabricated); Mock shows the demo set.
+  const shocks = isMock ? SHOCKS : [];
+  const activeCount = shocks.filter((s) => s.status === 'CONFIRMED').length;
+
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -25,15 +35,21 @@ export default function PriceShocksPage() {
           <p className="text-xs text-[#475467] mt-0.5">
             A route surge is only certified as a Price Shock when synchronous elevated pricing is verified across multiple independent channels, eliminating scraping artifacts.
           </p>
+          <div className="mt-1.5">
+            <DataSourceMeta isMock={isMock} source={isMock ? 'Demo dataset' : 'AirPulse PriceGuard (live)'} />
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <span className="px-2.5 py-1 bg-rose-50 text-rose-800 border border-rose-300 font-bold text-xs rounded">
-            2 Active Confirmed Shocks
+            {activeCount} Active Confirmed Shocks
           </span>
         </div>
       </div>
 
-      {/* Shocks Table */}
+      {shocks.length === 0 ? (
+        <EmptyShocksState layout="card" />
+      ) : (
+      /* Shocks Table */
       <div className="bg-white border border-[#E4E7EC] rounded-lg shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
@@ -52,7 +68,7 @@ export default function PriceShocksPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#F1F5F9]">
-              {SHOCKS.map((s) => (
+              {shocks.map((s) => (
                 <tr key={s.id} className="hover:bg-slate-50 transition-colors">
                   <td className="p-3 font-mono font-bold text-rose-700">{s.id}</td>
                   <td className="p-3 font-bold text-[#101828]">{s.route}</td>
@@ -80,6 +96,7 @@ export default function PriceShocksPage() {
           </table>
         </div>
       </div>
+      )}
     </div>
   );
 }

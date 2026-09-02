@@ -2,10 +2,13 @@
 
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { Activity, ArrowUpRight, ArrowDownRight, TrendingUp, SlidersHorizontal, RotateCcw } from 'lucide-react';
+import { Activity, SlidersHorizontal, RotateCcw } from 'lucide-react';
 import { MarketPressureBadge } from '@/components/ui/Badge';
-import { formatINR, formatPercent } from '@/lib/formatters';
+import { formatINR } from '@/lib/formatters';
 import { clsx } from 'clsx';
+import { useDataMode } from '@/lib/providers/DataModeProvider';
+import { useRouteContributors } from '@/lib/hooks/useDashboard';
+import { DataSourceMeta } from '@/components/data/DataBadge';
 
 const ALL_MARKET_ROUTES = [
   { route: 'DEL → BOM', origin: 'DEL', dest: 'BOM', median: 7420, change7d: 4.8, change30d: 12.1, status: 'SURGING' as const, t1: 11840, t7: 7420, t15: 5900, t30: 4850, t45: 4120 },
@@ -25,10 +28,41 @@ const WINDOW_COLS = [
   { key: 't45', code: 45, label: 'T+45 (36+d)' },
 ];
 
+type MarketRow = {
+  route: string; origin: string; dest: string; median: number;
+  change7d: number; change30d: number;
+  status: 'SURGING' | 'MODERATE_PRESSURE' | 'STABLE' | 'COLLAPSING';
+  t1: number | null; t7: number | null; t15: number | null; t30: number | null; t45: number | null;
+};
+
 export default function MarketMonitorPage() {
+  const { mode } = useDataMode();
+  const isMock = mode === 'mock';
   const [selectedWindows, setSelectedWindows] = useState<number[]>([1, 7, 15, 30, 45]);
   const [selectedPressure, setSelectedPressure] = useState<string>('ALL');
   const [selectedCorridor, setSelectedCorridor] = useState<string>('ALL');
+
+  // Real per-route medians from the backend (validated fares) in Live mode.
+  const { contributors } = useRouteContributors();
+  const liveRoutes: MarketRow[] = useMemo(() => {
+    const all = [...(contributors?.up ?? []), ...(contributors?.down ?? [])];
+    return all.map((c) => {
+      const origin = String(c.origin || '');
+      const dest = String(c.destination || '');
+      const median = Number(c.current_median_fare ?? 0);
+      const ch = Number(c.change_pct ?? 0);
+      const status: MarketRow['status'] = ch > 4 ? 'SURGING' : ch < -3 ? 'COLLAPSING' : ch > 0 ? 'MODERATE_PRESSURE' : 'STABLE';
+      return {
+        route: `${origin} → ${dest}`, origin: origin || '', dest: dest || '',
+        median, change7d: ch, change30d: ch,
+        status,
+        // Per-window breakdown is not available from single-snapshot imports — shown as —.
+        t1: null, t7: median || null, t15: null, t30: null, t45: null,
+      };
+    });
+  }, [contributors]);
+
+  const dataset: MarketRow[] = isMock ? (ALL_MARKET_ROUTES as MarketRow[]) : liveRoutes;
 
   const toggleWindow = (code: number) => {
     if (selectedWindows.includes(code)) {
@@ -47,12 +81,12 @@ export default function MarketMonitorPage() {
 
   // Filter routes
   const filteredRoutes = useMemo(() => {
-    return ALL_MARKET_ROUTES.filter((r) => {
+    return dataset.filter((r) => {
       if (selectedPressure !== 'ALL' && r.status !== selectedPressure) return false;
       if (selectedCorridor !== 'ALL' && !r.route.includes(selectedCorridor)) return false;
       return true;
     });
-  }, [selectedPressure, selectedCorridor]);
+  }, [dataset, selectedPressure, selectedCorridor]);
 
   // Compute reactive network summary KPIs from filtered dataset
   const kpiData = useMemo(() => {
@@ -81,10 +115,13 @@ export default function MarketMonitorPage() {
           <p className="text-xs text-[#475467] mt-0.5">
             Network-wide airfare movements, inflation pressure indicators, and multi-lead time fare term structures across all active domestic corridors.
           </p>
+          <div className="mt-1.5">
+            <DataSourceMeta isMock={isMock} source={isMock ? 'Demo dataset' : 'AirPulse validated fares (live)'} />
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <span className="px-2.5 py-1 bg-blue-50 text-blue-800 border border-blue-200 font-bold text-xs rounded">
-            Showing: {filteredRoutes.length} of {ALL_MARKET_ROUTES.length} Routes
+            Showing: {filteredRoutes.length} of {dataset.length} Routes
           </span>
         </div>
       </div>
@@ -238,19 +275,19 @@ export default function MarketMonitorPage() {
                       {r.change30d >= 0 ? '+' : ''}{r.change30d.toFixed(1)}%
                     </td>
                     {selectedWindows.includes(1) && (
-                      <td className="p-3 text-right font-mono text-rose-700 font-semibold tabular-nums">{formatINR(r.t1)}</td>
+                      <td className="p-3 text-right font-mono text-rose-700 font-semibold tabular-nums">{r.t1 == null ? '—' : formatINR(r.t1)}</td>
                     )}
                     {selectedWindows.includes(7) && (
-                      <td className="p-3 text-right font-mono font-bold text-[#101828] tabular-nums">{formatINR(r.t7)}</td>
+                      <td className="p-3 text-right font-mono font-bold text-[#101828] tabular-nums">{r.t7 == null ? '—' : formatINR(r.t7)}</td>
                     )}
                     {selectedWindows.includes(15) && (
-                      <td className="p-3 text-right font-mono text-[#475467] tabular-nums">{formatINR(r.t15)}</td>
+                      <td className="p-3 text-right font-mono text-[#475467] tabular-nums">{r.t15 == null ? '—' : formatINR(r.t15)}</td>
                     )}
                     {selectedWindows.includes(30) && (
-                      <td className="p-3 text-right font-mono text-[#475467] tabular-nums">{formatINR(r.t30)}</td>
+                      <td className="p-3 text-right font-mono text-[#475467] tabular-nums">{r.t30 == null ? '—' : formatINR(r.t30)}</td>
                     )}
                     {selectedWindows.includes(45) && (
-                      <td className="p-3 text-right font-mono text-emerald-700 tabular-nums">{formatINR(r.t45)}</td>
+                      <td className="p-3 text-right font-mono text-emerald-700 tabular-nums">{r.t45 == null ? '—' : formatINR(r.t45)}</td>
                     )}
                     <td className="p-3 text-right">
                       <Link
