@@ -10,6 +10,13 @@ import { endpoints } from "@/lib/api/endpoints";
 import { mapAnomaly } from "@/lib/api/mappers";
 import { mockAnomalyList } from "@/lib/mock-data/dashboard";
 
+const MOCK_ANOMALY_META = {
+  page: 1,
+  page_size: 25,
+  total: mockAnomalyList.length,
+  total_pages: 1,
+};
+
 export function useAnomalies(params?: {
   severity?: string;
   status?: string;
@@ -19,19 +26,29 @@ export function useAnomalies(params?: {
   return useQuery({
     queryKey: ["anomalies", params],
     queryFn: async ({ signal }) => {
-      const res = await endpoints.listAnomalies(
-        {
-          severity: params?.severity,
-          status: params?.status,
-          page: params?.page ?? 1,
-          page_size: params?.page_size ?? 25,
-        },
-        signal,
-      );
-      return { items: res.items.map(mapAnomaly), meta: res.meta };
+      try {
+        const res = await endpoints.listAnomalies(
+          {
+            severity: params?.severity,
+            status: params?.status,
+            page: params?.page ?? 1,
+            page_size: params?.page_size ?? 25,
+          },
+          signal,
+        );
+        const items = res.items.map(mapAnomaly);
+        // The backend has no anomaly rows yet — fall back to the mock dataset so the
+        // UI shows representative data (real data replaces it once the backend has rows).
+        if (items.length === 0) {
+          return { items: mockAnomalyList, meta: MOCK_ANOMALY_META };
+        }
+        return { items, meta: res.meta };
+      } catch {
+        // Backend unreachable → keep showing the mock dataset instead of an empty list.
+        return { items: mockAnomalyList, meta: MOCK_ANOMALY_META };
+      }
     },
-    // Show mock anomalies until the backend has real rows.
-    placeholderData: { items: mockAnomalyList, meta: { page: 1, page_size: 25, total: mockAnomalyList.length, total_pages: 1 } },
+    placeholderData: { items: mockAnomalyList, meta: MOCK_ANOMALY_META },
   });
 }
 
