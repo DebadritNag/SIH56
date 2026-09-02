@@ -56,3 +56,11 @@ airpulse-api/.venv/
 Thumbs.db
 *.pem
 *.log
+
+# ---------------------------------------------------------------------------
+# Scraped / imported source data (inputs, not code) — ingested via scripts
+# ---------------------------------------------------------------------------
+goibibo-*.csv
+*Annexure*.xlsx
+Annexures_*.xlsx
+*.csv
