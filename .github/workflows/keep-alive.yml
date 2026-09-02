@@ -1,0 +1,36 @@
+name: DB Keep-Alive
+
+# Pings the backend DB keep-alive endpoint every 2 days so the managed Postgres
+# (Supabase free tier) and the Render service never auto-pause from inactivity.
+# Also runnable manually from the Actions tab.
+
+on:
+  schedule:
+    - cron: "0 6 */2 * *" # every 2 days at 06:00 UTC
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping backend keep-alive (wakes Render + touches Supabase)
+        run: |
+          URL="${KEEP_ALIVE_URL:-https://sih56.onrender.com/api/v1/keep-alive}"
+          echo "Pinging $URL"
+          # Render free tier can cold-start (~50s); retry with a generous timeout.
+          for i in 1 2 3 4 5; do
+            code=$(curl -s -o /tmp/resp.json -w "%{http_code}" --max-time 90 "$URL" || echo "000")
+            echo "Attempt $i -> HTTP $code"
+            cat /tmp/resp.json 2>/dev/null || true
+            echo ""
+            if [ "$code" = "200" ]; then
+              echo "Keep-alive OK"
+              exit 0
+            fi
+            sleep 20
+          done
+          echo "Keep-alive failed after retries"
+          exit 1
+        env:
+          # Optional override via repo variable; defaults to the production URL above.
+          KEEP_ALIVE_URL: ${{ vars.KEEP_ALIVE_URL }}

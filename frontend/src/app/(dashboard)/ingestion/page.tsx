@@ -6,6 +6,9 @@ import { formatINR } from '@/lib/formatters';
 import { useDashboardSummary } from '@/lib/hooks/useDashboard';
 import { useRuns } from '@/lib/hooks/useResources';
 import { GenerateReportButton } from '@/components/data/GenerateReportButton';
+import { useDataMode } from '@/lib/providers/DataModeProvider';
+import { DataSourceMeta } from '@/components/data/DataBadge';
+import { endpoints } from '@/lib/api/endpoints';
 
 const PIPELINE_STAGES = [
   { name: 'COLLECT', count: '8,412', status: 'completed', desc: 'Raw HTTP & Browser extraction' },
@@ -60,29 +63,43 @@ export default function IngestionPage() {
   const [showRunConfirm, setShowRunConfirm] = React.useState(false);
   const [isTriggering, setIsTriggering] = React.useState(false);
 
+  const { mode } = useDataMode();
+  const isMock = mode === 'mock';
   const { summary } = useDashboardSummary();
   const { data: runsPage } = useRuns({ page_size: 10 });
 
-  // Prefer real run history; fall back to the static demo runs when none exist yet.
-  const realRuns: RunRow[] = (runsPage?.items ?? []).map(mapRun);
-  const runs: RunRow[] = realRuns.length > 0 ? realRuns : RECENT_RUNS;
+  // Live: only real run history (empty until real runs exist). Mock: demo runs.
+  const realRuns: RunRow[] = ((runsPage as { items?: Record<string, unknown>[] } | undefined)?.items ?? []).map(mapRun);
+  const runs: RunRow[] = isMock ? RECENT_RUNS : realRuns;
 
-  const quotesToday = summary?.quotes_24h ?? 28452;
-  const totalSources = summary?.total_sources ?? 5;
-  const healthySources = summary?.healthy_sources ?? 5;
+  const quotesToday = isMock ? 28452 : (summary?.quotes_24h ?? 0);
+  const totalSources = isMock ? 5 : (summary?.total_sources ?? 0);
+  const healthySources = isMock ? 5 : (summary?.healthy_sources ?? 0);
+  const pipelineStages = isMock ? PIPELINE_STAGES : [];
 
-  const handleTriggerCollection = () => {
+  const handleTriggerCollection = async () => {
     setIsTriggering(true);
     notify.loading('Starting manual collection run...', { id: 'coll-run' });
-
-    setTimeout(() => {
+    try {
+      if (isMock) {
+        await new Promise((r) => setTimeout(r, 600));
+        notify.success('Collection queued (demo)', { id: 'coll-run', description: 'Mock run submitted.' });
+      } else {
+        await endpoints.triggerCollection();
+        notify.success('Collection queued', {
+          id: 'coll-run',
+          description: 'Submitted to the backend collection orchestrator.',
+        });
+      }
+    } catch (err) {
+      notify.error('Collection trigger failed', {
+        id: 'coll-run',
+        description: err instanceof Error ? err.message : 'Backend rejected the request.',
+      });
+    } finally {
       setIsTriggering(false);
       setShowRunConfirm(false);
-      notify.success('Collection queued', {
-        id: 'coll-run',
-        description: 'Batch Run #1843 has been submitted to the Celery worker pool.',
-      });
-    }, 800);
+    }
   };
 
   return (
@@ -99,6 +116,9 @@ export default function IngestionPage() {
           <p className="text-xs text-[#475467] mt-0.5">
             Automated matrix collection scheduler, horizontal multi-stage transformation pipeline, and run audit logs.
           </p>
+          <div className="mt-1.5">
+            <DataSourceMeta isMock={isMock} source={isMock ? 'Demo dataset' : 'AirPulse backend (live)'} />
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -109,12 +129,20 @@ export default function IngestionPage() {
             <span>Run Collection Now</span>
           </button>
           <GenerateReportButton exportType={'PIPELINE_RUN' as never} format={'CSV' as never} title="Data Ingestion Pipeline Report" />
-          <span className="px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-300 font-bold text-xs rounded">
-            ● SCHEDULER: RUNNING (Every 3 Hours)
-          </span>
-          <span className="px-2.5 py-1 bg-slate-100 text-[#475467] text-xs font-medium rounded border border-slate-200">
-            Next Collection: 18:00 IST
-          </span>
+          {isMock ? (
+            <>
+              <span className="px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-300 font-bold text-xs rounded">
+                ● SCHEDULER: RUNNING (Every 3 Hours)
+              </span>
+              <span className="px-2.5 py-1 bg-slate-100 text-[#475467] text-xs font-medium rounded border border-slate-200">
+                Next Collection: 18:00 IST
+              </span>
+            </>
+          ) : (
+            <span className="px-2.5 py-1 bg-slate-100 text-[#475467] text-xs font-medium rounded border border-slate-200">
+              Ingestion: manual CSV import
+            </span>
+          )}
         </div>
       </div>
 
@@ -169,7 +197,7 @@ export default function IngestionPage() {
 
         {/* Horizontal Pipeline Steps */}
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5">
-          {PIPELINE_STAGES.map((stage, idx) => (
+          {pipelineStages.map((stage, idx) => (
             <div
               key={idx}
               className="bg-[#F8FAFC] border border-[#E4E7EC] rounded p-2.5 flex flex-col justify-between relative group hover:border-blue-300 transition-colors"
@@ -184,6 +212,11 @@ export default function IngestionPage() {
               <p className="text-[10px] text-[#667085] line-clamp-1">{stage.desc}</p>
             </div>
           ))}
+          {pipelineStages.length === 0 && (
+            <div className="col-span-full p-4 text-center text-xs text-[#667085]">
+              No pipeline run has executed yet in this environment. Import fares or trigger a collection to populate pipeline stages.
+            </div>
+          )}
         </div>
       </div>
 
@@ -209,6 +242,11 @@ export default function IngestionPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#F1F5F9]">
+              {runs.length === 0 && (
+                <tr><td colSpan={9} className="p-6 text-center text-xs text-[#667085] font-sans">
+                  No collection runs recorded yet. Runs appear here after a scheduled or manual collection executes.
+                </td></tr>
+              )}
               {runs.map((run) => (
                 <tr key={run.id} className="hover:bg-slate-50 transition-colors font-mono">
                   <td className="p-3 font-bold text-blue-700">#{run.id}</td>

@@ -231,15 +231,22 @@ async def get_top_route_movements(
     out: List[Dict[str, Any]] = []
     try:
         rows = (await db.execute(q)).all()
+        medians = [float(r.med) for r in rows if r.med is not None]
+        network_median = (sorted(medians)[len(medians) // 2] if medians else 0.0)
         for r in rows:
             med = float(r.med) if r.med is not None else 0.0
+            # Real "fare-level impact": deviation of this route's median from the
+            # network median (single-snapshot data has no time-delta, so this is the
+            # honest cross-sectional contribution that drives the chart bars).
+            dev_pct = round(((med - network_median) / network_median) * 100.0, 1) if network_median else 0.0
             out.append({
                 "route": f"{r.origin}-{r.destination}", "market": f"{r.origin}-{r.destination}",
                 "origin": r.origin, "destination": r.destination,
                 "current_median": round(med, 0), "sample_count": int(r.n),
                 "min_fare": round(float(r.lo), 0), "max_fare": round(float(r.hi), 0),
                 "spread_pct": round(((float(r.hi) - float(r.lo)) / med) * 100.0, 1) if med else 0.0,
-                "direction": "up",
+                "change_pct": dev_pct,
+                "direction": "up" if dev_pct >= 0 else "down",
             })
     except Exception:
         await db.rollback()

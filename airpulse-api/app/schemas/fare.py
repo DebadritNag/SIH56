@@ -79,32 +79,35 @@ class NormalizedFareRecord(BaseModel):
 
 
 class ValidatedFareResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    # Populate from ORM attributes; map live column names onto the API's field names.
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     id: UUID
-    raw_fare_id: UUID
-    source_id: UUID
-    route_id: UUID
-    airline_code: str
-    flight_number: Optional[str]
-    origin_code: str
-    destination_code: str
+    raw_fare_id: Optional[UUID] = None
+    source_id: Optional[UUID] = None
+    route_id: Optional[UUID] = None
+    data_origin: Optional[str] = None
+    airline_code: str = Field(validation_alias="airline")
+    flight_number: Optional[str] = None
+    origin_code: str = Field(validation_alias="origin")
+    destination_code: str = Field(validation_alias="destination")
     departure_at: datetime
-    arrival_at: Optional[datetime]
-    booking_window_days: int
-    cabin_class: str
-    refundable: Optional[bool]
-    baggage_kg: Optional[float]
-    base_fare: Decimal
-    taxes: Decimal
-    fees: Decimal
+    arrival_at: Optional[datetime] = None
+    booking_window_days: Optional[int] = None
+    cabin_class: Optional[str] = Field(default=None, validation_alias="cabin")
+    fare_class: Optional[str] = None
+    refundable: Optional[bool] = None
+    baggage_allowance: Optional[str] = None
+    base_fare: Optional[Decimal] = None
+    taxes: Optional[Decimal] = None
+    mandatory_fees: Optional[Decimal] = None
     total_fare: Decimal
     currency: str
     normalized_total_fare: Decimal
     validation_status: str
-    validation_errors: Optional[List[Dict[str, Any]]]
-    duplicate_group_id: Optional[UUID]
-    is_duplicate: bool
+    validation_errors: Optional[Any] = None
+    duplicate_group_id: Optional[UUID] = None
+    is_duplicate: bool = False
     quote_hash: str
     collected_at: datetime
     created_at: datetime

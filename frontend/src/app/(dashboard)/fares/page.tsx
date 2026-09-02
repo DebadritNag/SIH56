@@ -1,15 +1,63 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Database, Search, ShieldCheck, Download, SlidersHorizontal, RotateCcw } from 'lucide-react';
+import { Database, Search, Download, SlidersHorizontal, RotateCcw } from 'lucide-react';
 import { FareObservation } from '@/types';
 import { FareProvenanceDrawer } from '@/components/drawers/FareProvenanceDrawer';
 import { ExportDialog } from '@/components/dialogs/ExportDialog';
 import { OriginBadge } from '@/components/ui/Badge';
 import { formatINR } from '@/lib/formatters';
 import { GenerateReportButton } from '@/components/data/GenerateReportButton';
-import { notify } from '@/lib/notify';
 import { clsx } from 'clsx';
+import { useDataMode } from '@/lib/providers/DataModeProvider';
+import { useFares } from '@/lib/hooks/useResources';
+import { DataSourceMeta } from '@/components/data/DataBadge';
+
+function bwLabel(days?: number | null): string {
+  if (days == null) return 'T+0';
+  if (days <= 2) return 'T+1';
+  if (days <= 10) return 'T+7';
+  if (days <= 20) return 'T+15';
+  if (days <= 35) return 'T+30';
+  return 'T+45';
+}
+
+/** Map a raw backend validated fare into the table's FareObservation shape. */
+function mapLiveFare(f: Record<string, unknown>): FareObservation {
+  const base = Number(f.base_fare ?? f.total_fare ?? 0);
+  const total = Number(f.total_fare ?? 0);
+  const taxes = Number(f.taxes ?? 0) + Number(f.mandatory_fees ?? 0);
+  const origin = String(f.origin_code ?? f.origin ?? '');
+  const dest = String(f.destination_code ?? f.destination ?? '');
+  const dep = f.departure_at ? new Date(String(f.departure_at)) : null;
+  return {
+    id: String(f.id),
+    collected_at: f.collected_at ? new Date(String(f.collected_at)).toLocaleString() : '—',
+    route: `${origin} → ${dest}`,
+    departure_date: dep ? dep.toLocaleDateString() : '—',
+    booking_window: bwLabel(f.booking_window_days as number | undefined),
+    airline: String(f.airline_code ?? f.airline ?? 'UNKNOWN'),
+    flight_number: String(f.flight_number ?? '—'),
+    source: 'Goibibo (OTA)',
+    base_fare: base,
+    taxes,
+    fees: 0,
+    total_fare: total,
+    validation_status: (String(f.validation_status ?? 'VALID')) as FareObservation['validation_status'],
+    anomaly_status: 'NORMAL',
+    origin_type: (String(f.data_origin ?? 'IMPORTED')) as FareObservation['origin_type'],
+    provenance: {
+      collection_run_id: String(f.raw_fare_id ?? '—'),
+      response_hash: String(f.quote_hash ?? '—'),
+      collector_version: 'manual-scrape',
+      parser_version: 'goibibo-csv-importer-v1.0.0',
+      fareguard_prediction: 0,
+      priceguard_score: 0,
+      index_eligible: true,
+      pipeline_steps: [],
+    },
+  };
+}
 
 const ALL_MOCK_FARES: FareObservation[] = [
   {
@@ -206,8 +254,19 @@ const ALL_MOCK_FARES: FareObservation[] = [
 const WINDOW_TAGS = ['T+1', 'T+7', 'T+15', 'T+30', 'T+45'];
 
 export default function FaresPage() {
+  const { mode } = useDataMode();
+  const isMock = mode === 'mock';
   const [selectedFare, setSelectedFare] = useState<FareObservation | null>(null);
   const [showExportModal, setShowExportModal] = useState(false);
+
+  // Live: real validated fares from the backend (all imported observations).
+  const { data: farePage } = useFares({ page_size: 200 });
+  const liveFares: FareObservation[] = useMemo(() => {
+    const raw = (farePage as { data?: Record<string, unknown>[]; items?: Record<string, unknown>[] } | undefined);
+    const rows = raw?.data ?? raw?.items ?? [];
+    return rows.map(mapLiveFare);
+  }, [farePage]);
+  const sourceFares = isMock ? ALL_MOCK_FARES : liveFares;
 
   // Analytical Filters
   const [routeFilter, setRouteFilter] = useState<string>('ALL');
@@ -232,7 +291,7 @@ export default function FaresPage() {
   };
 
   const filteredFares = useMemo(() => {
-    return ALL_MOCK_FARES.filter((f) => {
+    return sourceFares.filter((f) => {
       if (routeFilter !== 'ALL' && !f.route.includes(routeFilter)) return false;
       if (sourceFilter !== 'ALL' && !f.source.includes(sourceFilter)) return false;
       if (!selectedWindows.includes(f.booking_window)) return false;
@@ -246,7 +305,7 @@ export default function FaresPage() {
       }
       return true;
     });
-  }, [routeFilter, sourceFilter, selectedWindows, searchQuery]);
+  }, [sourceFares, routeFilter, sourceFilter, selectedWindows, searchQuery]);
 
   return (
     <div className="space-y-5">
@@ -262,6 +321,9 @@ export default function FaresPage() {
           <p className="text-xs text-[#475467] mt-0.5">
             Query individual collected quotes. Every observed fare is tied to an immutable raw payload SHA-256 hash, collector version, and full transformation audit trail.
           </p>
+          <div className="mt-1.5">
+            <DataSourceMeta isMock={isMock} source={isMock ? 'Demo dataset' : 'AirPulse validated fares (live)'} />
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <button
