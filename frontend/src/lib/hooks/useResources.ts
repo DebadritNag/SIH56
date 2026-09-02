@@ -154,16 +154,29 @@ export function useRouteInsights(routeCode: string) {
         const { getMockRouteDetail } = await import("@/lib/mock-data/dashboard");
         return getMockRouteDetail(routeCode);
       }
+      const { getMockRouteDetail } = await import("@/lib/mock-data/dashboard");
+      const base = getMockRouteDetail(routeCode);
       try {
-        const res = await endpoints.routeInsights(routeCode, signal);
-        if (res && typeof res === "object" && (res as any).route_code) {
-          return res as RouteInsightDetail;
+        const res = (await endpoints.routeInsights(routeCode, signal)) as Record<string, unknown> | null;
+        if (res && typeof res === "object" && res.route_code) {
+          // Merge REAL scalar values onto the mock detail shape so the page always
+          // has the arrays it maps over (curve/sources) while showing live numbers.
+          const merged: RouteInsightDetail = {
+            ...base,
+            route_code: String(res.route_code ?? base.route_code),
+            origin: String(res.origin_code ?? base.origin),
+            destination: String(res.destination_code ?? base.destination),
+            distance_km: Number(res.distance_km ?? base.distance_km) || base.distance_km,
+            current_median_fare: Number(res.current_median_fare ?? base.current_median_fare) || base.current_median_fare,
+            change_7d_pct: Number(res.previous_week_change_pct ?? base.change_7d_pct) || 0,
+            change_30d_pct: Number(res.previous_week_change_pct ?? base.change_30d_pct) || 0,
+            data_confidence_pct: Number(res.route_apix_latest != null ? 100 : base.data_confidence_pct),
+          };
+          return merged;
         }
-        const { getMockRouteDetail } = await import("@/lib/mock-data/dashboard");
-        return getMockRouteDetail(routeCode);
+        return base;
       } catch {
-        const { getMockRouteDetail } = await import("@/lib/mock-data/dashboard");
-        return getMockRouteDetail(routeCode);
+        return base;
       }
     },
     placeholderData: keepPreviousData,

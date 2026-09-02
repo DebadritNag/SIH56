@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { exportsApi } from '@/lib/api/exports';
+import { apiClient } from '@/lib/api/client';
 import { CreateExportInput, ExportJob } from '@/types';
 import { notify } from '@/lib/notify';
 
@@ -101,31 +102,38 @@ export function useCreateExport() {
 export function useDownloadExport() {
   return useMutation({
     mutationFn: async (job: ExportJob) => {
-      notify.info('Preparing download...', { description: job.filename });
-      try {
-        const info = await exportsApi.getDownloadUrl(job.id);
-        const link = document.createElement('a');
-        link.href = info.download_url;
-        link.setAttribute('download', info.filename);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        notify.success('Download started', { description: info.filename });
-      } catch {
-        // Direct browser mock file generation fallback if API is not running
-        const blob = new Blob([`AirPulse Export: ${job.title}\nSHA256: ${job.checksum_sha256 || 'live'}\nFilename: ${job.filename}`], {
-          type: 'text/plain;charset=utf-8',
+      // Guard: demo/fallback jobs have non-UUID ids (e.g. "exp-1090") and cannot
+      // be fetched from the backend — never emit a corrupt placeholder file.
+      const isRealJob = /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(job.id);
+      if (!isRealJob) {
+        notify.error('Report unavailable', {
+          description: 'This is a demo entry. Generate a report from a page to download a real file.',
         });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', job.filename);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        notify.success('Download started', { description: job.filename });
+        return;
       }
+
+      notify.info('Preparing download...', { description: job.filename });
+      // Fetch the real bytes through the backend stream endpoint (correct MIME,
+      // valid content) and save as a typed Blob. Avoids cross-origin <a download>
+      // pitfalls and never writes a text placeholder.
+      const blob = await apiClient.downloadBlob(`/exports/${job.id}/stream`);
+      const typedBlob = job.export_format === 'PDF' && blob.type !== 'application/pdf'
+        ? new Blob([blob], { type: 'application/pdf' })
+        : blob;
+      const url = URL.createObjectURL(typedBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', job.filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      notify.success('Download started', { description: job.filename });
+    },
+    onError: (err: unknown) => {
+      notify.error('Download failed', {
+        description: err instanceof Error ? err.message : 'Could not retrieve the report file.',
+      });
     },
   });
 }

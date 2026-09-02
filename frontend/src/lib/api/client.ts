@@ -164,4 +164,25 @@ export async function getPaginated<T>(
   return { items: env.data ?? [], meta: env.meta };
 }
 
-export const apiClient = { getData, postData, getPaginated, request };
+/**
+ * Fetch a binary file (PDF/XLSX/CSV/ZIP) from the backend with auth and return
+ * the raw Blob. Never returns a placeholder — throws ApiError on failure so the
+ * caller can surface a real error instead of saving a corrupt file.
+ */
+export async function downloadBlob(path: string): Promise<Blob> {
+  const token = resolveToken();
+  const headers: Record<string, string> = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  let res: Response;
+  try {
+    res = await fetch(buildUrl(path), { method: "GET", headers, cache: "no-store" });
+  } catch (err) {
+    throw new ApiError(err instanceof Error ? err.message : "Network request failed", 0, "NETWORK_ERROR");
+  }
+  if (!res.ok) {
+    throw new ApiError(`Download failed with status ${res.status}`, res.status, "DOWNLOAD_ERROR");
+  }
+  return await res.blob();
+}
+
+export const apiClient = { getData, postData, getPaginated, request, downloadBlob };

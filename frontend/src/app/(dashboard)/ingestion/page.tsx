@@ -92,10 +92,18 @@ export default function IngestionPage() {
         });
       }
     } catch (err) {
-      notify.error('Collection trigger failed', {
-        id: 'coll-run',
-        description: err instanceof Error ? err.message : 'Backend rejected the request.',
-      });
+      const status = (err as { status?: number })?.status;
+      if (status === 403 || status === 401) {
+        notify.info('Analyst clearance required', {
+          id: 'coll-run',
+          description: 'Triggering collection needs an analyst/admin role. Current data is ingested via CSV import.',
+        });
+      } else {
+        notify.error('Collection trigger failed', {
+          id: 'coll-run',
+          description: err instanceof Error ? err.message : 'Backend rejected the request.',
+        });
+      }
     } finally {
       setIsTriggering(false);
       setShowRunConfirm(false);
