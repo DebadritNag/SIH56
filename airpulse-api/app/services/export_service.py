@@ -16,8 +16,10 @@ from app.db.models import (
     AirfareIndex,
     Anomaly,
     BacktestRun,
+    BenchmarkFare,
     ExportJob,
     IndexComponent,
+    ReferenceDataset,
     Route,
     Source,
     ValidatedFare,
@@ -530,20 +532,75 @@ class ExportService:
         return summary, components, weights, coverage, meta
 
     async def _prepare_backtest_data(self) -> Tuple[Dict, List, List, List, List, List]:
+        from sqlalchemy import func
+
+        # Real MoSPI CPI benchmark series (monthly) from synchronized official dataset.
+        ds = (await self.db.execute(
+            select(ReferenceDataset).where(ReferenceDataset.dataset_type == "CPI")
+            .order_by(ReferenceDataset.retrieved_at.desc())
+        )).scalars().first()
+
+        dates: List[str] = []
+        bench_series: List[float] = []
+        dataset_checksum = None
+        if ds:
+            dataset_checksum = ds.checksum
+            rows = (await self.db.execute(
+                select(BenchmarkFare)
+                .where(BenchmarkFare.reference_dataset_id == ds.id,
+                       BenchmarkFare.benchmark_type == "mospi_cpi_general")
+                .order_by(BenchmarkFare.period_start)
+            )).scalars().all()
+            for r in rows:
+                if r.period_start and r.value is not None:
+                    dates.append(r.period_start.strftime("%Y-%m"))
+                    bench_series.append(round(float(r.value), 2))
+
+        # Real APIx proxy per month: median normalized fare indexed (base 5000=100),
+        # aligned to the same months as the benchmark. Truthful — empty where no fares.
+        apix_by_month: Dict[str, float] = {}
+        try:
+            month = func.to_char(ValidatedFare.departure_at, "YYYY-MM")
+            arows = (await self.db.execute(
+                select(month.label("m"),
+                       func.percentile_cont(0.5).within_group(ValidatedFare.normalized_total_fare).label("med"))
+                .group_by(month)
+            )).all()
+            for ar in arows:
+                if ar.med is not None:
+                    apix_by_month[ar.m] = round((float(ar.med) / 5000.0) * 100.0, 2)
+        except Exception:
+            await self.db.rollback()
+
+        apix_series = [apix_by_month.get(m, 0.0) for m in dates]
+
+        # Real per-route median contributions from validated fares.
+        top_routes: List[str] = []
+        contribs: List[float] = []
+        try:
+            rr = (await self.db.execute(
+                select(ValidatedFare.origin, ValidatedFare.destination,
+                       func.percentile_cont(0.5).within_group(ValidatedFare.normalized_total_fare).label("med"),
+                       func.count(ValidatedFare.id).label("n"))
+                .group_by(ValidatedFare.origin, ValidatedFare.destination)
+                .order_by(func.count(ValidatedFare.id).desc()).limit(8)
+            )).all()
+            for r in rr:
+                top_routes.append(f"{r.origin}-{r.destination}")
+                contribs.append(round(float(r.med) / 1000.0, 2) if r.med else 0.0)
+        except Exception:
+            await self.db.rollback()
+
         report_meta = {
-            "report_id": "REP-2026-Q3-019",
-            "data_origin": "LIVE",
+            "report_id": f"REP-{utc_now():%Y%m%d-%H%M}",
+            "data_origin": "LIVE" if (bench_series or apix_by_month) else "NO_DATA",
             "generated_at": utc_now().strftime("%Y-%m-%d %H:%M UTC"),
-            "checksum": "8f4a1c0b3d5e7f9a2b4c6e8d0f2a4b6c8e0d2f4a6b8c0d2e4f6a8b0c2d4e6f8",
+            "official_source": "MoSPI eSankhyiki",
+            "dataset_name": ds.dataset_name if ds else None,
+            "dataset_version": ds.dataset_version if ds else None,
+            "reference_period": (f"{ds.reference_period_start} to {ds.reference_period_end}" if ds else None),
+            "checksum": dataset_checksum or "N/A",
+            "comparability_note": ("MoSPI CPI (General) covers a broader basket than airfares; "
+                                   "comparison is contextual, not like-for-like."),
         }
-        dates = [
-            "2025-10", "2025-11", "2025-12", "2026-01", "2026-02", "2026-03",
-            "2026-04", "2026-05", "2026-06", "2026-07", "2026-08", "2026-09"
-        ]
-        apix_series = [100.0, 101.4, 103.8, 102.5, 101.9, 103.2, 104.8, 106.1, 105.4, 106.9, 107.6, 108.4]
-        bench_series = [100.0, 101.0, 103.1, 102.8, 102.1, 103.0, 104.2, 105.5, 105.0, 106.3, 107.1, 107.9]
-
-        top_routes = ["DEL-BOM", "DEL-BLR", "BOM-BLR", "DEL-CCU", "BOM-GOI"]
-        contribs = [1.82, 1.14, 0.72, 0.45, -0.21]
-
         return report_meta, dates, apix_series, bench_series, top_routes, contribs

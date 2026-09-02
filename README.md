@@ -32,6 +32,45 @@ AirPulse is **not** a flight-booking app. It is a government-grade analytics pla
 
 ---
 
+## Official reference data (MoSPI eSankhyiki) & real-fare ingestion
+
+AirPulse integrates the SIH-provided **MoSPI eSankhyiki** portal as an *official / reference*
+statistical source — distinct from high-frequency market fare observations. It is **not**
+implemented as an airline/OTA collector.
+
+- **Official-data connector** (`MospiESankhyikiAdapter`): real portal health checks, dataset
+  discovery, format detection (CSV/XLS/XLSX/JSON), and SHA-256 checksums. It never fabricates
+  data — if the source is unreachable, the sync is recorded as `FAILED`/`PARTIAL` and the
+  previously synced version stays active.
+- **Immutable versioning + provenance**: `reference_datasets` → `reference_dataset_versions`
+  (checksum, schema fingerprint, immutable original stored in the private
+  `reference-datasets` bucket) → `benchmark_fares` (normalized series). Every sync is tracked
+  in `reference_sync_runs` with audit events.
+- **Real benchmark ingested**: the official **MoSPI CPI (General)** All-India Combined index
+  (Jan-2025 → Jul-2026, base 2012=100) is synchronized and used as a **contextual** backtest
+  benchmark — with an explicit comparability note (CPI covers a broader basket than airfares).
+
+**Real market fares (Live mode).** Manually-scraped OTA CSVs (e.g. Goibibo) are ingested via
+`GoibiboCsvImporter` into `validated_fares` as `data_origin = IMPORTED`, matched to real routes
+and sources, with a deterministic `quote_hash` for dedup. In **Live** mode every dashboard
+metric, chart, top-route table, and booking-window summary is computed **directly from these
+real observations** (`/dashboard/*` endpoints); when a selection has no matching fares the API
+returns an honest empty/representative state rather than fake data. **Mock** mode remains a
+clearly-labelled demo fallback.
+
+**FareGuard training** runs on the real accumulated fares (`FareTrainingService`) and refuses
+to emit metrics when there is insufficient real data (reporting `insufficient_data` with the
+real fare summary) instead of training a meaningless model — retrain as more CSVs are imported.
+
+**Report generation** (`/exports`, backtest audit PDF) pulls the **real** MoSPI benchmark
+series, real per-route medians, and the actual dataset name/version/checksum into the dossier,
+generated on demand and listed under Downloads & Exports.
+
+> Scraped CSV/XLSX inputs are git-ignored; they are ingested via
+> `scripts/import_goibibo_csvs.py` and `scripts/ingest_mospi_annexure.py`.
+
+---
+
 ## Monorepo layout
 
 ```
@@ -163,7 +202,7 @@ authentication and realtime notifications.
 | **Supabase PostgreSQL 17** | Canonical data store (native enums, JSONB, TIMESTAMPTZ, NUMERIC money). |
 | **Supabase Auth** | JWT identity provider; `profiles` auto-provisioning trigger. |
 | **Supabase Realtime** | Postgres change broadcast on operational tables. |
-| **Supabase Storage** | Private buckets: `raw-responses`, `imported-datasets`, `reference-datasets`, `backtest-reports`, `model-artifacts`. |
+| **Supabase Storage** | Private buckets: `raw-responses`, `imported-datasets`, `reference-datasets`, `backtest-reports`, `model-artifacts`, `generated-exports`. |
 | **Docker / docker-compose** | Local orchestration (API, worker, beat, Redis). |
 
 ---
