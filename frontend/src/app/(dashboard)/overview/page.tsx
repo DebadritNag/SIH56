@@ -221,9 +221,9 @@ export default function OverviewPage() {
         </div>
         <div className="flex items-center gap-2 text-xs">
           <GenerateReportButton
-            exportType={'APIX_INDEX' as never}
-            format={'PDF' as never}
-            title="Airfare Intelligence Overview Report"
+            exportType="OVERVIEW_REPORT"
+            format="PDF"
+            title="AirPulse — Airfare Intelligence Overview Report"
             filters={{
               windows: filters.bookingWindows,
               routes: filters.routeIds,

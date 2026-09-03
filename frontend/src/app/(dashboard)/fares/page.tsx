@@ -334,9 +334,9 @@ export default function FaresPage() {
             <span>Export Verified Quotes</span>
           </button>
           <GenerateReportButton
-            exportType={'FARE_OBSERVATIONS' as never}
-            format={'CSV' as never}
-            title="Validated Fare Observations Report"
+            exportType="FARE_OBSERVATIONS"
+            format="CSV"
+            title="AirPulse — Validated Fare Observations Report"
             filters={{
               route: routeFilter === 'ALL' ? undefined : routeFilter,
               source: sourceFilter === 'ALL' ? undefined : sourceFilter,

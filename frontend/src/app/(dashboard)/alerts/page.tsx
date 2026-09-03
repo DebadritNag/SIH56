@@ -7,6 +7,7 @@ import { useDataMode } from '@/lib/providers/DataModeProvider';
 import { useAlerts } from '@/lib/hooks/useResources';
 import { DataSourceMeta } from '@/components/data/DataBadge';
 import { EmptyAlertsState } from '@/components/states/EmptyState';
+import { GenerateReportButton } from '@/components/data/GenerateReportButton';
 
 type Sev = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
 
@@ -74,6 +75,11 @@ export default function AlertsPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <GenerateReportButton
+            exportType="ALERTS"
+            format="PDF"
+            title="AirPulse — Active Alerts Dossier"
+          />
           <span className="px-2.5 py-1 bg-rose-50 text-rose-800 border border-rose-200 font-bold text-xs rounded">
             {alerts.filter((a) => !a.acknowledged).length} Unacknowledged Alerts
           </span>

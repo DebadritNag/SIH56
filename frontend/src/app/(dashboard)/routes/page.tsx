@@ -26,6 +26,9 @@ const AVAILABLE_ROUTES = [
   { code: 'BOM-BLR', label: 'BOM → BLR (Mumbai - Bengaluru)' },
   { code: 'DEL-CCU', label: 'DEL → CCU (Delhi - Kolkata)' },
   { code: 'HYD-DEL', label: 'HYD → DEL (Hyderabad - Delhi)' },
+  { code: 'BOM-GOI', label: 'BOM → GOI (Mumbai - Goa)' },
+  { code: 'BLR-PNQ', label: 'BLR → PNQ (Bengaluru - Pune)' },
+  { code: 'CCU-GAU', label: 'CCU → GAU (Kolkata - Guwahati)' },
 ];
 
 export default function RoutesPage() {

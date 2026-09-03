@@ -136,7 +136,7 @@ export default function IngestionPage() {
             <Play className="w-3.5 h-3.5 fill-current" />
             <span>Run Collection Now</span>
           </button>
-          <GenerateReportButton exportType={'PIPELINE_RUN' as never} format={'CSV' as never} title="Data Ingestion Pipeline Report" />
+          <GenerateReportButton exportType="PIPELINE_RUN" format="CSV" title="AirPulse — Data Ingestion Pipeline Audit Report" />
           {isMock ? (
             <>
               <span className="px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-300 font-bold text-xs rounded">

@@ -6,6 +6,7 @@ import { formatINR } from '@/lib/formatters';
 import { useDataMode } from '@/lib/providers/DataModeProvider';
 import { useBookingWindowSummary } from '@/lib/hooks/useDashboard';
 import { DataSourceMeta } from '@/components/data/DataBadge';
+import { GenerateReportButton } from '@/components/data/GenerateReportButton';
 
 const WINDOW_DATA = [
   { code: 'T+1', label: 'Emergency / Last Minute', days: '1 - 2 Days', medianFare: 11200, volatility: 'High (34.2%)', cpiWeight: '15.0%', rationale: 'Captures distressed, non-discretionary corporate & medical travel premium.' },
@@ -52,6 +53,13 @@ export default function BookingWindowsPage() {
           <div className="mt-1.5">
             <DataSourceMeta isMock={isMock} source={isMock ? 'Demo dataset' : 'AirPulse validated fares (live)'} />
           </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <GenerateReportButton
+            exportType="BOOKING_WINDOW_ANALYSIS"
+            format="PDF"
+            title="AirPulse — Advance Booking Window Analysis"
+          />
         </div>
       </div>
 

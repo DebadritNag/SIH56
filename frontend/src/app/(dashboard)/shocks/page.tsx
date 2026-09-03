@@ -6,6 +6,7 @@ import { formatINR } from '@/lib/formatters';
 import { useDataMode } from '@/lib/providers/DataModeProvider';
 import { DataSourceMeta } from '@/components/data/DataBadge';
 import { EmptyShocksState } from '@/components/states/EmptyState';
+import { GenerateReportButton } from '@/components/data/GenerateReportButton';
 
 const SHOCKS = [
   { id: 'SHOCK-2026-0902-A', route: 'DEL → BOM', window: 'T+1', surgePct: 42.8, medianFare: 11840, baselineFare: 8290, agreementCount: '4/4 Sources', carriers: 'IndiGo, Air India, Akasa', detectedAt: '15:10 IST Today', status: 'CONFIRMED' },
@@ -40,6 +41,11 @@ export default function PriceShocksPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <GenerateReportButton
+            exportType="PRICE_SHOCKS"
+            format="PDF"
+            title="AirPulse — Market Price Shock Summary"
+          />
           <span className="px-2.5 py-1 bg-rose-50 text-rose-800 border border-rose-300 font-bold text-xs rounded">
             {activeCount} Active Confirmed Shocks
           </span>

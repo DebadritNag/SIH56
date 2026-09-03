@@ -21,6 +21,7 @@ import { ScrapingTestStep, ScrapingTestResult } from '@/types';
 import { formatINR } from '@/lib/formatters';
 import { notify } from '@/lib/notify';
 import { endpoints } from '@/lib/api/endpoints';
+import { GenerateReportButton } from '@/components/data/GenerateReportButton';
 
 const INITIAL_STEPS: ScrapingTestStep[] = [
   { step_number: 1, title: 'Collector Initialized', status: 'pending', detail: 'ota01-v1.4.2 instance instantiated with ethical rate limiter (60 req/min)' },
@@ -190,6 +191,11 @@ export default function ScrapingTestPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <GenerateReportButton
+            exportType="SYSTEM_SELF_TEST_REPORT"
+            format="PDF"
+            title="AirPulse — Live Scraping Verification Report"
+          />
           <span className="px-2.5 py-1 font-bold text-xs rounded uppercase tracking-wide border bg-emerald-50 text-emerald-800 border-emerald-300">
             LIVE WEB REQUEST • REAL FETCH
           </span>

@@ -5,6 +5,7 @@ import { CheckCircle2 } from 'lucide-react';
 import { useDataMode } from '@/lib/providers/DataModeProvider';
 import { useRouteContributors, useDashboardSummary } from '@/lib/hooks/useDashboard';
 import { DataSourceMeta } from '@/components/data/DataBadge';
+import { GenerateReportButton } from '@/components/data/GenerateReportButton';
 
 const QUALITY_MATRIX = [
   { route: 'DEL → BOM', t1: 98, t7: 99, t15: 96, t30: 94, t45: 92 },
@@ -65,6 +66,11 @@ export default function DataQualityPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <GenerateReportButton
+            exportType="DATA_QUALITY"
+            format="PDF"
+            title="AirPulse — Statistical Data Quality Matrix"
+          />
           <span className="px-2.5 py-1 bg-emerald-50 text-emerald-800 font-bold border border-emerald-300 rounded text-xs">
             {isMock ? 'Overall Quality: 94.8 / 100' : `${matrix.length} routes with live observations`}
           </span>

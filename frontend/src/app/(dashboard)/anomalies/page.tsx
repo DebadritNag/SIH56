@@ -75,7 +75,12 @@ export default function AnomaliesPage() {
             <Download className="w-3.5 h-3.5 text-blue-600" />
             <span>Export Anomalies</span>
           </button>
-          <GenerateReportButton exportType={'ANOMALIES' as never} format={'PDF' as never} title="PriceGuard Anomaly Report" />
+          <GenerateReportButton
+            exportType="ANOMALIES"
+            format="PDF"
+            title="AirPulse — Anomaly Intelligence Report"
+            filters={{ severity: severityFilter }}
+          />
           {dataMode === 'mock' && <MockBadge />}
           <span className="px-2.5 py-1 bg-rose-50 text-rose-700 font-bold rounded border border-rose-200">
             PriceGuard Active (Contamination: 0.04)

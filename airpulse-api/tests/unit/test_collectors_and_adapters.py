@@ -51,10 +51,10 @@ async def test_mospi_esankhyiki_adapter():
     assert len(datasets) >= 2
     assert any("CPI" in d["dataset_name"] for d in datasets)
 
-    ds_payload = await adapter.fetch_dataset("MOSPI_CPI_TRANSPORT_2026")
+    ds_payload = adapter.fetch_fixture()
     assert "checksum" in ds_payload
     assert len(ds_payload["checksum"]) == 64
-    assert adapter.validate_dataset(ds_payload["data"]) is True
+    assert adapter.validate_dataset(ds_payload["raw_bytes"]) is True
 
 
 @pytest.mark.asyncio

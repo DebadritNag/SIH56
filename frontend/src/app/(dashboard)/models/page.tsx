@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Cpu, ShieldCheck, CheckCircle2, Code, Layers } from 'lucide-react';
+import { GenerateReportButton } from '@/components/data/GenerateReportButton';
 
 export default function ModelsPage() {
   return (
@@ -18,6 +19,13 @@ export default function ModelsPage() {
           <p className="text-xs text-[#475467] mt-0.5">
             Model cards, training hyperparameters, evaluation metrics, and SHAP explainability specifications for FareGuard and PriceGuard.
           </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <GenerateReportButton
+            exportType="MODEL_REPORT"
+            format="PDF"
+            title="AirPulse — FareGuard & PriceGuard Model Registry"
+          />
         </div>
       </div>
 

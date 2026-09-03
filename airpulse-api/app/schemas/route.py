@@ -27,6 +27,24 @@ class RouteResponse(RouteBase):
     updated_at: datetime
 
 
+class AdvancePurchasePoint(BaseModel):
+    days_prior: int
+    window_label: str
+    today_fare: float
+    median_30d_fare: float
+
+
+class SourceComparisonItem(BaseModel):
+    source_name: str
+    source_type: str
+    median_fare: float
+    min_fare: float
+    observations: int
+    freshness: str
+    agreement_status: str
+    reliability_score: float
+
+
 class RouteInsights(BaseModel):
     route_code: str
     origin_code: str
@@ -40,3 +58,5 @@ class RouteInsights(BaseModel):
     source_coverage_count: int
     open_anomalies_count: int
     route_apix_latest: float
+    advance_purchase_curve: Optional[list[AdvancePurchasePoint]] = None
+    sources_comparison: Optional[list[SourceComparisonItem]] = None

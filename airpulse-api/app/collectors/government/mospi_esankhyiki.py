@@ -105,6 +105,19 @@ class MospiESankhyikiAdapter(BaseGovernmentAdapter):
                 "api_url": f"{CPI_API_BASE}/cpi/getCPIData",
                 "base_year": "2012=100",
             },
+            {
+                "external_dataset_id": "cpi-transport-communication-subindex",
+                "dataset_name": "MoSPI CPI (Transport & Communication Sub-Index)",
+                "dataset_code": "MOSPI_CPI_TRANSPORT_2026",
+                "product_name": "Transport & Communication CPI",
+                "dataset_type": "CPI_SUBINDEX",
+                "frequency": "monthly",
+                "format": "xlsx",
+                "relevance": "HIGH",
+                "landing_page_url": f"{PORTAL_BASE}/download-reports",
+                "api_url": f"{CPI_API_BASE}/cpi/getCPIData",
+                "base_year": "2012=100",
+            },
         ]
 
     async def fetch_metadata(self, dataset_code: str) -> Dict[str, Any]:

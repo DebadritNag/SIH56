@@ -74,7 +74,7 @@ export default function SourcesPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <GenerateReportButton exportType={'SOURCE_HEALTH' as never} format={'XLSX' as never} title="Source Health Report" />
+          <GenerateReportButton exportType="SOURCE_HEALTH" format="XLSX" title="AirPulse — Data Source Health Report" />
           <span className="px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-300 font-bold text-xs rounded">
             {SOURCES.length} Sources Active • {healthy} Healthy • {degraded} Degraded
           </span>

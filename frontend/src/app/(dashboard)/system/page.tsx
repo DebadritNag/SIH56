@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { ShieldCheck, Play, RotateCw, CheckCircle2, Server, Database, Key } from 'lucide-react';
 import { useSystemDiagnostics } from '@/lib/hooks/useDashboard';
+import { GenerateReportButton } from '@/components/data/GenerateReportButton';
 
 const TESTS = [
   { id: 1, name: 'PostgreSQL Database Connection & SSL', status: 'PASS', latency: '4ms' },
@@ -61,11 +62,16 @@ export default function SystemPage() {
             Automated verification suite validating database connectivity, cache layers, ML inference speed, and data source health.
           </p>
         </div>
-        <div>
+        <div className="flex items-center gap-2">
+          <GenerateReportButton
+            exportType="SYSTEM_DIAGNOSTICS_REPORT"
+            format="PDF"
+            title="AirPulse — System Diagnostics Dossier"
+          />
           <button
             onClick={runSelfTest}
             disabled={running}
-            className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded shadow-2xs transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded shadow-2xs transition-colors disabled:opacity-50 cursor-pointer"
           >
             {running ? <RotateCw className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5 fill-current" />}
             <span>RUN SYSTEM SELF-TEST</span>

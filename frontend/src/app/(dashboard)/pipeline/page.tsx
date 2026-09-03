@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { GitCommit, ArrowRight, CheckCircle2, RotateCw } from 'lucide-react';
+import { GenerateReportButton } from '@/components/data/GenerateReportButton';
 
 const NODES = [
   { name: '1. Web Scraping & Ingestion', workers: '4 Celery Workers', qps: '18 req/s', status: 'ACTIVE', color: 'border-blue-400' },
@@ -27,6 +28,13 @@ export default function PipelineMonitorPage() {
           <p className="text-xs text-[#475467] mt-0.5">
             End-to-end data pipeline topology showing queue depths, ingestion throughput, ML scoring latency, and persistence lag.
           </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <GenerateReportButton
+            exportType="PIPELINE_RUN"
+            format="PDF"
+            title="AirPulse — Pipeline Monitor Audit Report"
+          />
         </div>
       </div>
 

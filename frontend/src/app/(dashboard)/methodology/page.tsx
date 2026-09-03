@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { BookOpen, FileText, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { GenerateReportButton } from '@/components/data/GenerateReportButton';
 
 export default function MethodologyPage() {
   return (
@@ -18,6 +19,13 @@ export default function MethodologyPage() {
           <p className="text-xs text-[#475467] mt-0.5">
             Rigorous mathematical documentation conforming to MoSPI CPI Technical Advisory Committee standards.
           </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <GenerateReportButton
+            exportType="METHODOLOGY_REPORT"
+            format="PDF"
+            title="AirPulse — Official Index Methodology Document"
+          />
         </div>
       </div>
 

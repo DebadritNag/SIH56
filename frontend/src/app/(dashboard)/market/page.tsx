@@ -9,6 +9,7 @@ import { clsx } from 'clsx';
 import { useDataMode } from '@/lib/providers/DataModeProvider';
 import { useRouteContributors } from '@/lib/hooks/useDashboard';
 import { DataSourceMeta } from '@/components/data/DataBadge';
+import { GenerateReportButton } from '@/components/data/GenerateReportButton';
 
 const ALL_MARKET_ROUTES = [
   { route: 'DEL → BOM', origin: 'DEL', dest: 'BOM', median: 7420, change7d: 4.8, change30d: 12.1, status: 'SURGING' as const, t1: 11840, t7: 7420, t15: 5900, t30: 4850, t45: 4120 },
@@ -120,6 +121,15 @@ export default function MarketMonitorPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <GenerateReportButton
+            exportType="OVERVIEW_REPORT"
+            format="PDF"
+            title="AirPulse — Market Monitor Route Velocity Report"
+            filters={{
+              pressure: selectedPressure,
+              corridor: selectedCorridor,
+            }}
+          />
           <span className="px-2.5 py-1 bg-blue-50 text-blue-800 border border-blue-200 font-bold text-xs rounded">
             Showing: {filteredRoutes.length} of {dataset.length} Routes
           </span>

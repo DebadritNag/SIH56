@@ -10,11 +10,14 @@ class ExportType(str, Enum):
     APIX_INDEX = "APIX_INDEX"
     APIX_COMPONENTS = "APIX_COMPONENTS"
     ROUTE_INTELLIGENCE = "ROUTE_INTELLIGENCE"
+    BOOKING_WINDOW_ANALYSIS = "BOOKING_WINDOW_ANALYSIS"
     ANOMALIES = "ANOMALIES"
     PRICE_SHOCKS = "PRICE_SHOCKS"
+    ALERTS = "ALERTS"
     SOURCE_HEALTH = "SOURCE_HEALTH"
     COLLECTION_RUN = "COLLECTION_RUN"
     PIPELINE_RUN = "PIPELINE_RUN"
+    INGESTION_REPORT = "INGESTION_REPORT"
     DATA_QUALITY = "DATA_QUALITY"
     BACKTEST_DATA = "BACKTEST_DATA"
     BACKTEST_AUDIT_PDF = "BACKTEST_AUDIT_PDF"
@@ -22,7 +25,10 @@ class ExportType(str, Enum):
     PROVENANCE_REPORT = "PROVENANCE_REPORT"
     REFERENCE_DATASET = "REFERENCE_DATASET"
     BASKET_DEFINITION = "BASKET_DEFINITION"
+    MODEL_REPORT = "MODEL_REPORT"
     SYSTEM_DIAGNOSTICS_REPORT = "SYSTEM_DIAGNOSTICS_REPORT"
+    SYSTEM_SELF_TEST_REPORT = "SYSTEM_SELF_TEST_REPORT"
+    OVERVIEW_REPORT = "OVERVIEW_REPORT"
     CHART_IMAGE = "CHART_IMAGE"
 
 
@@ -50,20 +56,26 @@ ALLOWED_FORMAT_MAPPING: Dict[ExportType, List[ExportFormat]] = {
     ExportType.FARE_OBSERVATIONS: [ExportFormat.CSV, ExportFormat.XLSX, ExportFormat.JSON],
     ExportType.APIX_INDEX: [ExportFormat.CSV, ExportFormat.XLSX, ExportFormat.PDF],
     ExportType.APIX_COMPONENTS: [ExportFormat.CSV, ExportFormat.XLSX],
-    ExportType.ROUTE_INTELLIGENCE: [ExportFormat.CSV, ExportFormat.PDF],
+    ExportType.ROUTE_INTELLIGENCE: [ExportFormat.CSV, ExportFormat.XLSX, ExportFormat.PDF],
+    ExportType.BOOKING_WINDOW_ANALYSIS: [ExportFormat.CSV, ExportFormat.XLSX, ExportFormat.PDF],
     ExportType.ANOMALIES: [ExportFormat.CSV, ExportFormat.XLSX, ExportFormat.PDF],
-    ExportType.PRICE_SHOCKS: [ExportFormat.CSV, ExportFormat.XLSX],
-    ExportType.SOURCE_HEALTH: [ExportFormat.CSV, ExportFormat.XLSX],
+    ExportType.PRICE_SHOCKS: [ExportFormat.CSV, ExportFormat.XLSX, ExportFormat.PDF],
+    ExportType.ALERTS: [ExportFormat.CSV, ExportFormat.PDF],
+    ExportType.SOURCE_HEALTH: [ExportFormat.CSV, ExportFormat.XLSX, ExportFormat.PDF],
     ExportType.COLLECTION_RUN: [ExportFormat.CSV, ExportFormat.JSON],
-    ExportType.PIPELINE_RUN: [ExportFormat.CSV, ExportFormat.JSON],
-    ExportType.DATA_QUALITY: [ExportFormat.PDF, ExportFormat.XLSX],
+    ExportType.PIPELINE_RUN: [ExportFormat.CSV, ExportFormat.JSON, ExportFormat.PDF],
+    ExportType.INGESTION_REPORT: [ExportFormat.CSV, ExportFormat.JSON, ExportFormat.PDF],
+    ExportType.DATA_QUALITY: [ExportFormat.PDF, ExportFormat.XLSX, ExportFormat.CSV],
     ExportType.BACKTEST_DATA: [ExportFormat.XLSX, ExportFormat.CSV],
     ExportType.BACKTEST_AUDIT_PDF: [ExportFormat.PDF, ExportFormat.XLSX, ExportFormat.ZIP],
     ExportType.METHODOLOGY_REPORT: [ExportFormat.PDF],
     ExportType.PROVENANCE_REPORT: [ExportFormat.PDF, ExportFormat.JSON],
     ExportType.REFERENCE_DATASET: [ExportFormat.CSV, ExportFormat.XLSX],
     ExportType.BASKET_DEFINITION: [ExportFormat.CSV, ExportFormat.XLSX],
+    ExportType.MODEL_REPORT: [ExportFormat.PDF, ExportFormat.XLSX, ExportFormat.JSON],
     ExportType.SYSTEM_DIAGNOSTICS_REPORT: [ExportFormat.PDF, ExportFormat.JSON],
+    ExportType.SYSTEM_SELF_TEST_REPORT: [ExportFormat.PDF, ExportFormat.JSON],
+    ExportType.OVERVIEW_REPORT: [ExportFormat.PDF, ExportFormat.CSV, ExportFormat.XLSX],
     ExportType.CHART_IMAGE: [ExportFormat.PNG, ExportFormat.PDF],
 }
 
