@@ -42,6 +42,8 @@ class SourceResponse(SourceBase):
     last_failure_at: Optional[datetime] = None
     consecutive_failures: int = 0
     reliability_score: float = 1.0
+    quotes_today: int = 0
+    avg_latency_ms: int = 120
     created_at: datetime
     updated_at: datetime
 

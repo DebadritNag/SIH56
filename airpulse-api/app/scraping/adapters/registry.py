@@ -45,6 +45,16 @@ class GenericPortalAdapter(SourceAdapter):
 
     def build_url(self, request: SearchRequest) -> str:
         dep_str = str(request.departure_date)
+        norm_name = (self.source_name or "").lower()
+        if "makemytrip" in norm_name:
+            cabin_val = getattr(request.cabin, "value", "E") if hasattr(request.cabin, "value") else "E"
+            return f"https://www.makemytrip.com/flight/search?itinerary={request.origin}-{request.destination}-{dep_str}&tripType=O&paxType=A-1_C-0_I-0&intl=false&cabinClass={cabin_val}"
+        elif "indigo" in norm_name:
+            return f"https://www.goindigo.in/booking/search-flights?origin={request.origin}&destination={request.destination}&departure={dep_str}&adults=1&class=E"
+        elif "airindia" in norm_name or "air_india" in norm_name:
+            return f"https://www.airindia.com/in/en/booking/flight-search?from={request.origin}&to={request.destination}&departDate={dep_str}&adult=1&cabin=Economy"
+        elif self._base_url and "google.com" not in self._base_url:
+            return f"{self._base_url}/search?origin={request.origin}&destination={request.destination}&date={dep_str}"
         return f"{self._base_url}?q=Flights+from+{request.origin}+to+{request.destination}+on+{dep_str}&curr=INR"
 
     def parse_scrapy_response(self, response_data: dict, request: SearchRequest):

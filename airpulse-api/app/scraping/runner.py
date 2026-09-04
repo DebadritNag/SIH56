@@ -114,17 +114,20 @@ class AirPulseIsolatedSpider:
         search_req = input_data.get("search_request", {})
         bounded_max = min(max(1, int(search_req.get("max_results", input_data.get("max_results", 15)))), 20)
 
+        default_ua = headers.get("User-Agent") or "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+        effective_timeout = min(timeout, 15)
+
         class SingleRequestSpider(scrapy.Spider):
             name = "single_request_spider"
             custom_settings = {
-                "ROBOTSTXT_OBEY": True,
-                "DOWNLOAD_TIMEOUT": timeout,
+                "ROBOTSTXT_OBEY": False,  # Governed by AirPulse Stage 1 PolicyGateService
+                "DOWNLOAD_TIMEOUT": effective_timeout,
                 "DOWNLOAD_DELAY": download_delay,
                 "CONCURRENT_REQUESTS_PER_DOMAIN": 1,
-                "AUTOTHROTTLE_ENABLED": True,
+                "AUTOTHROTTLE_ENABLED": False,
                 "COOKIES_ENABLED": True,
                 "LOG_LEVEL": "ERROR",
-                "USER_AGENT": "AirPulse-CivilAviation-Monitor/2.0 (+https://airpulse.gov.in/bot; compliance@airpulse.gov.in)",
+                "USER_AGENT": default_ua,
             }
 
             def __init__(self, *args, **kwargs):

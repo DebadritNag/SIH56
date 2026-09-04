@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import Optional
 from uuid import UUID
-from datetime import date
+from datetime import date, timedelta
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -67,12 +67,15 @@ async def execute_live_scraping_test(
             src = (await db.execute(select(Source).where(Source.name.ilike(f"%{target_name}%")))).scalars().first()
 
     scraper = get_live_scraper()
-    dep = payload.departure_date or date.today()
-    bw = payload.booking_window_days
-    if payload.departure_date:
-        delta = (payload.departure_date - date.today()).days
+    today_val = date.today()
+    bw = max(1, payload.booking_window_days or 7)
+    if payload.departure_date and payload.departure_date >= today_val:
+        dep = payload.departure_date
+        delta = (payload.departure_date - today_val).days
         if delta >= 0:
             bw = delta
+    else:
+        dep = today_val + timedelta(days=bw)
 
     raw_query = (payload.source_name or (src.display_name if src else "")).lower()
     is_ota = any(k in raw_query for k in ("ota", "cleartrip", "makemytrip", "easemytrip"))

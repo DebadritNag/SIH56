@@ -82,6 +82,7 @@ class CollectionRunDetail(BaseModel):
     duration_ms: Optional[int]
     trigger_type: str
     triggered_by: Optional[str]
+    run_metadata: Optional[Dict[str, Any]] = None
     pipeline_runs: Optional[List[PipelineRunDetail]] = []
 
 

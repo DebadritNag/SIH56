@@ -25,16 +25,18 @@ import { GenerateReportButton } from '@/components/data/GenerateReportButton';
 import { CircleReloadingAnimation } from '@/components/ui/CircleReloadingAnimation';
 
 
-const INITIAL_STEPS: ScrapingTestStep[] = [
-  { step_number: 1, title: 'Collector Initialized', status: 'pending', detail: 'ota01-v1.4.2 instance instantiated with ethical rate limiter (60 req/min)' },
-  { step_number: 2, title: 'Source Reachability & DNS Handshake', status: 'pending', detail: 'TCP connection established, TLS 1.3 negotiated' },
-  { step_number: 3, title: 'Search Request Submitted', status: 'pending', detail: 'DEL -> BOM, Date: 09 Sep 2026, Window: T+7, Cabin: Economy' },
-  { step_number: 4, title: 'HTTP Response Received', status: 'pending', detail: 'HTTP 200 OK (184.6 KB raw JSON payload)' },
-  { step_number: 5, title: 'Fare Elements Detected', status: 'pending', detail: '18 airfare quotes extracted across 5 scheduled domestic carriers' },
-  { step_number: 6, title: 'Cryptographic SHA-256 Envelope Stored', status: 'pending', detail: 'Immutable record committed to raw_fares with hash 4d8a0c5f...' },
-  { step_number: 7, title: 'Canonical Product Normalization', status: 'pending', detail: '18/18 quotes normalized to base fare, taxes, fees, and booking window days' },
-  { step_number: 8, title: 'Domain Sanity & Physical Validation', status: 'pending', detail: '17 quotes valid; 1 quote rejected (corrupted negative fare detected)' },
-  { step_number: 9, title: 'Database Persistence & Deduplication Verification', status: 'pending', detail: 'Validated fares committed with quote hash generation' },
+const LIVE_PIPELINE_STEPS: ScrapingTestStep[] = [
+  { step_number: 1, title: 'POLICY CHECK', status: 'pending', detail: 'Policy gate verified · Ethical rate limiter and ToS guidelines checked' },
+  { step_number: 2, title: 'ENGINE INIT', status: 'pending', detail: 'Collector engine initialized (Scrapy subprocess / Playwright browser context)' },
+  { step_number: 3, title: 'NAVIGATION', status: 'pending', detail: 'Connecting to live source portal and dispatching search request' },
+  { step_number: 4, title: 'JS RENDER', status: 'pending', detail: 'Evaluating HTML payload buffers and client-side DOM execution' },
+  { step_number: 5, title: 'BLOCK CHECK', status: 'pending', detail: 'Zero-evasion protocol check (CAPTCHA / Cloudflare / Akamai challenge verification)' },
+  { step_number: 6, title: 'SEARCH', status: 'pending', detail: 'Evaluating corridor origin, destination, and departure date criteria' },
+  { step_number: 7, title: 'RESULT DETECTION', status: 'pending', detail: 'Detecting flight inventory cards and fare elements' },
+  { step_number: 8, title: 'PARSE', status: 'pending', detail: 'Parsing structured flight numbers, departure/arrival schedules, and prices' },
+  { step_number: 9, title: 'RAW STORAGE', status: 'pending', detail: 'Computing cryptographic SHA-256 immutable evidence envelope' },
+  { step_number: 10, title: 'NORMALIZATION', status: 'pending', detail: 'Normalizing base fare, taxes, mandatory fees, and booking window days' },
+  { step_number: 11, title: 'VALIDATION', status: 'pending', detail: 'Validating fares against civil aviation domain bounds and physical limits' },
 ];
 
 export default function ScrapingTestPage() {
@@ -51,12 +53,12 @@ export default function ScrapingTestPage() {
 
   const [isRunning, setIsRunning] = useState(false);
   const [activeStepIndex, setActiveStepIndex] = useState<number>(-1);
-  const [steps, setSteps] = useState<ScrapingTestStep[]>(INITIAL_STEPS);
+  const [steps, setSteps] = useState<ScrapingTestStep[]>(LIVE_PIPELINE_STEPS);
   const [testResult, setTestResult] = useState<ScrapingTestResult | null>(null);
   const [showRawJson, setShowRawJson] = useState(false);
 
   const STATUS_MAP: Record<string, ScrapingTestStep['status']> = {
-    passed: 'completed', warning: 'completed', failed: 'failed',
+    passed: 'completed', warning: 'completed', failed: 'failed', skipped: 'pending',
   };
 
   const handleRunLiveTest = async () => {
@@ -69,7 +71,7 @@ export default function ScrapingTestPage() {
     setIsRunning(true);
     setTestResult(null);
     setActiveStepIndex(0);
-    setSteps(INITIAL_STEPS.map((s, idx) => ({
+    setSteps(LIVE_PIPELINE_STEPS.map((s, idx) => ({
       ...s,
       status: idx === 0 ? 'running' : 'pending',
       detail: idx === 0 ? 'Verifying source policy and rate limits...' : '',
@@ -79,37 +81,37 @@ export default function ScrapingTestPage() {
     const [origin, destination] = route.split('-');
     const bwMap: Record<string, number> = { 'T+1 (1-2 Days)': 1, 'T+7 (3-10 Days)': 7, 'T+15 (11-20 Days)': 15, 'T+30 (21-35 Days)': 30, 'T+45 (36+ Days)': 45 };
 
-    const LIVE_PROMPT_DETAILS: Record<number, string> = {
-      0: 'Policy verified: ALLOWED · Ethical rate limiter engaged',
-      1: 'Collector context active · Resource filtering applied',
-      2: 'Connected to live corridor stream (HTTP 200)',
-      3: 'Live payload buffers received and parsed',
-      4: 'Security challenge check clean (no bot blocks)',
-      5: `Probing corridor: ${origin} → ${destination}`,
-      6: 'Live flight inventory & fare records detected',
-      7: 'Raw records parsed and catalogued',
-      8: 'Computing SHA-256 cryptographic proof',
-      9: 'Observation envelope normalized',
-      10: 'Geo-position coordinates validated',
-    };
-
+    // Advance Stage 0 (Policy) -> Stage 1 (Engine Init) -> Stage 2 (Navigation)
+    // AND HOLD ON STAGE 2 (Navigation) while waiting for network response!
     let activeIndex = 0;
     const progressTimer = setInterval(() => {
-      if (activeIndex < INITIAL_STEPS.length - 1) {
+      if (activeIndex < 2) {
         activeIndex++;
         setActiveStepIndex(activeIndex);
         setSteps((prev) =>
           prev.map((s, idx) => {
             if (idx < activeIndex) {
-              return { ...s, status: 'completed', detail: LIVE_PROMPT_DETAILS[idx] || s.detail };
+              const detail = idx === 0
+                ? 'Policy verified: ALLOWED · Ethical rate limiter engaged'
+                : `Engine active: ${selectedEngine} collector context ready`;
+              return { ...s, status: 'completed', detail };
             } else if (idx === activeIndex) {
-              return { ...s, status: 'running', detail: 'Processing live telemetry...' };
+              return {
+                ...s,
+                status: 'running',
+                detail: idx === 2
+                  ? `Connecting to ${selectedSource} via ${selectedEngine} engine…`
+                  : 'Initializing collector engine…',
+              };
             }
             return s;
           })
         );
+      } else {
+        // Hold strictly at stage 2 (Navigation) while waiting for network response!
+        clearInterval(progressTimer);
       }
-    }, 450);
+    }, 350);
 
     try {
       const res = await endpoints.runScrapingTest({
@@ -126,38 +128,67 @@ export default function ScrapingTestPage() {
       });
       clearInterval(progressTimer);
 
-      // Smoothly advance through remaining steps sequentially so user observes pipeline execution
       const finalStages = (res.stages && res.stages.length > 0) ? res.stages : [];
-      for (let i = activeIndex; i < INITIAL_STEPS.length; i++) {
-        setActiveStepIndex(i);
-        setSteps((prev) =>
-          prev.map((s, idx) => {
-            if (idx < i) {
-              const backendDetail = finalStages[idx]?.detail || LIVE_PROMPT_DETAILS[idx] || s.detail;
-              return { ...s, status: 'completed', detail: backendDetail };
-            } else if (idx === i) {
-              return { ...s, status: 'running', detail: finalStages[idx]?.detail || 'Executing verification...' };
-            }
-            return s;
-          })
-        );
-        await new Promise((r) => setTimeout(r, 160));
-      }
+      const hasFailed = res.status === 'FAILED';
 
-      // Final mapping of real backend stages dynamically onto the step list
-      if (res.stages && res.stages.length > 0) {
-        setSteps(
-          res.stages.map((st: any, idx: number) => {
-            const rawStatus = (st.status || '').toLowerCase();
-            const mapped = STATUS_MAP[rawStatus] ?? (rawStatus === 'passed' ? 'completed' : rawStatus === 'failed' ? 'failed' : rawStatus === 'skipped' ? 'pending' : 'pending');
-            return {
-              step_number: idx + 1,
-              title: st.stage.replace(/_/g, ' '),
-              status: mapped,
-              detail: st.detail || '',
-            };
-          })
-        );
+      if (hasFailed) {
+        // Map backend stages directly - NEVER advance beyond the failure stage!
+        setActiveStepIndex(2);
+        if (finalStages.length > 0) {
+          setSteps(
+            finalStages.map((st: any, idx: number) => {
+              const rawStatus = (st.status || '').toLowerCase();
+              const mapped = STATUS_MAP[rawStatus] ?? (rawStatus === 'passed' ? 'completed' : rawStatus === 'failed' ? 'failed' : 'pending');
+              return {
+                step_number: idx + 1,
+                title: st.stage.replace(/_/g, ' '),
+                status: mapped,
+                detail: st.detail || '',
+              };
+            })
+          );
+        } else {
+          setSteps((prev) =>
+            prev.map((s, idx) => {
+              if (idx < 2) return { ...s, status: 'completed' };
+              if (idx === 2) return { ...s, status: 'failed', detail: res.failure_reason || 'Navigation timed out' };
+              return { ...s, status: 'pending' };
+            })
+          );
+        }
+      } else {
+        // Success: smoothly advance through remaining stages (2 to 10)
+        for (let i = 2; i < LIVE_PIPELINE_STEPS.length; i++) {
+          setActiveStepIndex(i);
+          setSteps((prev) =>
+            prev.map((s, idx) => {
+              if (idx < i) {
+                const backendDetail = finalStages[idx]?.detail || s.detail;
+                return { ...s, status: 'completed', detail: backendDetail };
+              } else if (idx === i) {
+                return { ...s, status: 'running', detail: finalStages[idx]?.detail || 'Processing live telemetry...' };
+              }
+              return s;
+            })
+          );
+          await new Promise((r) => setTimeout(r, 80));
+        }
+
+        // Final complete state
+        if (finalStages.length > 0) {
+          setSteps(
+            finalStages.map((st: any, idx: number) => {
+              const rawStatus = (st.status || '').toLowerCase();
+              const mapped = STATUS_MAP[rawStatus] ?? (rawStatus === 'passed' ? 'completed' : rawStatus === 'failed' ? 'failed' : 'pending');
+              return {
+                step_number: idx + 1,
+                title: st.stage.replace(/_/g, ' '),
+                status: mapped,
+                detail: st.detail || '',
+              };
+            })
+          );
+        }
       }
 
       if (res.status === 'FAILED') {
@@ -362,10 +393,10 @@ export default function ScrapingTestPage() {
     setIsRunning(true);
     setTestResult(null);
     setActiveStepIndex(0);
-    setSteps(INITIAL_STEPS.map((s) => ({ ...s, status: 'pending' })));
+    setSteps(LIVE_PIPELINE_STEPS.map((s: ScrapingTestStep) => ({ ...s, status: 'pending' })));
     let currentStep = 0;
     const interval = setInterval(() => {
-      if (currentStep < INITIAL_STEPS.length) {
+      if (currentStep < LIVE_PIPELINE_STEPS.length) {
         if (simulateFailure && currentStep === 3) {
           setSteps((prev) => prev.map((s, idx) => (idx < 3 ? { ...s, status: 'completed' } : idx === 3 ? { ...s, status: 'failed', detail: 'HTTP 429 Too Many Requests (simulated)' } : { ...s, status: 'pending' })));
           setTestResult(mockScrapingTestFailure);

@@ -97,10 +97,17 @@ class Source(Base):
     consecutive_failures = Column(Integer, default=0, nullable=False)
     reliability_score = Column(Float, default=1.0, nullable=False)
     collector_version = Column(String(50), default="1.0.0", nullable=False)
-    parser_version = Column(String(50), default="1.0.0", nullable=False)
-    source_metadata = Column(JSONB, nullable=True)
+    metadata_json = Column("metadata", JSONB, nullable=True)
     created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
+
+    @property
+    def source_metadata(self):
+        return self.metadata_json or {}
+
+    @source_metadata.setter
+    def source_metadata(self, val):
+        self.metadata_json = val
 
 
 class CollectionRun(Base):
@@ -141,9 +148,8 @@ class PipelineRun(Base):
     records_input = Column(Integer, default=0, nullable=False)
     records_processed = Column(Integer, default=0, nullable=False)
     records_failed = Column(Integer, default=0, nullable=False)
-    version = Column(String(50), nullable=False, default="1.0.0")
-    error_summary = Column(JSONB, nullable=True)
-    run_metadata = Column(JSONB, nullable=True)
+    error_summary = Column(Text, nullable=True)
+    metadata_json = Column("metadata", JSONB, nullable=True)
     created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
 
     steps = relationship("PipelineStep", back_populates="pipeline_run", cascade="all, delete-orphan")
@@ -155,6 +161,7 @@ class PipelineStep(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     pipeline_run_id = Column(UUID(as_uuid=True), ForeignKey("pipeline_runs.id"), nullable=False, index=True)
     step_name = Column(String(50), nullable=False, index=True)
+    step_order = Column(Integer, nullable=True)
     status = Column(String(20), nullable=False, default="pending")  # pending, running, completed, failed, skipped
     started_at = Column(DateTime(timezone=True), nullable=True)
     finished_at = Column(DateTime(timezone=True), nullable=True)
@@ -162,8 +169,9 @@ class PipelineStep(Base):
     records_output = Column(Integer, default=0, nullable=False)
     records_failed = Column(Integer, default=0, nullable=False)
     duration_ms = Column(Integer, nullable=True)
-    message = Column(String(255), nullable=True)
-    step_metadata = Column(JSONB, nullable=True)
+    message = Column(Text, nullable=True)
+    metadata_json = Column("metadata", JSONB, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
 
     pipeline_run = relationship("PipelineRun", back_populates="steps")
 

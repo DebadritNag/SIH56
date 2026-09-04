@@ -62,6 +62,8 @@ class SourceRepository:
         if "requires_javascript" in config and config["requires_javascript"] is not None:
             src.requires_javascript = bool(config["requires_javascript"])
             meta["requires_javascript"] = bool(config["requires_javascript"])
-        src.source_metadata = meta
+        src.metadata_json = meta
+        from datetime import datetime, timezone
+        src.updated_at = datetime.now(timezone.utc)
         await self.session.flush()
         return src

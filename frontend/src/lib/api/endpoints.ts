@@ -60,6 +60,9 @@ export interface BackendSource {
   playwright_enabled?: boolean;
   last_successful_engine?: string | null;
   last_attempted_engine?: string | null;
+  quotes_today?: number;
+  avg_latency_ms?: number;
+  records_today?: number;
 }
 
 export interface BackendSourceHealth {
@@ -229,6 +232,9 @@ export const endpoints = {
       requires_javascript?: boolean;
     },
   ) => patchData<BackendSource>(`/sources/${sourceId}/engine`, payload),
+
+  // Source Health & Socket Probes
+  probeSources: () => postData<{ probed_count: number; timestamp: string }>("/sources/probe"),
 } as const;
 
 export interface ScrapingTestStageApi {

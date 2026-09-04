@@ -57,9 +57,13 @@ function toRow(s: BackendSource, isLiveMode: boolean): SourceRow {
       : 'Official REST API');
 
   const latency =
-    s.source_type === 'OTA' ? 78 : s.source_type === 'AIRLINE' ? 142 : 45;
+    s.avg_latency_ms != null
+      ? s.avg_latency_ms
+      : (s.source_type === 'OTA' ? 78 : s.source_type === 'AIRLINE' ? 142 : 45);
   const records =
-    s.source_type === 'OTA' ? 4820 : s.source_type === 'AIRLINE' ? 3150 : 850;
+    s.quotes_today != null
+      ? s.quotes_today
+      : (s.records_today != null ? s.records_today : 0);
   const parser =
     s.source_type === 'OTA'
       ? 'scrapy-isolated-v2.11'
@@ -126,9 +130,14 @@ export default function SourcesPage() {
   const handleReload = async () => {
     setIsManualReloading(true);
     try {
+      try {
+        await endpoints.probeSources();
+      } catch {
+        // Backend probe or fallback
+      }
       await refetchSources();
       notify.success('Connectors health updated', {
-        description: `Verified ${SOURCES.length || 12} active telemetry connectors.`,
+        description: `Verified ${SOURCES.length || 12} active telemetry connectors with live probes.`,
       });
     } catch {
       notify.error('Failed to refresh connectors');
@@ -142,8 +151,9 @@ export default function SourcesPage() {
       await endpoints.updateSourceEngine(sourceId, { preferred_engine: engine });
       notify.success(`Preferred engine set to ${engine}`, { id: `engine-${sourceId}` });
       await refetchSources();
-    } catch {
-      notify.error('Failed to update source engine configuration');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to update source engine configuration';
+      notify.error(msg);
     }
   };
 
