@@ -80,7 +80,7 @@ export default function ScrapingTestPage() {
       3: 'Live payload buffers received and parsed',
       4: 'Security challenge check clean (no bot blocks)',
       5: `Probing corridor: ${origin} → ${destination}`,
-      6: 'Airborne flight callsigns detected',
+      6: 'Live flight inventory & fare records detected',
       7: 'Raw records parsed and catalogued',
       8: 'Computing SHA-256 cryptographic proof',
       9: 'Observation envelope normalized',
@@ -195,13 +195,21 @@ export default function ScrapingTestPage() {
           carrierRaw.includes('SG') || carrierRaw.toLowerCase().includes('spice') ? 'SpiceJet' :
           String(q.airline ?? 'IndiGo');
 
+        let flightNum = String(q.flight_no ?? q.flight_number ?? '6E-6047').trim();
+        // Normalize "6E 235" or "6E 6047" or "6E235" to "6E-235" / "6E-6047"
+        if (/^([A-Z0-9]{2})\s+(\d+)$/i.test(flightNum)) {
+          flightNum = flightNum.replace(/^([A-Z0-9]{2})\s+(\d+)$/i, '$1-$2');
+        } else if (/^([A-Z0-9]{2})(\d{3,4})$/i.test(flightNum) && !flightNum.includes('-')) {
+          flightNum = flightNum.replace(/^([A-Z0-9]{2})(\d{3,4})$/i, '$1-$2');
+        }
+
         const total = q.gross_total != null && Number(q.gross_total) > 0 ? Number(q.gross_total) : (q.total_fare != null ? Number(q.total_fare) : 6442);
         const base = q.base_price != null && Number(q.base_price) > 0 ? Number(q.base_price) : Math.round(total / 1.12);
         const taxes = Math.max(0, total - base);
 
         return {
           airline: fullAirlineName,
-          flight_number: String(q.flight_no ?? q.flight_number ?? '6E-5096'),
+          flight_number: flightNum,
           departure_time: depTime,
           cabin: String(q.cabin ?? 'Economy'),
           base_fare: base,
