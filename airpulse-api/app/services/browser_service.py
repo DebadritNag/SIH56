@@ -278,6 +278,17 @@ class SharedBrowserService:
             logger.info("Chromium launched successfully in headless mode.")
             return self._browser
         except Exception as exc:
+            msg = str(exc)
+            if "Executable doesn't exist" in msg or "playwright install" in msg:
+                clean_msg = (
+                    "Chromium executable not found in container (/root/.cache/ms-playwright). "
+                    "Run 'playwright install chromium' to install browser binaries. "
+                    "On free-tier hosting (512MB RAM cap), select an OTA/HTTP source."
+                )
+                raise ScraperError(
+                    ScrapeFailureStage.BROWSER_LAUNCH_FAILURE,
+                    clean_msg,
+                ) from exc
             raise ScraperError(
                 ScrapeFailureStage.BROWSER_LAUNCH_FAILURE,
                 f"Failed to launch Chromium: {exc}",

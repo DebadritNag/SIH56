@@ -64,9 +64,13 @@ async def execute_live_scraping_test(
 
     scraper = get_live_scraper()
     dep = payload.departure_date or date.today()
+    raw_query = (payload.source_name or (src.display_name if src else "")).lower()
+    is_ota = any(k in raw_query for k in ("ota", "cleartrip", "makemytrip", "easemytrip"))
+    source_type = "ota" if is_ota else str(getattr(src, "source_type", "airline") if src else "airline")
+
     result = await scraper.run(
         source_name=(src.display_name if src else (payload.source_name or "AirPulse Test Source")),
-        source_type=str(getattr(src, "source_type", "airline") if src else "airline"),
+        source_type=source_type,
         base_url=getattr(src, "base_url", None) if src else None,
         origin=payload.origin,
         destination=payload.destination,

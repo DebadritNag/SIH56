@@ -145,7 +145,8 @@ class LiveScraper:
 
         # Determine if this request targets a browser-rendered airline portal
         norm_name = source_name.lower().strip().replace(" ", "_")
-        is_airline = (
+        is_ota = any(k in norm_name for k in ("ota", "cleartrip", "makemytrip", "easemytrip"))
+        is_airline = not is_ota and (
             "indigo" in norm_name
             or "air_india" in norm_name
             or "spicejet" in norm_name
@@ -461,6 +462,7 @@ class LiveScraper:
                 "duration_ms": duration_ms,
                 "stages": stages,
                 "quotes": valid_quotes,
+                "collector_version": f"{airline_key}-playwright-v1.2.0",
                 "is_live": True,
             }
 
@@ -625,6 +627,7 @@ class LiveScraper:
             "duration_ms": duration_ms,
             "stages": stages,
             "quotes": valid[:50],
+            "collector_version": "ota-http-telemetry-v1.2.0",
             "is_live": True,
         }
 
@@ -681,6 +684,32 @@ class LiveScraper:
         response_hash: Optional[str] = None,
     ) -> Dict[str, Any]:
         duration_ms = int((time.time() - started) * 1000)
+
+        # Dynamic, context-accurate remediation guidance
+        remediation = "Source temporarily unavailable or blocked. Try an alternate source or use MOCK mode for demonstrations."
+        if failure_stage == ScrapeFailureStage.BROWSER_LAUNCH_FAILURE.value:
+            remediation = (
+                "Chromium browser binary missing on host. Run 'playwright install chromium' to install browsers, "
+                "or select an OTA/HTTP source which runs without a headless browser."
+            )
+        elif failure_stage in (ScrapeFailureStage.BLOCKED.value, ScrapeFailureStage.CHALLENGE_DETECTED.value, ScrapeFailureStage.CAPTCHA_DETECTED.value):
+            remediation = "Source portal presented an anti-bot security challenge. AirPulse complies with ethical zero-evasion scraping. Try another route or use MOCK mode."
+        elif failure_stage == ScrapeFailureStage.RATE_LIMITED.value:
+            remediation = "Upstream rate limit reached (HTTP 429). Adaptive rate limiter engaged. Retry after cooldown."
+        elif failure_stage == ScrapeFailureStage.POLICY_RESTRICTED.value:
+            remediation = "Extraction disallowed by institutional policy gate or robots.txt."
+
+        engine_version = "ota-http-telemetry-v1.2.0"
+        low_src = source_name.lower()
+        if "indigo" in low_src:
+            engine_version = "indigo-playwright-v1.2.0"
+        elif "air_india" in low_src or "air india" in low_src:
+            engine_version = "airindia-playwright-v1.2.0"
+        elif "spicejet" in low_src:
+            engine_version = "spicejet-playwright-v1.2.0"
+        elif "akasa" in low_src:
+            engine_version = "akasa-playwright-v1.2.0"
+
         return {
             "status": "FAILED",
             "source": source_name,
@@ -691,6 +720,8 @@ class LiveScraper:
             "response_hash": response_hash,
             "failure_stage": failure_stage,
             "failure_reason": failure_reason,
+            "recommended_remediation": remediation,
+            "collector_version": engine_version,
             "quotes_found": 0,
             "quotes_validated": 0,
             "quotes_rejected": 0,

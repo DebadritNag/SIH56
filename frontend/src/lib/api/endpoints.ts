@@ -232,6 +232,9 @@ export interface ScrapingTestApiResult {
   duration_ms: number;
   failure_stage?: string;
   failure_reason?: string;
+  recommended_remediation?: string;
+  collector_version?: string;
+  last_successful_run?: string;
   stages: ScrapingTestStageApi[];
   quotes: Array<Record<string, unknown>>;
   is_live: boolean;

@@ -96,18 +96,53 @@ export default function ScrapingTestPage() {
       }
 
       if (res.status === 'FAILED') {
+        const stage = res.failure_stage || 'FAILED';
+        let remediation = res.recommended_remediation;
+        if (!remediation) {
+          if (stage === 'BROWSER_LAUNCH_FAILURE') {
+            remediation = 'Chromium executable not found on host. Run `playwright install chromium` in your server environment, or select an OTA/HTTP source which operates with zero browser overhead.';
+          } else if (stage === 'BLOCKED' || stage === 'CHALLENGE_DETECTED' || stage === 'CAPTCHA_DETECTED') {
+            remediation = 'Source portal presented an anti-bot challenge. AirPulse complies with zero-evasion scraping. Try another route or use MOCK mode.';
+          } else if (stage === 'RATE_LIMITED') {
+            remediation = 'Upstream source rate limit reached (HTTP 429). Adaptive rate limiter is backing off. Retry after cooldown.';
+          } else {
+            remediation = 'Source blocked/unavailable. Try another source, or use MOCK mode for a demo.';
+          }
+        }
+
+        const engineVersion = res.collector_version || (
+          selectedSource.includes('IndiGo') ? 'indigo-playwright-v1.2.0' :
+          selectedSource.includes('Air India') ? 'airindia-playwright-v1.2.0' :
+          selectedSource.includes('SpiceJet') ? 'spicejet-playwright-v1.2.0' :
+          'ota-http-telemetry-v1.2.0'
+        );
+
         setTestResult({
-          ...mockScrapingTestFailure,
           success: false,
+          source: res.source || selectedSource,
+          route: res.route || `${origin} → ${destination}`,
+          departure_date: res.departure_date || departureDate,
+          booking_window: bookingWindow,
+          capture_timestamp: new Date().toISOString(),
+          http_status: res.http_status ?? 500,
+          response_size_kb: 0,
+          quotes_found: 0,
+          quotes_valid: 0,
+          quotes_rejected: 0,
+          response_hash: res.response_hash || '—',
+          collector_version: engineVersion,
+          parser_version: 'v1.2.0',
+          raw_evidence_json: '{}',
+          extracted_fares: [],
           failure_diagnostic: {
-            stage: res.failure_stage || 'FAILED',
+            stage: stage,
             reason: res.failure_reason || 'Live source unavailable',
-            last_success: '—',
-            recommended_action: 'Source blocked/unavailable. Try another source, or use MOCK mode for a demo.',
+            last_success: res.last_successful_run || '—',
+            recommended_action: remediation,
           },
-        } as ScrapingTestResult);
+        } as unknown as ScrapingTestResult);
         setIsRunning(false);
-        notify.error('Live scraping failed', { id: 'scrape-probe', description: `${res.failure_stage}: ${res.failure_reason}` });
+        notify.error('Live scraping failed', { id: 'scrape-probe', description: `${stage}: ${res.failure_reason}` });
         return;
       }
 
@@ -136,7 +171,7 @@ export default function ScrapingTestPage() {
         quotes_valid: res.quotes_validated,
         raw_evidence_json: JSON.stringify(res.quotes?.slice(0, 5) ?? [], null, 2),
         extracted_fares: fares,
-        collector_version: 'live-http-v1',
+        collector_version: res.collector_version || (selectedSource.includes('IndiGo') ? 'indigo-playwright-v1.2.0' : 'ota-http-telemetry-v1.2.0'),
       } as unknown as ScrapingTestResult);
       setIsRunning(false);
       notify.success('Live scraping verified', {
