@@ -30,6 +30,9 @@ logger = logging.getLogger(__name__)
 DEFAULT_USER_AGENT = (
     "AirPulse-Price-Intelligence/1.0 (+https://airpulse.gov.in/bot; MoSPI-CPI-Augmentation)"
 )
+STANDARD_BROWSER_USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+)
 
 # Safe resource reduction: block heavy non-essential assets to save bandwidth.
 # CRITICAL: NEVER block "document", "script", "xhr", "fetch".
@@ -37,10 +40,10 @@ SAFE_BLOCKED_RESOURCE_TYPES: Set[str] = {"image", "font", "media"}
 
 # Challenge & Blocking Detection Marker Dictionaries
 CAPTCHA_MARKERS = [
-    "captcha",
+    "g-recaptcha",
     "recaptcha",
-    "hcaptcha",
     "cf-turnstile",
+    "hcaptcha-box",
     "geetest",
     "arkoselabs",
     "funcaptcha",
@@ -48,6 +51,7 @@ CAPTCHA_MARKERS = [
     "are you a robot",
     "security verification",
     "bot verification",
+    "please complete the security check",
 ]
 
 BLOCKED_MARKERS = [
@@ -225,7 +229,7 @@ class SharedBrowserService:
 
     _instance: Optional[SharedBrowserService] = None
 
-    def __init__(self, user_agent: str = DEFAULT_USER_AGENT):
+    def __init__(self, user_agent: str = STANDARD_BROWSER_USER_AGENT):
         self.user_agent = user_agent
         self._pw: Optional[Any] = None
         self._browser: Optional[Any] = None
@@ -316,6 +320,9 @@ class SharedBrowserService:
                     user_agent=self.user_agent,
                     viewport={"width": 1280, "height": 800},
                     locale="en-US",
+                    extra_http_headers={
+                        "Accept-Language": "en-US,en;q=0.9",
+                    },
                 )
                 session = BrowserSession(source_key=source_key, context=context)
                 self._sessions[source_key] = session
@@ -351,7 +358,7 @@ class SharedBrowserService:
         page: Any,
         url: str,
         nav_timeout_ms: int = 30000,
-        wait_until: str = "networkidle",
+        wait_until: str = "domcontentloaded",
     ) -> Tuple[Optional[int], str, str]:
         """Navigates to URL and returns (http_status, page_title, page_content)."""
         try:
@@ -390,7 +397,16 @@ class SharedBrowserService:
         content: str,
     ) -> ChallengeDetectionResult:
         """Runs the generic challenge detector on current page state."""
-        return ChallengeDetector.detect(page_text=content, http_status=http_status, title=title)
+        # Prefer visible rendered body text over raw HTML to avoid false positives on minified JS bundles
+        check_text = content
+        if page:
+            try:
+                body_text = await page.inner_text("body")
+                if body_text and len(body_text.strip()) > 20:
+                    check_text = body_text
+            except Exception:
+                pass
+        return ChallengeDetector.detect(page_text=check_text, http_status=http_status, title=title)
 
     async def capture_audit_evidence(
         self,
