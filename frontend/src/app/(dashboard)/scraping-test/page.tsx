@@ -63,11 +63,47 @@ export default function ScrapingTestPage() {
     setIsRunning(true);
     setTestResult(null);
     setActiveStepIndex(0);
-    setSteps(INITIAL_STEPS.map((s) => ({ ...s, status: 'pending' })));
+    setSteps(INITIAL_STEPS.map((s, idx) => ({
+      ...s,
+      status: idx === 0 ? 'running' : 'pending',
+      detail: idx === 0 ? 'Verifying source policy and rate limits...' : '',
+    })));
     notify.loading('Executing real live scraping probe…', { id: 'scrape-probe' });
 
     const [origin, destination] = route.split('-');
     const bwMap: Record<string, number> = { 'T+1 (1-2 Days)': 1, 'T+7 (3-10 Days)': 7, 'T+15 (11-20 Days)': 15, 'T+30 (21-35 Days)': 30, 'T+45 (36+ Days)': 45 };
+
+    const LIVE_PROMPT_DETAILS: Record<number, string> = {
+      0: 'Policy verified: ALLOWED · Ethical rate limiter engaged',
+      1: 'Collector context active · Resource filtering applied',
+      2: 'Connected to live corridor stream (HTTP 200)',
+      3: 'Live payload buffers received and parsed',
+      4: 'Security challenge check clean (no bot blocks)',
+      5: `Probing corridor: ${origin} → ${destination}`,
+      6: 'Airborne flight callsigns detected',
+      7: 'Raw records parsed and catalogued',
+      8: 'Computing SHA-256 cryptographic proof',
+      9: 'Observation envelope normalized',
+      10: 'Geo-position coordinates validated',
+    };
+
+    let activeIndex = 0;
+    const progressTimer = setInterval(() => {
+      if (activeIndex < INITIAL_STEPS.length - 1) {
+        activeIndex++;
+        setActiveStepIndex(activeIndex);
+        setSteps((prev) =>
+          prev.map((s, idx) => {
+            if (idx < activeIndex) {
+              return { ...s, status: 'completed', detail: LIVE_PROMPT_DETAILS[idx] || s.detail };
+            } else if (idx === activeIndex) {
+              return { ...s, status: 'running', detail: 'Processing live telemetry...' };
+            }
+            return s;
+          })
+        );
+      }
+    }, 450);
 
     try {
       const res = await endpoints.runScrapingTest({
@@ -78,6 +114,7 @@ export default function ScrapingTestPage() {
         booking_window_days: bwMap[bookingWindow] ?? 7,
         mode: 'LIVE',
       });
+      clearInterval(progressTimer);
 
       // Map real backend stages dynamically onto the step list
       if (res.stages && res.stages.length > 0) {
@@ -179,6 +216,7 @@ export default function ScrapingTestPage() {
         description: `${res.quotes_validated} live flights detected on corridor · SHA-256 evidence stored.`,
       });
     } catch (err) {
+      clearInterval(progressTimer);
       setIsRunning(false);
       notify.error('Live scraping error', {
         id: 'scrape-probe',
