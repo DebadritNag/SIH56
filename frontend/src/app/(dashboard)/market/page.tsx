@@ -10,6 +10,8 @@ import { useDataMode } from '@/lib/providers/DataModeProvider';
 import { useRouteContributors } from '@/lib/hooks/useDashboard';
 import { DataSourceMeta } from '@/components/data/DataBadge';
 import { GenerateReportButton } from '@/components/data/GenerateReportButton';
+import { CircleReloadingAnimation } from '@/components/ui/CircleReloadingAnimation';
+
 
 const ALL_MARKET_ROUTES = [
   { route: 'DEL → BOM', origin: 'DEL', dest: 'BOM', median: 7420, change7d: 4.8, change30d: 12.1, status: 'SURGING' as const, t1: 11840, t7: 7420, t15: 5900, t30: 4850, t45: 4120 },
@@ -44,8 +46,13 @@ export default function MarketMonitorPage() {
   const [selectedCorridor, setSelectedCorridor] = useState<string>('ALL');
 
   // Real per-route medians from the backend (validated fares) in Live mode.
-  const { contributors } = useRouteContributors();
+  const {
+    contributors,
+    isLoading: isContribLoading,
+    isFetching: isContribFetching,
+  } = useRouteContributors();
   const liveRoutes: MarketRow[] = useMemo(() => {
+
     const all = [...(contributors?.up ?? []), ...(contributors?.down ?? [])];
     return all.map((c) => {
       const origin = String(c.origin || '');
@@ -243,12 +250,20 @@ export default function MarketMonitorPage() {
           <span className="text-xs text-[#667085]">Observed Median Fares across Selected Advance Windows</span>
         </div>
         <div className="overflow-x-auto">
-          {filteredRoutes.length === 0 ? (
+          {!isMock && (isContribLoading || isContribFetching) && liveRoutes.length === 0 ? (
+            <CircleReloadingAnimation
+              title="Calculating Live Route Pressure &amp; Margins..."
+              subtitle="Aggregating multi-window airfare distributions across monitored corridors..."
+              badge="ROUTE ANALYSIS"
+              minHeight="min-h-[360px]"
+            />
+          ) : filteredRoutes.length === 0 ? (
             <div className="p-8 text-center text-xs text-[#667085]">
               No corridors match the selected matrix filters. Click Reset to restore all routes.
             </div>
           ) : (
             <table className="w-full text-left text-xs">
+
               <thead className="bg-[#F8FAFC] text-[#475467] font-semibold border-b border-[#E4E7EC] text-[11px] uppercase">
                 <tr>
                   <th className="p-3">Corridor</th>

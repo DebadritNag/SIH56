@@ -2,6 +2,8 @@
 
 import React from 'react';
 import { clsx } from 'clsx';
+import { CircleReloadingAnimation } from './CircleReloadingAnimation';
+
 
 export interface Column<T> {
   key: string;
@@ -30,12 +32,16 @@ export function DataTable<T extends Record<string, any>>({
 }: DataTableProps<T>) {
   if (isLoading) {
     return (
-      <div className="w-full bg-white border border-[#E4E7EC] rounded-lg p-8 flex flex-col items-center justify-center text-xs text-[#667085]">
-        <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mb-2" />
-        Loading dataset records...
-      </div>
+      <CircleReloadingAnimation
+        title="Loading Dataset Records..."
+        subtitle="Retrieving real-time analytical records and observational attributes."
+        badge="LOADING"
+        minHeight="min-h-[220px]"
+        size="sm"
+      />
     );
   }
+
 
   if (data.length === 0) {
     return (

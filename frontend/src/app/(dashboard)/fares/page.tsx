@@ -12,6 +12,9 @@ import { clsx } from 'clsx';
 import { useDataMode } from '@/lib/providers/DataModeProvider';
 import { useFares } from '@/lib/hooks/useResources';
 import { DataSourceMeta } from '@/components/data/DataBadge';
+import { CircleReloadingAnimation } from '@/components/ui/CircleReloadingAnimation';
+
+
 
 function bwLabel(days?: number | null): string {
   if (days == null) return 'T+0';
@@ -260,13 +263,14 @@ export default function FaresPage() {
   const [showExportModal, setShowExportModal] = useState(false);
 
   // Live: real validated fares from the backend (all imported observations).
-  const { data: farePage } = useFares({ page_size: 200 });
+  const { data: farePage, isLoading: isFaresLoading, isFetching: isFaresFetching } = useFares({ page_size: 200 });
   const liveFares: FareObservation[] = useMemo(() => {
     const raw = (farePage as { data?: Record<string, unknown>[]; items?: Record<string, unknown>[] } | undefined);
     const rows = raw?.data ?? raw?.items ?? [];
     return rows.map(mapLiveFare);
   }, [farePage]);
   const sourceFares = isMock ? ALL_MOCK_FARES : liveFares;
+
 
   // Analytical Filters
   const [routeFilter, setRouteFilter] = useState<string>('ALL');
@@ -453,12 +457,20 @@ export default function FaresPage() {
       {/* Table */}
       <div className="bg-white border border-[#E4E7EC] rounded-lg shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
-          {filteredFares.length === 0 ? (
+          {!isMock && (isFaresLoading || isFaresFetching) && liveFares.length === 0 ? (
+            <CircleReloadingAnimation
+              title="Retrieving Live Corridor Airfare Quotes..."
+              subtitle="Querying validated airline carrier quotes, tax breakdowns, and SHA-256 evidence..."
+              badge="LIVE DATA RETRIEVAL"
+              minHeight="min-h-[360px]"
+            />
+          ) : filteredFares.length === 0 ? (
             <div className="p-8 text-center text-xs text-[#667085]">
               No observations match the selected filters. Click Reset to restore all fares.
             </div>
           ) : (
             <table className="w-full text-left text-xs">
+
               <thead className="bg-[#F8FAFC] text-[#475467] font-semibold border-b border-[#E4E7EC] text-[11px] uppercase">
                 <tr>
                   <th className="p-3">Collected (IST)</th>

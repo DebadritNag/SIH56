@@ -22,6 +22,8 @@ import { formatINR } from '@/lib/formatters';
 import { notify } from '@/lib/notify';
 import { endpoints } from '@/lib/api/endpoints';
 import { GenerateReportButton } from '@/components/data/GenerateReportButton';
+import { CircleReloadingAnimation } from '@/components/ui/CircleReloadingAnimation';
+
 
 const INITIAL_STEPS: ScrapingTestStep[] = [
   { step_number: 1, title: 'Collector Initialized', status: 'pending', detail: 'ota01-v1.4.2 instance instantiated with ethical rate limiter (60 req/min)' },
@@ -193,6 +195,7 @@ export default function ScrapingTestPage() {
           carrierRaw.includes('QP') || carrierRaw.toLowerCase().includes('akasa') ? 'Akasa Air' :
           carrierRaw.includes('IX') || carrierRaw.toLowerCase().includes('express') ? 'Air India Express' :
           carrierRaw.includes('AI') || carrierRaw.toLowerCase().includes('india') ? 'Air India' :
+          carrierRaw.includes('UK') || carrierRaw.toLowerCase().includes('vistara') ? 'Vistara' :
           carrierRaw.includes('SG') || carrierRaw.toLowerCase().includes('spice') ? 'SpiceJet' :
           String(q.airline ?? 'IndiGo');
 
@@ -638,6 +641,14 @@ export default function ScrapingTestPage() {
                 </div>
               </div>
             )
+          ) : isRunning ? (
+            <CircleReloadingAnimation
+              title="Executing Live Scraping Probe..."
+              subtitle={`Processing Stage ${String(activeStepIndex + 1).padStart(2, '0')}: ${steps[activeStepIndex]?.title || 'Connecting'}. Live telemetry extraction, normalizations, and cryptographic envelope signing in progress.`}
+              badge="LIVE COLLECTION IN PROGRESS"
+              size="lg"
+              minHeight="min-h-[380px]"
+            />
           ) : (
             <div className="bg-white border border-[#E4E7EC] rounded-lg p-8 text-center text-xs text-[#667085] flex flex-col items-center justify-center min-h-[300px]">
               <Terminal className="w-8 h-8 text-slate-300 mb-2" />
@@ -652,3 +663,4 @@ export default function ScrapingTestPage() {
     </div>
   );
 }
+

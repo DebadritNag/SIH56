@@ -13,6 +13,7 @@ import { EmptyAnomaliesState, EmptySearchResultsState } from '@/components/state
 import { GenerateReportButton } from '@/components/data/GenerateReportButton';
 import { MockBadge } from '@/components/data/DataBadge';
 import { useDataMode } from '@/lib/providers/DataModeProvider';
+import { CircleReloadingAnimation } from '@/components/ui/CircleReloadingAnimation';
 
 export default function AnomaliesPage() {
   const [selectedAnomaly, setSelectedAnomaly] = useState<AnomalyItem | null>(null);
@@ -21,10 +22,15 @@ export default function AnomaliesPage() {
   const [showExportModal, setShowExportModal] = useState(false);
 
   // Real anomalies from FastAPI (falls back to mock while the backend has no rows).
-  const { data: anomalyPage } = useAnomalies({
+  const {
+    data: anomalyPage,
+    isLoading: isAnomaliesLoading,
+    isFetching: isAnomaliesFetching,
+  } = useAnomalies({
     severity: severityFilter === 'ALL' ? undefined : severityFilter,
     page_size: 50,
   });
+
   const { summary } = useDashboardSummary();
   const { mode: dataMode } = useDataMode();
 
@@ -171,12 +177,21 @@ export default function AnomaliesPage() {
 
       {/* Main Table */}
       <div className="bg-white border border-[#E4E7EC] rounded-lg shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-[#F8FAFC] text-[#475467] font-semibold border-b border-[#E4E7EC] uppercase text-[11px]">
-              <tr>
-                <th className="p-3">Severity</th>
-                <th className="p-3">Incident Code</th>
+        {dataMode === 'real' && (isAnomaliesLoading || isAnomaliesFetching) && anomalies.length === 0 ? (
+          <CircleReloadingAnimation
+            title="Evaluating Real-Time Price Anomalies..."
+            subtitle="Executing Isolation Forest & FareGuard anomaly detection models on live observations."
+            badge="ANOMALY DETECTION"
+            minHeight="min-h-[360px]"
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-[#F8FAFC] text-[#475467] font-semibold border-b border-[#E4E7EC] uppercase text-[11px]">
+                <tr>
+                  <th className="p-3">Severity</th>
+                  <th className="p-3">Incident Code</th>
+
                 <th className="p-3">Route &amp; Window</th>
                 <th className="p-3">Carrier / Flight</th>
                 <th className="p-3 text-right">Actual Observed</th>
@@ -259,7 +274,9 @@ export default function AnomaliesPage() {
             )
           )}
         </div>
+        )}
       </div>
+
 
       {/* Slide-over Detail Drawer */}
       <AnomalyDetailDrawer
