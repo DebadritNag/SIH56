@@ -48,26 +48,27 @@ function deriveStatus(s: BackendSource): SourceStatus {
 }
 
 function toRow(s: BackendSource, isLiveMode: boolean): SourceRow {
+  const typeKey = (s.source_type || '').toUpperCase();
   const method =
     s.collection_method ??
-    (s.source_type === 'AIRLINE'
+    (typeKey === 'AIRLINE'
       ? 'Dual Engine (Scrapy + Playwright)'
-      : s.source_type === 'OTA'
+      : typeKey === 'OTA'
       ? 'Isolated Scrapy Crawler'
       : 'Official REST API');
 
   const latency =
     s.avg_latency_ms != null
       ? s.avg_latency_ms
-      : (s.source_type === 'OTA' ? 78 : s.source_type === 'AIRLINE' ? 142 : 45);
+      : (typeKey === 'OTA' ? 78 : typeKey === 'AIRLINE' ? 142 : 45);
   const records =
     s.quotes_today != null
       ? s.quotes_today
       : (s.records_today != null ? s.records_today : 0);
   const parser =
-    s.source_type === 'OTA'
+    typeKey === 'OTA'
       ? 'scrapy-isolated-v2.11'
-      : s.source_type === 'AIRLINE'
+      : typeKey === 'AIRLINE'
       ? 'playwright-v2.1'
       : 'gov-cpi-v1.0';
 
@@ -84,12 +85,12 @@ function toRow(s: BackendSource, isLiveMode: boolean): SourceRow {
 
   const supported = s.supported_engines && s.supported_engines.length > 0
     ? s.supported_engines
-    : (s.source_type === 'AIRLINE' ? ['scrapy', 'playwright'] : ['scrapy']);
+    : (typeKey === 'AIRLINE' ? ['SCRAPY', 'PLAYWRIGHT'] : ['SCRAPY']);
 
   return {
     id: s.id,
     name: s.display_name || s.name,
-    type: SOURCE_TYPE_LABELS[s.source_type] ?? s.source_type,
+    type: SOURCE_TYPE_LABELS[typeKey] ?? s.source_type,
     status: deriveStatus(s),
     method,
     freshness,

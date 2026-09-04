@@ -79,15 +79,8 @@ export function useSources(params?: { page?: number; page_size?: number }) {
           meta: { page: 1, page_size: 50, total: MOCK_SOURCES_LIST.length, total_pages: 1 },
         };
       }
-      try {
-        const res = await endpoints.listSources({ page: params?.page ?? 1, page_size: params?.page_size ?? 50 }, signal);
-        return res;
-      } catch {
-        return {
-          items: MOCK_SOURCES_LIST,
-          meta: { page: 1, page_size: 50, total: MOCK_SOURCES_LIST.length, total_pages: 1 },
-        };
-      }
+      // Live mode: fetch genuine live sources and telemetry from FastAPI backend
+      return endpoints.listSources({ page: params?.page ?? 1, page_size: params?.page_size ?? 50 }, signal);
     },
     placeholderData: keepPreviousData,
   });
