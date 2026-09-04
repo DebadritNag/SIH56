@@ -30,6 +30,23 @@
         "cabin_label": "[data-test='cabin'], .cabin-class"
       }
     },
+    "makemytrip": {
+      "carrier_code": "MMT",
+      "display_name": "MakeMyTrip (OTA Source 01)",
+      "enabled": true,
+      "base_url": "https://www.makemytrip.com",
+      "search_url_template": "https://www.makemytrip.com/flight/search?itinerary={origin}-{destination}-{departure_date}&tripType=O&paxType=A-1_C-0_I-0&intl=false&cabinClass={cabin}",
+      "selectors": {
+        "results_container": ".listingContainer, #flight-listing, .flight-results",
+        "flight_row": ".listingCard, .flight-item, [data-test='flight-card']",
+        "flight_number": ".flightNumber, .airWays-info, .flight-name",
+        "departure_time": ".timeInfoLeft, .dept-time, .time",
+        "arrival_time": ".timeInfoRight, .arr-time",
+        "base_fare": ".basePrice, .base-amount",
+        "total_fare": ".actual-price, .priceSection, .fare-amount",
+        "cabin_label": ".cabinClass, .cabin-name"
+      }
+    },
     "air_india": {
       "carrier_code": "AI",
       "display_name": "Air India",

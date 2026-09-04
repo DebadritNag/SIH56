@@ -256,19 +256,43 @@ class LiveScraper:
                     f"Chromium instance active · Isolated context created for {airline_key}",
                 )
             )
-        except ScraperError as err:
-            stages.append(_build_stage("BROWSER_START", "FAIL", str(err), {"failure_stage": err.stage.value}))
+        except (ScraperError, Exception) as exc:
+            is_launch_fail = False
+            if isinstance(exc, ScraperError) and exc.stage == ScrapeFailureStage.BROWSER_LAUNCH_FAILURE:
+                is_launch_fail = True
+            elif "Executable doesn't exist" in str(exc) or "playwright install" in str(exc):
+                is_launch_fail = True
+
+            if is_launch_fail:
+                logger.warning(
+                    f"Chromium binary missing in container environment: {exc}. "
+                    f"Gracefully adapting {source_name} to direct HTTP corridor telemetry flow."
+                )
+                stages.append(
+                    _build_stage(
+                        "BROWSER_START",
+                        "WARNING",
+                        "Chromium binary not found in container (/root/.cache/ms-playwright). "
+                        "Gracefully fell back to direct HTTP corridor telemetry probe.",
+                    )
+                )
+                return await self._run_http_flow(
+                    stages=stages,
+                    started=started,
+                    source_name=source_name,
+                    base_url=base_url,
+                    origin=origin,
+                    destination=destination,
+                    departure=departure,
+                    booking_window_days=booking_window_days,
+                )
+
+            msg = str(exc)
+            stage_val = exc.stage.value if isinstance(exc, ScraperError) else ScrapeFailureStage.BROWSER_LAUNCH_FAILURE.value
+            stages.append(_build_stage("BROWSER_START", "FAIL", msg, {"failure_stage": stage_val}))
             self._fill_skipped_stages(stages)
             return self._finalize_result(
-                stages, started, err.stage.value, str(err),
-                origin, destination, departure, booking_window_days, source_name,
-            )
-        except Exception as exc:
-            msg = f"Failed to launch browser: {exc}"
-            stages.append(_build_stage("BROWSER_START", "FAIL", msg, {"failure_stage": ScrapeFailureStage.BROWSER_LAUNCH_FAILURE.value}))
-            self._fill_skipped_stages(stages)
-            return self._finalize_result(
-                stages, started, ScrapeFailureStage.BROWSER_LAUNCH_FAILURE.value, msg,
+                stages, started, stage_val, msg,
                 origin, destination, departure, booking_window_days, source_name,
             )
 
@@ -528,7 +552,8 @@ class LiveScraper:
         booking_window_days: int,
     ) -> Dict[str, Any]:
         """HTTP-based live reachability and telemetry flow."""
-        stages.append(_build_stage("BROWSER_START", "PASS", "HTTP lightweight collector selected (no headless browser overhead)"))
+        if not any(s.get("stage") == "BROWSER_START" for s in stages):
+            stages.append(_build_stage("BROWSER_START", "PASS", "HTTP lightweight collector selected (no headless browser overhead)"))
 
         # Build bounding box for corridor
         o = AIRPORT_COORDS.get(origin)
