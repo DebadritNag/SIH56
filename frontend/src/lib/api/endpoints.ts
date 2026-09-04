@@ -240,4 +240,8 @@ export interface ScrapingTestApiResult {
   is_live: boolean;
   is_fallback?: boolean;
   fallback_reason?: string;
+  browser_engine?: string;
+  browser_version?: string;
+  browser_executable?: string;
+  browser_launch_status?: string;
 }

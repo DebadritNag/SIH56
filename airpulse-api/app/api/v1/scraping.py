@@ -96,3 +96,19 @@ async def run_scraping_test(
     """Executes a controlled single-request live extraction probe and returns 11-stage telemetry."""
     result = await execute_live_scraping_test(payload, db)
     return APIResponse(success=(result["status"] in ("PASSED", "PARTIAL")), data=result)
+
+
+@router.get("/browser-capability", response_model=APIResponse)
+async def get_browser_capability(
+    run_test: bool = False,
+    current_user: UserContext = Depends(require_viewer),
+):
+    """Returns resolved browser capability metadata and optionally executes an isolated self-test."""
+    from app.services.browser_service import SharedBrowserService
+    service = SharedBrowserService.get_instance()
+    if run_test:
+        test_res = await SharedBrowserService.run_startup_self_test()
+        return APIResponse(success=(test_res.get("self_test_status") == "PASSED"), data=test_res)
+    cap = service.get_capability()
+    return APIResponse(success=(cap.launch_status == "SUCCESS"), data=cap.to_dict())
+

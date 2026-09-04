@@ -5,8 +5,8 @@ services:
     region: singapore
     plan: free
     rootDir: airpulse-api
-    buildCommand: pip install -r requirements.txt && playwright install chromium
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    buildCommand: pip install -r requirements.txt && (playwright install --with-deps chromium || playwright install chromium)
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1
     healthCheckPath: /api/v1/health
     envVars:
       - key: PYTHON_VERSION
@@ -21,6 +21,8 @@ services:
         value: INFO
       - key: AUTH_STRICT
         value: "true"
+      - key: PLAYWRIGHT_BROWSERS_PATH
+        value: "/ms-playwright"
       # CORS: set to your deployed frontend origin(s), comma-separated
       - key: CORS_ORIGINS
         value: '["http://localhost:3000"]'

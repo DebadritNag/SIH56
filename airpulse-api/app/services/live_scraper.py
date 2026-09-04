@@ -20,6 +20,7 @@ Features:
 """
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -188,30 +189,64 @@ class LiveScraper:
 
         try:
             try:
-                return await self._run_browser_flow(
-                    stages=stages,
-                    started=started,
-                    source_name=source_name,
-                    norm_name=norm_name,
-                    base_url=base_url,
-                    origin=origin,
-                    destination=destination,
-                    departure=dep,
-                    booking_window_days=booking_window_days,
+                return await asyncio.wait_for(
+                    self._run_browser_flow(
+                        stages=stages,
+                        started=started,
+                        source_name=source_name,
+                        norm_name=norm_name,
+                        base_url=base_url,
+                        origin=origin,
+                        destination=destination,
+                        departure=dep,
+                        booking_window_days=booking_window_days,
+                    ),
+                    timeout=self.timeout,
+                )
+            except asyncio.TimeoutError:
+                logger.warning(f"Browser live collection timed out after {self.timeout}s.")
+                stages.append(
+                    _build_stage(
+                        "NAVIGATION",
+                        "FAIL",
+                        f"Live extraction timed out after {self.timeout}s",
+                        {"failure_stage": ScrapeFailureStage.TIMEOUT.value},
+                    )
+                )
+                self._fill_skipped_stages(stages)
+                return self._finalize_result(
+                    stages,
+                    started,
+                    ScrapeFailureStage.TIMEOUT.value,
+                    f"Live extraction timed out after {self.timeout}s",
+                    origin,
+                    destination,
+                    dep,
+                    booking_window_days,
+                    source_name,
                 )
             except Exception as browser_err:
-                logger.warning(f"Browser live collection error: {browser_err}; adapting to HTTP telemetry flow.")
-                return await self._run_http_flow(
-                    stages=stages,
-                    started=started,
-                    source_name=source_name,
-                    base_url=base_url,
-                    origin=origin,
-                    destination=destination,
-                    departure=dep,
-                    booking_window_days=booking_window_days,
-                    initial_fallback=True,
-                    initial_reason=f"Browser collection encountered an exception: {browser_err}; engaged resilient corridor telemetry.",
+                logger.error(f"Browser live collection error: {browser_err}")
+                stage_val = ScrapeFailureStage.CONNECTION_FAILURE.value
+                stages.append(
+                    _build_stage(
+                        "NAVIGATION",
+                        "FAIL",
+                        f"Live collection error: {browser_err}",
+                        {"failure_stage": stage_val},
+                    )
+                )
+                self._fill_skipped_stages(stages)
+                return self._finalize_result(
+                    stages,
+                    started,
+                    stage_val,
+                    str(browser_err),
+                    origin,
+                    destination,
+                    dep,
+                    booking_window_days,
+                    source_name,
                 )
         finally:
             rate_limiter.release()
@@ -252,49 +287,42 @@ class LiveScraper:
                 source_key=airline_key,
                 block_heavy_resources=True,
             )
+            cap = self.browser_service.get_capability()
             stages.append(
                 _build_stage(
                     "BROWSER_START",
                     "PASS",
-                    f"Chromium instance active · Isolated context created for {airline_key}",
+                    f"Resolved engine: {cap.engine} v{cap.version} ({cap.executable_path}) · Isolated context active",
+                    {
+                        "browser_engine": cap.engine,
+                        "browser_version": cap.version,
+                        "browser_executable": cap.executable_path,
+                        "browser_launch_status": cap.launch_status,
+                    },
                 )
             )
         except (ScraperError, Exception) as exc:
-            is_launch_fail = False
-            if isinstance(exc, ScraperError) and exc.stage == ScrapeFailureStage.BROWSER_LAUNCH_FAILURE:
-                is_launch_fail = True
-            elif "Executable doesn't exist" in str(exc) or "playwright install" in str(exc):
-                is_launch_fail = True
-
-            if is_launch_fail:
-                logger.warning(
-                    f"Chromium binary missing in container environment: {exc}. "
-                    f"Gracefully adapting {source_name} to direct HTTP corridor telemetry flow."
-                )
-                stages.append(
-                    _build_stage(
-                        "BROWSER_START",
-                        "WARNING",
-                        "Chromium binary not found in container (/root/.cache/ms-playwright). "
-                        "Gracefully fell back to direct HTTP corridor telemetry probe.",
-                    )
-                )
-                return await self._run_http_flow(
-                    stages=stages,
-                    started=started,
-                    source_name=source_name,
-                    base_url=base_url,
-                    origin=origin,
-                    destination=destination,
-                    departure=departure,
-                    booking_window_days=booking_window_days,
-                    initial_fallback=True,
-                    initial_reason="Chromium binary missing in container environment (/root/.cache/ms-playwright); fell back to HTTP corridor telemetry.",
-                )
-
+            cap = self.browser_service.get_capability()
             msg = str(exc)
-            stage_val = exc.stage.value if isinstance(exc, ScraperError) else ScrapeFailureStage.BROWSER_LAUNCH_FAILURE.value
-            stages.append(_build_stage("BROWSER_START", "FAIL", msg, {"failure_stage": stage_val}))
+            stage_val = ScrapeFailureStage.BROWSER_UNAVAILABLE.value
+            if isinstance(exc, ScraperError) and exc.stage:
+                stage_val = exc.stage.value
+
+            logger.error(f"Browser capability resolution failed: {msg}. BROWSER_UNAVAILABLE.")
+            stages.append(
+                _build_stage(
+                    "BROWSER_START",
+                    "FAIL",
+                    f"Browser capability resolution failed: {msg}. BROWSER_UNAVAILABLE.",
+                    {
+                        "failure_stage": stage_val,
+                        "browser_engine": cap.engine,
+                        "browser_version": cap.version,
+                        "browser_executable": cap.executable_path,
+                        "browser_launch_status": cap.launch_status,
+                    },
+                )
+            )
             self._fill_skipped_stages(stages)
             return self._finalize_result(
                 stages, started, stage_val, msg,
@@ -505,6 +533,10 @@ class LiveScraper:
                 "stages": stages,
                 "quotes": valid_quotes,
                 "collector_version": f"{airline_key}-playwright-v1.2.0",
+                "browser_engine": cap.engine,
+                "browser_version": cap.version,
+                "browser_executable": cap.executable_path,
+                "browser_launch_status": cap.launch_status,
                 "is_live": True,
                 "is_fallback": False,
                 "fallback_reason": None,
@@ -516,6 +548,13 @@ class LiveScraper:
                     await page.close()
                 except Exception:
                     pass
+            # Immediately release browser process and reclaim memory on 512MB container environments
+            try:
+                await self.browser_service.close_all()
+                import gc
+                gc.collect()
+            except Exception:
+                pass
 
     async def _parse_row_element(
         self, row: Any, sel: Dict[str, str], origin: str, dst: str, dep: date, bw: int, source: str
@@ -753,6 +792,7 @@ class LiveScraper:
         valid = [q for q in quotes if (q.get("gross_total") is not None and q.get("gross_total") > 0) or (q.get("latitude") is not None and q.get("longitude") is not None)]
         stages.append(_build_stage("VALIDATION", "PASS", f"{len(valid)}/{len(quotes)} validated against airfare schema & physical bounds"))
 
+        cap = self.browser_service.get_capability()
         duration_ms = int((time.time() - started) * 1000)
         return {
             "status": "PASSED" if valid else "PARTIAL",
@@ -769,6 +809,10 @@ class LiveScraper:
             "stages": stages,
             "quotes": valid[:50],
             "collector_version": "ota-http-telemetry-v1.2.0",
+            "browser_engine": cap.engine,
+            "browser_version": cap.version,
+            "browser_executable": cap.executable_path,
+            "browser_launch_status": cap.launch_status,
             "is_live": True,
             "is_fallback": is_fallback,
             "fallback_reason": fallback_reason,
@@ -1211,10 +1255,11 @@ class LiveScraper:
 
         # Dynamic, context-accurate remediation guidance
         remediation = "Source temporarily unavailable or blocked. Try an alternate source or use MOCK mode for demonstrations."
-        if failure_stage == ScrapeFailureStage.BROWSER_LAUNCH_FAILURE.value:
+        if failure_stage in (ScrapeFailureStage.BROWSER_UNAVAILABLE.value, ScrapeFailureStage.BROWSER_LAUNCH_FAILURE.value):
             remediation = (
-                "Chromium browser binary missing on host. Run 'playwright install chromium' to install browsers, "
-                "or select an OTA/HTTP source which runs without a headless browser."
+                "No compatible browser engine found in environment (checked Playwright Chromium, Google Chrome, "
+                "Chrome Stable, System Chromium, Microsoft Edge). Install Playwright Chromium with 'playwright install chromium' "
+                "or install Google Chrome on the host/container."
             )
         elif failure_stage in (ScrapeFailureStage.BLOCKED.value, ScrapeFailureStage.CHALLENGE_DETECTED.value, ScrapeFailureStage.CAPTCHA_DETECTED.value):
             remediation = "Source portal presented an anti-bot security challenge. AirPulse complies with ethical zero-evasion scraping. Try another route or use MOCK mode."
@@ -1234,6 +1279,7 @@ class LiveScraper:
         elif "akasa" in low_src:
             engine_version = "akasa-playwright-v1.2.0"
 
+        cap = self.browser_service.get_capability()
         return {
             "status": "FAILED",
             "source": source_name,
@@ -1246,6 +1292,10 @@ class LiveScraper:
             "failure_reason": failure_reason,
             "recommended_remediation": remediation,
             "collector_version": engine_version,
+            "browser_engine": cap.engine,
+            "browser_version": cap.version,
+            "browser_executable": cap.executable_path,
+            "browser_launch_status": cap.launch_status,
             "quotes_found": 0,
             "quotes_validated": 0,
             "quotes_rejected": 0,

@@ -16,6 +16,8 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
+import os
+import shutil
 import sys
 import time
 from dataclasses import dataclass, field
@@ -225,6 +227,305 @@ class ChallengeDetector:
         return ChallengeDetectionResult(detected=False)
 
 
+@dataclass
+class BrowserCapability:
+    """Encapsulates the resolved browser engine, version, path, and launch status."""
+    engine: str = "none"  # "playwright-chromium", "google-chrome", "google-chrome-stable", "system-chromium", "msedge", or "none"
+    version: str = "unknown"
+    executable_path: str = "none"
+    launch_status: str = "UNAVAILABLE"  # "SUCCESS", "FAILED", "UNAVAILABLE"
+    channel: Optional[str] = None
+    error: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "browser_engine": self.engine,
+            "browser_version": self.version,
+            "browser_executable": self.executable_path,
+            "browser_launch_status": self.launch_status,
+        }
+
+
+class BrowserCapabilityResolver:
+    """Multi-tier browser detection and launch capability resolver for AirPulse.
+
+    Detection order strictly adhering to specification:
+    1. Playwright-managed Chromium
+    2. Google Chrome (channel='chrome')
+    3. Google Chrome Stable executable (binary search on disk)
+    4. System Chromium (binary search on disk)
+    5. Microsoft Edge if installed (channel='msedge' or binary search)
+    """
+
+    CHROME_STABLE_CANDIDATE_PATHS = [
+        # Linux / Container
+        "/usr/bin/google-chrome-stable",
+        "/usr/bin/google-chrome",
+        "/opt/google/chrome/google-chrome",
+        # Windows
+        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+        r"%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe",
+        # macOS
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    ]
+
+    SYSTEM_CHROMIUM_CANDIDATE_PATHS = [
+        # Linux / Container
+        "/usr/bin/chromium",
+        "/usr/bin/chromium-browser",
+        "/snap/bin/chromium",
+        # Windows
+        r"C:\Program Files\Chromium\Application\chrome.exe",
+        r"C:\Program Files (x86)\Chromium\Application\chrome.exe",
+        r"%LOCALAPPDATA%\Chromium\Application\chrome.exe",
+    ]
+
+    EDGE_CANDIDATE_PATHS = [
+        # Windows
+        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+        r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+        # Linux
+        "/usr/bin/microsoft-edge-stable",
+        "/usr/bin/microsoft-edge",
+        # macOS
+        "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+    ]
+
+    LOW_MEMORY_CHROMIUM_ARGS = [
+        "--disable-dev-shm-usage",
+        "--no-sandbox",
+        "--disable-gpu",
+        "--disable-software-rasterizer",
+        "--no-zygote",
+        "--disable-extensions",
+        "--disable-background-networking",
+        "--disable-background-timer-throttling",
+        "--disable-backgrounding-occluded-windows",
+        "--disable-breakpad",
+        "--disable-component-update",
+        "--disable-domain-reliability",
+        "--disable-features=AudioServiceOutOfProcess,IsolateOrigins,site-per-process",
+        "--disable-hang-monitor",
+        "--disable-ipc-flooding-protection",
+        "--disable-popup-blocking",
+        "--disable-renderer-backgrounding",
+        "--disable-sync",
+        "--mute-audio",
+        "--no-first-run",
+        "--js-flags=--max-old-space-size=128",
+    ]
+
+    @classmethod
+    async def _try_launch(cls, launcher: Any, **kwargs) -> Any:
+        """Launches a browser instance using the provided launcher and arguments."""
+        return await launcher.launch(**kwargs)
+
+    @classmethod
+    async def resolve_installed_browser(cls) -> BrowserCapability:
+        """Resolves installed browser capability in a transient Playwright session."""
+        try:
+            from playwright.async_api import async_playwright
+            async with async_playwright() as pw:
+                browser, cap = await cls.resolve_and_launch(pw)
+                if browser:
+                    try:
+                        await browser.close()
+                    except Exception:
+                        pass
+                return cap
+        except Exception as exc:
+            return BrowserCapability(
+                engine="none",
+                version="unknown",
+                executable_path="none",
+                launch_status="UNAVAILABLE",
+                error=str(exc),
+            )
+
+    @classmethod
+    async def resolve_and_launch(cls, pw: Any) -> Tuple[Optional[Any], BrowserCapability]:
+        """Tries each browser tier in the specified order, returning (browser_instance, capability).
+        If all tiers fail, returns (None, UNAVAILABLE capability)."""
+        errors: List[str] = []
+
+        # -------------------------------------------------------------
+        # Tier 1: Playwright-managed Chromium
+        # -------------------------------------------------------------
+        pw_exec = getattr(pw.chromium, "executable_path", None)
+        try:
+            logger.info("Resolving Browser Tier 1: Playwright-managed Chromium...")
+            browser = await cls._try_launch(
+                pw.chromium,
+                headless=True,
+                args=cls.LOW_MEMORY_CHROMIUM_ARGS,
+            )
+            cap = BrowserCapability(
+                engine="playwright-chromium",
+                version=browser.version,
+                executable_path=pw_exec or "playwright-managed",
+                launch_status="SUCCESS",
+            )
+            logger.info(f"Tier 1 (Playwright Chromium) resolved successfully: v{cap.version}")
+            return browser, cap
+        except Exception as e1:
+            err1 = f"Tier 1 (Playwright Chromium) failed: {e1}"
+            logger.debug(err1)
+            errors.append(err1)
+
+        # -------------------------------------------------------------
+        # Tier 2: Google Chrome (channel='chrome')
+        # -------------------------------------------------------------
+        try:
+            logger.info("Resolving Browser Tier 2: Google Chrome (channel='chrome')...")
+            browser = await cls._try_launch(
+                pw.chromium,
+                channel="chrome",
+                headless=True,
+                args=cls.LOW_MEMORY_CHROMIUM_ARGS,
+            )
+            exec_path = cls._find_executable(cls.CHROME_STABLE_CANDIDATE_PATHS, "google-chrome") or "chrome"
+            cap = BrowserCapability(
+                engine="google-chrome",
+                version=browser.version,
+                executable_path=exec_path,
+                launch_status="SUCCESS",
+                channel="chrome",
+            )
+            logger.info(f"Tier 2 (Google Chrome) resolved successfully: v{cap.version}")
+            return browser, cap
+        except Exception as e2:
+            err2 = f"Tier 2 (Google Chrome) failed: {e2}"
+            logger.debug(err2)
+            errors.append(err2)
+
+        # -------------------------------------------------------------
+        # Tier 3: Google Chrome Stable executable
+        # -------------------------------------------------------------
+        chrome_stable_path = cls._find_executable(cls.CHROME_STABLE_CANDIDATE_PATHS, "google-chrome-stable")
+        if chrome_stable_path:
+            try:
+                logger.info(f"Resolving Browser Tier 3: Chrome Stable executable at {chrome_stable_path}...")
+                browser = await cls._try_launch(
+                    pw.chromium,
+                    executable_path=chrome_stable_path,
+                    headless=True,
+                    args=cls.LOW_MEMORY_CHROMIUM_ARGS,
+                )
+                cap = BrowserCapability(
+                    engine="google-chrome-stable",
+                    version=browser.version,
+                    executable_path=chrome_stable_path,
+                    launch_status="SUCCESS",
+                )
+                logger.info(f"Tier 3 (Chrome Stable) resolved successfully: v{cap.version}")
+                return browser, cap
+            except Exception as e3:
+                err3 = f"Tier 3 (Chrome Stable at {chrome_stable_path}) failed: {e3}"
+                logger.debug(err3)
+                errors.append(err3)
+        else:
+            errors.append("Tier 3: No Google Chrome Stable executable found on disk.")
+
+        # -------------------------------------------------------------
+        # Tier 4: System Chromium
+        # -------------------------------------------------------------
+        system_chromium_path = (
+            cls._find_executable(cls.SYSTEM_CHROMIUM_CANDIDATE_PATHS, "chromium")
+            or cls._find_executable(cls.SYSTEM_CHROMIUM_CANDIDATE_PATHS, "chromium-browser")
+        )
+        if system_chromium_path:
+            try:
+                logger.info(f"Resolving Browser Tier 4: System Chromium at {system_chromium_path}...")
+                browser = await cls._try_launch(
+                    pw.chromium,
+                    executable_path=system_chromium_path,
+                    headless=True,
+                    args=cls.LOW_MEMORY_CHROMIUM_ARGS,
+                )
+                cap = BrowserCapability(
+                    engine="system-chromium",
+                    version=browser.version,
+                    executable_path=system_chromium_path,
+                    launch_status="SUCCESS",
+                )
+                logger.info(f"Tier 4 (System Chromium) resolved successfully: v{cap.version}")
+                return browser, cap
+            except Exception as e4:
+                err4 = f"Tier 4 (System Chromium at {system_chromium_path}) failed: {e4}"
+                logger.debug(err4)
+                errors.append(err4)
+        else:
+            errors.append("Tier 4: No System Chromium executable found on disk.")
+
+        # -------------------------------------------------------------
+        # Tier 5: Microsoft Edge if installed
+        # -------------------------------------------------------------
+        try:
+            logger.info("Resolving Browser Tier 5: Microsoft Edge (channel='msedge')...")
+            browser = await cls._try_launch(
+                pw.chromium,
+                channel="msedge",
+                headless=True,
+                args=cls.LOW_MEMORY_CHROMIUM_ARGS,
+            )
+            exec_path = cls._find_executable(cls.EDGE_CANDIDATE_PATHS, "msedge") or "msedge"
+            cap = BrowserCapability(
+                engine="msedge",
+                version=browser.version,
+                executable_path=exec_path,
+                launch_status="SUCCESS",
+                channel="msedge",
+            )
+            logger.info(f"Tier 5 (Microsoft Edge) resolved successfully: v{cap.version}")
+            return browser, cap
+        except Exception as e5:
+            edge_path = cls._find_executable(cls.EDGE_CANDIDATE_PATHS, "msedge")
+            if edge_path:
+                try:
+                    browser = await cls._try_launch(
+                        pw.chromium,
+                        executable_path=edge_path,
+                        headless=True,
+                        args=cls.LOW_MEMORY_CHROMIUM_ARGS,
+                    )
+                    cap = BrowserCapability(
+                        engine="msedge",
+                        version=browser.version,
+                        executable_path=edge_path,
+                        launch_status="SUCCESS",
+                    )
+                    logger.info(f"Tier 5 (Microsoft Edge executable) resolved successfully: v{cap.version}")
+                    return browser, cap
+                except Exception as e5_path:
+                    errors.append(f"Tier 5 (Edge executable at {edge_path}) failed: {e5_path}")
+            else:
+                errors.append(f"Tier 5 (Microsoft Edge) failed: {e5}")
+
+        # All 5 tiers failed
+        combined_err = " | ".join(errors)
+        logger.error(f"All 5 browser capability tiers failed. BROWSER_UNAVAILABLE. Details: {combined_err}")
+        return None, BrowserCapability(
+            engine="none",
+            version="unknown",
+            executable_path="none",
+            launch_status="UNAVAILABLE",
+            error=combined_err,
+        )
+
+    @classmethod
+    def _find_executable(cls, candidate_paths: List[str], command_name: Optional[str] = None) -> Optional[str]:
+        if command_name:
+            cmd = shutil.which(command_name)
+            if cmd and os.path.exists(cmd):
+                return cmd
+        for path in candidate_paths:
+            expanded = os.path.expandvars(path)
+            if os.path.exists(expanded):
+                return expanded
+        return None
+
+
 class SharedBrowserService:
     """Singleton-style asynchronous browser lifecycle and context manager for AirPulse."""
 
@@ -237,6 +538,7 @@ class SharedBrowserService:
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._sessions: Dict[str, BrowserSession] = {}
         self._lock: Optional[asyncio.Lock] = None
+        self._current_capability: Optional[BrowserCapability] = None
         self.session_timeout_seconds = 1800.0  # 30-minute context expiry
 
     @classmethod
@@ -250,6 +552,12 @@ class SharedBrowserService:
         if self._lock is None or self._loop != current_loop:
             self._lock = asyncio.Lock()
         return self._lock
+
+    def get_capability(self) -> BrowserCapability:
+        """Returns the current resolved browser capability."""
+        if self._current_capability is not None:
+            return self._current_capability
+        return BrowserCapability()
 
     async def _ensure_browser(self) -> Any:
         current_loop = asyncio.get_running_loop()
@@ -269,55 +577,149 @@ class SharedBrowserService:
         try:
             from playwright.async_api import async_playwright
         except ImportError as exc:
+            self._current_capability = BrowserCapability(
+                engine="none",
+                version="unknown",
+                executable_path="none",
+                launch_status="UNAVAILABLE",
+                error="Playwright package not installed in environment",
+            )
             raise ScraperError(
-                ScrapeFailureStage.BROWSER_LAUNCH_FAILURE,
+                ScrapeFailureStage.BROWSER_UNAVAILABLE,
                 "Playwright is not installed in the environment.",
             ) from exc
 
-        try:
-            self._pw = await async_playwright().start()
-            self._browser = await self._pw.chromium.launch(
-                headless=True,
-                args=["--disable-dev-shm-usage", "--no-sandbox"],
-            )
-            logger.info("Chromium launched successfully in headless mode.")
-            return self._browser
-        except Exception as exc:
-            msg = str(exc)
-            if "Executable doesn't exist" in msg or "playwright install" in msg:
-                logger.info("Chromium executable missing; attempting automatic on-demand installation...")
-                try:
-                    proc = await asyncio.create_subprocess_exec(
-                        sys.executable, "-m", "playwright", "install", "chromium",
-                        stdout=asyncio.subprocess.PIPE,
-                        stderr=asyncio.subprocess.PIPE,
-                    )
-                    stdout, stderr = await proc.communicate()
-                    if proc.returncode == 0:
-                        logger.info("Chromium auto-installed successfully; retrying launch...")
-                        self._browser = await self._pw.chromium.launch(
-                            headless=True,
-                            args=["--disable-dev-shm-usage", "--no-sandbox"],
-                        )
-                        return self._browser
-                    else:
-                        logger.warning(f"Chromium auto-install failed with returncode {proc.returncode}: {stderr.decode(errors='ignore')}")
-                except Exception as auto_err:
-                    logger.warning(f"Chromium auto-install exception: {auto_err}")
+        self._pw = await async_playwright().start()
 
-                clean_msg = (
-                    "Chromium executable not found in container (/root/.cache/ms-playwright). "
-                    "Run 'playwright install chromium' to install browser binaries. "
-                    "On free-tier hosting (512MB RAM cap), select an OTA/HTTP source."
-                )
-                raise ScraperError(
-                    ScrapeFailureStage.BROWSER_LAUNCH_FAILURE,
-                    clean_msg,
-                ) from exc
+        # Multi-tier browser resolution across all 5 candidate tiers
+        browser, cap = await BrowserCapabilityResolver.resolve_and_launch(self._pw)
+        self._current_capability = cap
+
+        if browser is None or cap.launch_status != "SUCCESS":
             raise ScraperError(
-                ScrapeFailureStage.BROWSER_LAUNCH_FAILURE,
-                f"Failed to launch Chromium: {exc}",
-            ) from exc
+                ScrapeFailureStage.BROWSER_UNAVAILABLE,
+                f"No compatible browser engine available in environment (checked Playwright Chromium, Google Chrome, Chrome Stable, System Chromium, Microsoft Edge). Details: {cap.error}",
+            )
+
+        self._browser = browser
+        logger.info(f"Browser launched: {cap.engine} v{cap.version} ({cap.executable_path})")
+        return self._browser
+
+    @classmethod
+    async def run_startup_self_test(cls) -> Dict[str, Any]:
+        """Performs a verified startup probe:
+        1. Finds browser executable via 5-tier capability resolver
+        2. Launches browser
+        3. Loads a local test page
+        4. Verifies JavaScript execution
+        5. Closes cleanly
+        """
+        start = time.time()
+        service = cls.get_instance()
+        try:
+            from playwright.async_api import async_playwright
+            async with async_playwright() as pw:
+                browser, cap = await BrowserCapabilityResolver.resolve_and_launch(pw)
+                if browser is None or cap.launch_status != "SUCCESS":
+                    logger.error(f"Startup self-test FAILED: BROWSER_UNAVAILABLE. {cap.error}")
+                    service._current_capability = cap
+                    return {
+                        "status": "FAILED",
+                        "self_test_status": "FAILED",
+                        "capability": cap.to_dict(),
+                        "browser_engine": cap.engine,
+                        "browser_version": cap.version,
+                        "browser_executable": cap.executable_path,
+                        "browser_launch_status": "UNAVAILABLE",
+                        "test_page_loaded": False,
+                        "js_execution_verified": False,
+                        "clean_exit": True,
+                        "error": cap.error or "No compatible browser engine available",
+                        "duration_ms": int((time.time() - start) * 1000),
+                    }
+
+                # Load a local test page with no external network dependencies
+                page = await browser.new_page()
+                await page.goto(
+                    "data:text/html,<!DOCTYPE html><html><head><title>AirPulse Self-Test</title></head><body><div id='probe'>AirPulse-Engine-Active</div></body></html>",
+                    wait_until="domcontentloaded",
+                )
+
+                # Verify JavaScript execution in the isolated page
+                js_result = await page.evaluate(
+                    "() => ({ sum: 2 + 2, text: document.getElementById('probe')?.innerText || '', ua: navigator.userAgent })"
+                )
+                js_verified = (
+                    isinstance(js_result, dict)
+                    and js_result.get("sum") == 4
+                    and js_result.get("text") == "AirPulse-Engine-Active"
+                )
+
+                await page.close()
+                await browser.close()
+
+                duration_ms = int((time.time() - start) * 1000)
+                if not js_verified:
+                    logger.error(f"Startup self-test FAILED: JavaScript evaluation mismatch ({js_result})")
+                    cap.launch_status = "FAILED"
+                    service._current_capability = cap
+                    return {
+                        "status": "FAILED",
+                        "self_test_status": "FAILED",
+                        "capability": cap.to_dict(),
+                        "browser_engine": cap.engine,
+                        "browser_version": cap.version,
+                        "browser_executable": cap.executable_path,
+                        "browser_launch_status": "FAILED",
+                        "test_page_loaded": True,
+                        "js_execution_verified": False,
+                        "clean_exit": True,
+                        "error": "JavaScript execution returned unexpected output",
+                        "duration_ms": duration_ms,
+                    }
+
+                logger.info(
+                    f"Startup self-test SUCCESS in {duration_ms}ms! Engine: {cap.engine} v{cap.version} at {cap.executable_path}"
+                )
+                service._current_capability = cap
+                return {
+                    "status": "PASSED",
+                    "self_test_status": "PASSED",
+                    "capability": cap.to_dict(),
+                    "browser_engine": cap.engine,
+                    "browser_version": cap.version,
+                    "browser_executable": cap.executable_path,
+                    "browser_launch_status": "SUCCESS",
+                    "test_page_loaded": True,
+                    "js_execution_verified": True,
+                    "clean_exit": True,
+                    "duration_ms": duration_ms,
+                }
+        except Exception as exc:
+            duration_ms = int((time.time() - start) * 1000)
+            logger.error(f"Startup self-test exception: {exc}")
+            failed_cap = BrowserCapability(
+                engine="none",
+                version="unknown",
+                executable_path="none",
+                launch_status="UNAVAILABLE",
+                error=str(exc),
+            )
+            service._current_capability = failed_cap
+            return {
+                "status": "FAILED",
+                "self_test_status": "FAILED",
+                "capability": failed_cap.to_dict(),
+                "browser_engine": "none",
+                "browser_version": "unknown",
+                "browser_executable": "none",
+                "browser_launch_status": "UNAVAILABLE",
+                "test_page_loaded": False,
+                "js_execution_verified": False,
+                "clean_exit": False,
+                "error": str(exc),
+                "duration_ms": duration_ms,
+            }
 
     async def get_or_create_context(self, source_key: str) -> Any:
         """Retrieves or creates an isolated BrowserContext for a specific source."""

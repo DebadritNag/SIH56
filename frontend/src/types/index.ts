@@ -189,6 +189,10 @@ export interface ScrapingTestResult {
   parser_version: string;
   is_fallback?: boolean;
   fallback_reason?: string;
+  browser_engine?: string;
+  browser_version?: string;
+  browser_executable?: string;
+  browser_launch_status?: string;
   extracted_fares: {
     airline: string;
     flight_number: string;

@@ -189,6 +189,10 @@ export default function ScrapingTestPage() {
           response_hash: res.response_hash || '—',
           collector_version: engineVersion,
           parser_version: 'v1.2.0',
+          browser_engine: res.browser_engine,
+          browser_version: res.browser_version,
+          browser_executable: res.browser_executable,
+          browser_launch_status: res.browser_launch_status,
           raw_evidence_json: '{}',
           extracted_fares: [],
           failure_diagnostic: {
@@ -253,7 +257,10 @@ export default function ScrapingTestPage() {
         response_size_kb: Math.round(((res.response_hash?.length ?? 0) + 1000) / 100) / 10,
         response_hash: res.response_hash || '—',
         quotes_valid: res.quotes_validated,
-        raw_evidence_json: JSON.stringify(res.quotes?.slice(0, 5) ?? [], null, 2),
+        browser_engine: res.browser_engine,
+        browser_version: res.browser_version,
+        browser_executable: res.browser_executable,
+        browser_launch_status: res.browser_launch_status,
         extracted_fares: fares,
         collector_version: res.collector_version || (selectedSource.includes('IndiGo') ? 'indigo-playwright-v1.2.0' : 'ota-http-telemetry-v1.2.0'),
       } as unknown as ScrapingTestResult);
@@ -273,11 +280,58 @@ export default function ScrapingTestPage() {
     } catch (err) {
       clearInterval(progressTimer);
       setIsRunning(false);
+      const errMsg = err instanceof Error ? err.message : 'Request failed';
+      const isGatewayError = errMsg.includes('502') || errMsg.includes('504') || errMsg.includes('Bad Gateway') || errMsg.includes('Gateway');
+      
       notify.error('Live scraping error', {
         id: 'scrape-probe',
-        description: err instanceof Error ? err.message : 'Request failed',
+        description: isGatewayError ? 'Upstream cloud gateway timeout (HTTP 502)' : errMsg,
       });
-      setSteps((prev) => prev.map((s, idx) => (idx <= 1 ? { ...s, status: 'completed' } : { ...s, status: 'failed' })));
+
+      setSteps((prev) =>
+        prev.map((s, idx) => {
+          if (idx === 2) {
+            return {
+              ...s,
+              status: 'failed',
+              detail: isGatewayError
+                ? 'Backend gateway timeout (HTTP 502): cloud host timed out waiting for upstream network probe.'
+                : `Network error: ${errMsg}`,
+            };
+          }
+          if (idx < 2) return { ...s, status: 'completed' };
+          return { ...s, status: 'pending', detail: 'Skipped due to connection timeout' };
+        })
+      );
+
+      setTestResult({
+        success: false,
+        source: selectedSource,
+        route: `${origin} → ${destination}`,
+        departure_date: departureDate,
+        booking_window: bookingWindow,
+        capture_timestamp: new Date().toISOString(),
+        http_status: isGatewayError ? 502 : 500,
+        response_size_kb: 0,
+        quotes_found: 0,
+        quotes_valid: 0,
+        quotes_rejected: 0,
+        response_hash: '—',
+        collector_version: 'ota-http-telemetry-v1.2.0',
+        parser_version: 'v1.2.0',
+        browser_launch_status: 'UNAVAILABLE',
+        raw_evidence_json: '{}',
+        extracted_fares: [],
+        failure_diagnostic: {
+          stage: isGatewayError ? 'GATEWAY_TIMEOUT (502)' : 'CONNECTION_FAILURE',
+          reason: isGatewayError
+            ? 'Upstream live extraction exceeded the cloud gateway deadline (HTTP 502).'
+            : errMsg,
+          last_success: '—',
+          recommended_action:
+            'The cloud deployment on Render timed out connecting to live upstream resources. Push/deploy the latest commit with the 5-tier Browser Capability Resolver and 25s timeout controls to resolve this.',
+        },
+      } as unknown as ScrapingTestResult);
     }
   };
 
@@ -567,6 +621,15 @@ export default function ScrapingTestPage() {
                     <span className="text-[#667085]">HTTP Status / Size:</span>
                     <span className="text-[#101828] font-mono">{testResult.http_status} OK ({testResult.response_size_kb} KB)</span>
                   </div>
+                  {testResult.browser_engine && (
+                    <div className="py-1.5 flex justify-between items-center">
+                      <span className="text-[#667085]">Browser Capability:</span>
+                      <span className="inline-flex items-center gap-1.5 font-mono text-[11px] font-semibold text-slate-900 bg-white border border-slate-200 px-2 py-0.5 rounded">
+                        <span className={`w-1.5 h-1.5 rounded-full ${testResult.browser_launch_status === 'SUCCESS' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                        {testResult.browser_engine} {testResult.browser_version ? `v${testResult.browser_version}` : ''} ({testResult.browser_launch_status || 'UNKNOWN'})
+                      </span>
+                    </div>
+                  )}
                   <div className="pt-1.5 flex justify-between items-center">
                     <span className="text-[#667085]">SHA-256 Checksum:</span>
                     <code className="text-[10px] bg-white border border-[#D0D5DD] px-1.5 py-0.5 rounded font-mono truncate max-w-[260px]">
@@ -675,6 +738,14 @@ export default function ScrapingTestPage() {
                     <span className="text-[#667085]">Collector Engine:</span>
                     <span className="font-mono text-[#101828]">{testResult.collector_version}</span>
                   </div>
+                  {testResult.browser_engine && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-[#667085]">Browser Diagnostic:</span>
+                      <span className="font-mono text-[11px] font-semibold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded">
+                        {testResult.browser_engine} ({testResult.browser_launch_status || 'NOT_LAUNCHED'})
+                      </span>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <span className="text-[#667085]">Last Successful Run:</span>
                     <span className="text-[#101828]">{testResult.failure_diagnostic?.last_success}</span>
