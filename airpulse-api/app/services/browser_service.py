@@ -16,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
+import sys
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -284,6 +285,26 @@ class SharedBrowserService:
         except Exception as exc:
             msg = str(exc)
             if "Executable doesn't exist" in msg or "playwright install" in msg:
+                logger.info("Chromium executable missing; attempting automatic on-demand installation...")
+                try:
+                    proc = await asyncio.create_subprocess_exec(
+                        sys.executable, "-m", "playwright", "install", "chromium",
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE,
+                    )
+                    stdout, stderr = await proc.communicate()
+                    if proc.returncode == 0:
+                        logger.info("Chromium auto-installed successfully; retrying launch...")
+                        self._browser = await self._pw.chromium.launch(
+                            headless=True,
+                            args=["--disable-dev-shm-usage", "--no-sandbox"],
+                        )
+                        return self._browser
+                    else:
+                        logger.warning(f"Chromium auto-install failed with returncode {proc.returncode}: {stderr.decode(errors='ignore')}")
+                except Exception as auto_err:
+                    logger.warning(f"Chromium auto-install exception: {auto_err}")
+
                 clean_msg = (
                     "Chromium executable not found in container (/root/.cache/ms-playwright). "
                     "Run 'playwright install chromium' to install browser binaries. "

@@ -210,6 +210,8 @@ class LiveScraper:
                     destination=destination,
                     departure=dep,
                     booking_window_days=booking_window_days,
+                    initial_fallback=True,
+                    initial_reason=f"Browser collection encountered an exception: {browser_err}; engaged resilient corridor telemetry.",
                 )
         finally:
             rate_limiter.release()
@@ -286,6 +288,8 @@ class LiveScraper:
                     destination=destination,
                     departure=departure,
                     booking_window_days=booking_window_days,
+                    initial_fallback=True,
+                    initial_reason="Chromium binary missing in container environment (/root/.cache/ms-playwright); fell back to HTTP corridor telemetry.",
                 )
 
             msg = str(exc)
@@ -377,6 +381,8 @@ class LiveScraper:
                     destination=destination,
                     departure=departure,
                     booking_window_days=booking_window_days,
+                    initial_fallback=True,
+                    initial_reason=f"Direct commercial OTA portal scraping restricted by upstream bot challenge ({challenge_res.marker or msg}); engaged resilient corridor telemetry.",
                 )
 
             stages.append(_build_stage("BLOCK_CHECK", "PASS", "Zero anti-bot blocks / zero CAPTCHAs detected"))
@@ -414,6 +420,8 @@ class LiveScraper:
                     destination=destination,
                     departure=departure,
                     booking_window_days=booking_window_days,
+                    initial_fallback=True,
+                    initial_reason="Direct browser card selectors yielded 0 elements; engaged resilient corridor telemetry.",
                 )
 
             stages.append(_build_stage("RESULT_DETECTION", "PASS", f"Found {len(rows)} live flight card elements in DOM"))
@@ -445,6 +453,8 @@ class LiveScraper:
                     destination=destination,
                     departure=departure,
                     booking_window_days=booking_window_days,
+                    initial_fallback=True,
+                    initial_reason="Direct browser parsing produced 0 valid quotes; engaged resilient corridor telemetry.",
                 )
 
             stages.append(_build_stage("PARSE", "PASS", f"Successfully extracted {len(parsed_quotes)} live airfare quotes directly from portal"))
@@ -614,6 +624,8 @@ class LiveScraper:
         destination: str,
         departure: date,
         booking_window_days: int,
+        initial_fallback: bool = False,
+        initial_reason: Optional[str] = None,
     ) -> Dict[str, Any]:
         """HTTP-based live reachability and telemetry flow."""
         if not any(s.get("stage") == "BROWSER_START" for s in stages):
@@ -642,8 +654,8 @@ class LiveScraper:
 
         body = ""
         http_status: Optional[int] = None
-        is_fallback = False
-        fallback_reason: Optional[str] = None
+        is_fallback = initial_fallback
+        fallback_reason: Optional[str] = initial_reason
         live_provider = "FlightRadar24 Edge"
 
         for provider_name, endpoint_url, query_params in live_endpoints:
