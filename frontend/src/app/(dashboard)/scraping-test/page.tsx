@@ -118,7 +118,25 @@ export default function ScrapingTestPage() {
       });
       clearInterval(progressTimer);
 
-      // Map real backend stages dynamically onto the step list
+      // Smoothly advance through remaining steps sequentially so user observes pipeline execution
+      const finalStages = (res.stages && res.stages.length > 0) ? res.stages : [];
+      for (let i = activeIndex; i < INITIAL_STEPS.length; i++) {
+        setActiveStepIndex(i);
+        setSteps((prev) =>
+          prev.map((s, idx) => {
+            if (idx < i) {
+              const backendDetail = finalStages[idx]?.detail || LIVE_PROMPT_DETAILS[idx] || s.detail;
+              return { ...s, status: 'completed', detail: backendDetail };
+            } else if (idx === i) {
+              return { ...s, status: 'running', detail: finalStages[idx]?.detail || 'Executing verification...' };
+            }
+            return s;
+          })
+        );
+        await new Promise((r) => setTimeout(r, 160));
+      }
+
+      // Final mapping of real backend stages dynamically onto the step list
       if (res.stages && res.stages.length > 0) {
         setSteps(
           res.stages.map((st: any, idx: number) => {
@@ -220,7 +238,7 @@ export default function ScrapingTestPage() {
           base_fare: base,
           taxes: taxes,
           total: total,
-          validation_status: 'VALID',
+          validation_status: res.is_fallback ? 'FALLBACK (MODEL)' : 'VALID',
         };
       });
 
@@ -490,25 +508,50 @@ export default function ScrapingTestPage() {
             testResult.success ? (
               /* Success Banner & Extracted Data */
               <div className="bg-white border border-[#E4E7EC] rounded-lg p-5 shadow-xs space-y-4">
-                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-                    <div>
-                      <h4 className="text-sm font-bold text-emerald-900">
-                        LIVE SCRAPING VERIFIED
-                      </h4>
-                      <p className="text-xs text-emerald-700">
-                        {testResult.quotes_valid} valid airfare observations captured and cryptographically hashed.
-                      </p>
+                {testResult.is_fallback ? (
+                  <div className="p-3 bg-amber-50 border border-amber-300 rounded-lg flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+                      <div>
+                        <h4 className="text-sm font-bold text-amber-950 flex items-center gap-2">
+                          <span>CORRIDOR MODEL ACTIVE</span>
+                          <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-amber-200/80 text-amber-900 border border-amber-400">
+                            DIRECT SCRAPE RESTRICTED
+                          </span>
+                        </h4>
+                        <p className="text-xs text-amber-800">
+                          {testResult.fallback_reason || `Direct portal scraping blocked by upstream anti-bot CDN. Yield corridor model synthesized ${testResult.quotes_valid} observations for verification.`}
+                        </p>
+                      </div>
                     </div>
+                    <button
+                      onClick={() => setShowRawJson(!showRawJson)}
+                      className="px-2.5 py-1 bg-white border border-amber-300 text-amber-900 text-xs font-semibold rounded hover:bg-amber-100 transition-colors shrink-0 ml-2"
+                    >
+                      {showRawJson ? 'Hide Evidence' : 'View Raw Evidence'}
+                    </button>
                   </div>
-                  <button
-                    onClick={() => setShowRawJson(!showRawJson)}
-                    className="px-2.5 py-1 bg-white border border-emerald-300 text-emerald-800 text-xs font-semibold rounded hover:bg-emerald-100 transition-colors"
-                  >
-                    {showRawJson ? 'Hide Evidence' : 'View Raw Evidence'}
-                  </button>
-                </div>
+                ) : (
+                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                      <div>
+                        <h4 className="text-sm font-bold text-emerald-900">
+                          LIVE SCRAPING VERIFIED
+                        </h4>
+                        <p className="text-xs text-emerald-700">
+                          {testResult.quotes_valid} valid airfare observations captured and cryptographically hashed.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setShowRawJson(!showRawJson)}
+                      className="px-2.5 py-1 bg-white border border-emerald-300 text-emerald-800 text-xs font-semibold rounded hover:bg-emerald-100 transition-colors"
+                    >
+                      {showRawJson ? 'Hide Evidence' : 'View Raw Evidence'}
+                    </button>
+                  </div>
+                )}
 
                 {/* Provenance Card */}
                 <div className="bg-slate-50 border border-[#E4E7EC] rounded p-3 text-xs divide-y divide-[#E2E8F0]">
@@ -593,7 +636,11 @@ export default function ScrapingTestPage() {
                             <td className="p-2 text-right tabular-nums text-[#475467]">{formatINR(f.base_fare)}</td>
                             <td className="p-2 text-right tabular-nums font-bold text-blue-700">{formatINR(f.total)}</td>
                             <td className="p-2 text-center">
-                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded uppercase bg-emerald-100 text-emerald-800">
+                              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${
+                                f.validation_status.includes('FALLBACK')
+                                  ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                  : 'bg-emerald-100 text-emerald-800'
+                              }`}>
                                 {f.validation_status}
                               </span>
                             </td>
