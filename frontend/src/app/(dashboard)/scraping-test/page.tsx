@@ -44,6 +44,10 @@ export default function ScrapingTestPage() {
   const [bookingWindow, setBookingWindow] = useState('T+7');
   const [cabin, setCabin] = useState('Economy');
   const [simulateFailure, setSimulateFailure] = useState(false);
+  const [selectedEngine, setSelectedEngine] = useState<'AUTO' | 'SCRAPY' | 'PLAYWRIGHT'>('AUTO');
+  const [compareEngines, setCompareEngines] = useState<boolean>(false);
+  const [resultLimit, setResultLimit] = useState<number>(15);
+  const [isNonstopOnly, setIsNonstopOnly] = useState<boolean>(false);
 
   const [isRunning, setIsRunning] = useState(false);
   const [activeStepIndex, setActiveStepIndex] = useState<number>(-1);
@@ -115,6 +119,10 @@ export default function ScrapingTestPage() {
         departure_date: departureDate,
         booking_window_days: bwMap[bookingWindow] ?? 7,
         mode: 'LIVE',
+        engine: selectedEngine,
+        compare: compareEngines,
+        max_results: resultLimit,
+        is_nonstop: isNonstopOnly ? true : undefined,
       });
       clearInterval(progressTimer);
 
@@ -193,8 +201,15 @@ export default function ScrapingTestPage() {
           browser_version: res.browser_version,
           browser_executable: res.browser_executable,
           browser_launch_status: res.browser_launch_status,
+          collection_engine: res.collection_engine || selectedEngine,
+          comparison: res.comparison,
           raw_evidence_json: '{}',
           extracted_fares: [],
+          results_seen: res.results_seen ?? 0,
+          results_matching: res.results_matching ?? 0,
+          results_collected: 0,
+          max_results: res.max_results ?? resultLimit,
+          stop_reason: res.stop_reason ?? stage,
           failure_diagnostic: {
             stage: stage,
             reason: res.failure_reason || 'Live source unavailable',
@@ -261,8 +276,15 @@ export default function ScrapingTestPage() {
         browser_version: res.browser_version,
         browser_executable: res.browser_executable,
         browser_launch_status: res.browser_launch_status,
+        collection_engine: res.collection_engine || selectedEngine,
+        comparison: res.comparison,
         extracted_fares: fares,
         collector_version: res.collector_version || (selectedSource.includes('IndiGo') ? 'indigo-playwright-v1.2.0' : 'ota-http-telemetry-v1.2.0'),
+        results_seen: res.results_seen ?? res.quotes_found ?? 0,
+        results_matching: res.results_matching ?? res.quotes_validated ?? 0,
+        results_collected: res.results_collected ?? res.quotes_validated ?? 0,
+        max_results: res.max_results ?? resultLimit,
+        stop_reason: res.stop_reason ?? (res.quotes_validated >= resultLimit ? 'RESULT_LIMIT_REACHED' : 'PAGE_EXHAUSTED'),
       } as unknown as ScrapingTestResult);
       setIsRunning(false);
 
@@ -483,10 +505,96 @@ export default function ScrapingTestPage() {
           </div>
         </div>
 
+        {/* Collection Engine Selector Segmented Control & Compare Toggle */}
+        <div className="mt-4 pt-3 border-t border-[#F1F5F9]">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <label className="text-xs font-semibold text-[#344054] block mb-1">
+                Collection Engine Mode
+              </label>
+              <div className="inline-flex p-1 bg-slate-100 rounded-lg border border-slate-200">
+                {(['AUTO', 'SCRAPY', 'PLAYWRIGHT'] as const).map((eng) => (
+                  <button
+                    key={eng}
+                    type="button"
+                    onClick={() => setSelectedEngine(eng)}
+                    disabled={isRunning}
+                    className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
+                      selectedEngine === eng
+                        ? 'bg-white text-blue-700 shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    {eng === 'AUTO' && 'AUTO (Intelligent)'}
+                    {eng === 'SCRAPY' && 'SCRAPY (Subprocess)'}
+                    {eng === 'PLAYWRIGHT' && 'PLAYWRIGHT (Browser)'}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[11px] text-[#667085] mt-1">
+                {selectedEngine === 'AUTO' && 'AUTO: Subprocess Scrapy crawler by default; escalates to Playwright only on confirmed JS shells; halts on 403/CAPTCHA.'}
+                {selectedEngine === 'SCRAPY' && 'SCRAPY: Isolated subprocess crawl with fresh Twisted reactor per crawl. Lightweight & zero browser overhead.'}
+                {selectedEngine === 'PLAYWRIGHT' && 'PLAYWRIGHT: Full Chromium/Edge browser context with 5-tier binary capability resolver. Executes JavaScript.'}
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-4">
+              <div>
+                <label className="text-xs font-semibold text-[#344054] block mb-1">
+                  Result Limit
+                </label>
+                <div className="inline-flex p-1 bg-slate-100 rounded-lg border border-slate-200">
+                  {([5, 10, 15] as const).map((limit) => (
+                    <button
+                      key={limit}
+                      type="button"
+                      onClick={() => setResultLimit(limit)}
+                      disabled={isRunning}
+                      className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
+                        resultLimit === limit
+                          ? 'bg-white text-blue-700 shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      {limit}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="pt-4">
+                <label className="flex items-center gap-1.5 text-xs text-[#344054] font-semibold cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isNonstopOnly}
+                    onChange={(e) => setIsNonstopOnly(e.target.checked)}
+                    disabled={isRunning}
+                    className="rounded text-blue-600 focus:ring-0"
+                  />
+                  <span>Nonstop Only</span>
+                </label>
+              </div>
+
+              <div className="pt-4">
+                <label className="flex items-center gap-1.5 text-xs text-[#344054] font-semibold cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={compareEngines}
+                    onChange={(e) => setCompareEngines(e.target.checked)}
+                    disabled={isRunning}
+                    className="rounded text-blue-600 focus:ring-0"
+                  />
+                  <span>Compare Engines</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div className="mt-3 pt-3 border-t border-[#F1F5F9] flex items-center justify-between text-xs">
           <div className="flex items-center gap-2 text-[#667085]">
             <Server className="w-3.5 h-3.5 text-slate-500" />
-            <span>Collector Engine: Ethical rate limiter with bounded 15s timeout and genuine institutional User-Agent header</span>
+            <span>Active Engine: <strong className="text-slate-900">{selectedEngine}</strong> · Ethical rate limiter with bounded 15s timeout</span>
           </div>
 
           <label className="flex items-center gap-1.5 text-xs text-[#667085] cursor-pointer">
@@ -506,9 +614,14 @@ export default function ScrapingTestPage() {
         {/* Left: 9-Stage Execution Telemetry */}
         <div className="lg:col-span-6 bg-white border border-[#E4E7EC] rounded-lg p-5 shadow-xs">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-bold text-[#101828] uppercase tracking-wide">
-              Live Pipeline Telemetry
-            </h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-bold text-[#101828] uppercase tracking-wide">
+                Live Pipeline Telemetry
+              </h3>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 font-bold uppercase">
+                ENGINE: {testResult?.collection_engine || selectedEngine}
+              </span>
+            </div>
             <span className="text-xs font-mono text-[#667085]">
               {isRunning ? 'STATUS: IN PROGRESS' : testResult ? (testResult.success ? 'STATUS: VERIFIED' : 'STATUS: FAILED') : 'READY'}
             </span>
@@ -607,11 +720,59 @@ export default function ScrapingTestPage() {
                   </div>
                 )}
 
+                {/* Bounded Collection & Early Stopping Metrics */}
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs shadow-2xs">
+                  <div className="bg-white p-2.5 rounded border border-slate-200 shadow-2xs">
+                    <span className="text-[10px] font-semibold text-slate-500 uppercase block">Results Found</span>
+                    <span className="text-base font-bold text-slate-900">{testResult.results_seen ?? testResult.quotes_valid ?? 0}</span>
+                  </div>
+                  <div className="bg-white p-2.5 rounded border border-slate-200 shadow-2xs">
+                    <span className="text-[10px] font-semibold text-slate-500 uppercase block">Matching Filters</span>
+                    <span className="text-base font-bold text-blue-700">{testResult.results_matching ?? testResult.quotes_valid ?? 0}</span>
+                  </div>
+                  <div className="bg-white p-2.5 rounded border border-slate-200 shadow-2xs">
+                    <span className="text-[10px] font-semibold text-slate-500 uppercase block">Fares Collected</span>
+                    <span className="text-base font-bold text-emerald-700">{testResult.results_collected ?? testResult.quotes_valid ?? 0}</span>
+                  </div>
+                  <div className="bg-white p-2.5 rounded border border-slate-200 shadow-2xs">
+                    <span className="text-[10px] font-semibold text-slate-500 uppercase block">Result Limit</span>
+                    <span className="text-base font-bold text-slate-800">{testResult.max_results ?? resultLimit}</span>
+                  </div>
+                  <div className="col-span-2 sm:col-span-1 bg-white p-2.5 rounded border border-slate-200 shadow-2xs flex flex-col justify-between">
+                    <span className="text-[10px] font-semibold text-slate-500 uppercase block">Stop Reason</span>
+                    <div className="mt-1">
+                      {testResult.stop_reason === 'RESULT_LIMIT_REACHED' ? (
+                        <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 uppercase">
+                          LIMIT REACHED
+                        </span>
+                      ) : testResult.stop_reason === 'PAGE_EXHAUSTED' ? (
+                        <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-300 uppercase">
+                          PAGE EXHAUSTED
+                        </span>
+                      ) : testResult.stop_reason === 'NO_AVAILABILITY' ? (
+                        <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 uppercase">
+                          NO AVAILABILITY
+                        </span>
+                      ) : (
+                        <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-800 border border-slate-300 uppercase">
+                          {testResult.stop_reason || 'COMPLETED'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
                 {/* Provenance Card */}
                 <div className="bg-slate-50 border border-[#E4E7EC] rounded p-3 text-xs divide-y divide-[#E2E8F0]">
                   <div className="pb-1.5 flex justify-between">
                     <span className="text-[#667085]">Source / Route:</span>
                     <span className="font-semibold text-[#101828]">{testResult.source} • {testResult.route}</span>
+                  </div>
+                  <div className="py-1.5 flex justify-between items-center">
+                    <span className="text-[#667085]">Active Engine:</span>
+                    <span className="inline-flex items-center gap-1 font-mono text-[11px] font-bold text-blue-900 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded uppercase">
+                      {testResult.collection_engine || selectedEngine}
+                    </span>
                   </div>
                   <div className="py-1.5 flex justify-between">
                     <span className="text-[#667085]">Travel Date:</span>
@@ -637,6 +798,84 @@ export default function ScrapingTestPage() {
                     </code>
                   </div>
                 </div>
+
+                {/* Dual Engine Side-by-Side Comparison Benchmark */}
+                {testResult.comparison && (
+                  <div className="p-3 bg-blue-50/50 border border-blue-200 rounded-lg space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-bold text-blue-950 uppercase tracking-wide">
+                        Dual-Engine Benchmark Comparison
+                      </h4>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-bold">
+                        SCRAPY VS PLAYWRIGHT
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      {/* Scrapy Column */}
+                      <div className="p-2.5 bg-white rounded border border-emerald-200 space-y-1.5 shadow-2xs">
+                        <div className="flex justify-between items-center border-b pb-1">
+                          <span className="font-bold text-emerald-800">Scrapy Subprocess</span>
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold">
+                            {(testResult.comparison as any).scrapy?.status || 'COMPLETED'}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-slate-600 flex justify-between">
+                          <span>Latency:</span>
+                          <span className="font-mono font-bold text-slate-900">
+                            {(testResult.comparison as any).scrapy?.duration_ms ?? '—'} ms
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-slate-600 flex justify-between">
+                          <span>Quotes Extracted:</span>
+                          <span className="font-mono font-bold text-emerald-700">
+                            {(testResult.comparison as any).scrapy?.quotes_found ?? 0}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-slate-600 flex justify-between">
+                          <span>HTTP Status:</span>
+                          <span className="font-mono text-slate-900">
+                            {(testResult.comparison as any).scrapy?.http_status ?? '—'}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-500 pt-1 border-t border-slate-100">
+                          Isolated spawned process · Zero browser memory overhead · High throughput
+                        </p>
+                      </div>
+
+                      {/* Playwright Column */}
+                      <div className="p-2.5 bg-white rounded border border-purple-200 space-y-1.5 shadow-2xs">
+                        <div className="flex justify-between items-center border-b pb-1">
+                          <span className="font-bold text-purple-800">Playwright Browser</span>
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200 font-bold">
+                            {(testResult.comparison as any).playwright?.status || 'COMPLETED'}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-slate-600 flex justify-between">
+                          <span>Latency:</span>
+                          <span className="font-mono font-bold text-slate-900">
+                            {(testResult.comparison as any).playwright?.duration_ms ?? '—'} ms
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-slate-600 flex justify-between">
+                          <span>Quotes Extracted:</span>
+                          <span className="font-mono font-bold text-purple-700">
+                            {(testResult.comparison as any).playwright?.quotes_found ?? 0}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-slate-600 flex justify-between">
+                          <span>Browser Engine:</span>
+                          <span className="font-mono text-slate-900 truncate max-w-[120px]">
+                            {(testResult.comparison as any).playwright?.browser_engine || 'Chromium'}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-500 pt-1 border-t border-slate-100">
+                          Headless browser · Client SPA JS execution · Full DOM parsing
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Fallback Active Diagnostic Banner */}
                 {testResult.is_fallback && (
@@ -734,8 +973,20 @@ export default function ScrapingTestPage() {
                     <span className="text-[#667085]">Failure Stage:</span>
                     <span className="font-mono font-bold text-rose-600">{testResult.failure_diagnostic?.stage}</span>
                   </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[#667085]">Stop Reason:</span>
+                    <span className="font-mono font-bold text-[11px] text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded uppercase">
+                      {testResult.stop_reason || testResult.failure_diagnostic?.stage || 'ERROR'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[#667085]">Collection Engine:</span>
+                    <span className="font-mono font-bold text-[11px] text-blue-800 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded uppercase">
+                      {testResult.collection_engine || selectedEngine}
+                    </span>
+                  </div>
                   <div className="flex justify-between">
-                    <span className="text-[#667085]">Collector Engine:</span>
+                    <span className="text-[#667085]">Collector Version:</span>
                     <span className="font-mono text-[#101828]">{testResult.collector_version}</span>
                   </div>
                   {testResult.browser_engine && (

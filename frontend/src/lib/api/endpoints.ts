@@ -5,7 +5,7 @@
  * Mapping to the frontend UI types lives in lib/api/mappers.ts. Hooks in
  * lib/hooks/* compose these with mock fallback.
  */
-import { getData, getPaginated, postData, type Paginated } from "@/lib/api/client";
+import { getData, getPaginated, postData, patchData, type Paginated } from "@/lib/api/client";
 
 // --- Raw backend response shapes --------------------------------------------
 export interface BackendDashboardSummary {
@@ -54,6 +54,12 @@ export interface BackendSource {
   consecutive_failures?: number;
   reliability_score?: number | null;
   last_success_at?: string | null;
+  preferred_engine?: string;
+  supported_engines?: string[];
+  scrapy_enabled?: boolean;
+  playwright_enabled?: boolean;
+  last_successful_engine?: string | null;
+  last_attempted_engine?: string | null;
 }
 
 export interface BackendSourceHealth {
@@ -207,7 +213,22 @@ export const endpoints = {
     departure_date: string;
     booking_window_days: number;
     mode?: string;
+    engine?: "AUTO" | "SCRAPY" | "PLAYWRIGHT" | string;
+    compare?: boolean;
+    max_results?: number;
+    is_nonstop?: boolean;
   }) => postData<ScrapingTestApiResult>("/ingestion/scraping-test", payload),
+
+  // Source Engine Management
+  updateSourceEngine: (
+    sourceId: string,
+    payload: {
+      preferred_engine?: string;
+      scrapy_enabled?: boolean;
+      playwright_enabled?: boolean;
+      requires_javascript?: boolean;
+    },
+  ) => patchData<BackendSource>(`/sources/${sourceId}/engine`, payload),
 } as const;
 
 export interface ScrapingTestStageApi {
@@ -240,8 +261,15 @@ export interface ScrapingTestApiResult {
   is_live: boolean;
   is_fallback?: boolean;
   fallback_reason?: string;
+  collection_engine?: string;
+  comparison?: Record<string, unknown>;
   browser_engine?: string;
   browser_version?: string;
   browser_executable?: string;
   browser_launch_status?: string;
+  results_seen?: number;
+  results_matching?: number;
+  results_collected?: number;
+  max_results?: number;
+  stop_reason?: string;
 }

@@ -151,6 +151,12 @@ export async function postData<T>(path: string, body?: unknown): Promise<T> {
   return env.data;
 }
 
+/** PATCH an APIResponse endpoint and return its unwrapped `data`. */
+export async function patchData<T>(path: string, body?: unknown): Promise<T> {
+  const env = await request<Envelope<T>>(path, { method: "PATCH", body });
+  return env.data;
+}
+
 /** GET a PaginatedResponse endpoint and return items + pagination meta. */
 export async function getPaginated<T>(
   path: string,
@@ -185,4 +191,4 @@ export async function downloadBlob(path: string): Promise<Blob> {
   return await res.blob();
 }
 
-export const apiClient = { getData, postData, getPaginated, request, downloadBlob };
+export const apiClient = { getData, postData, patchData, getPaginated, request, downloadBlob };

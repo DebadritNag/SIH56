@@ -8,7 +8,7 @@ from typing import Optional
 from uuid import UUID
 from datetime import date
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -26,7 +26,7 @@ SOURCE_ALIASES = {
     "airline direct (air india portal)": "air_india",
     "air india direct": "air_india",
     "airline direct (spicejet portal)": "spicejet",
-    "airline direct (akasa air portal)": "akasa_air",
+    "airline direct (akasa air portal)": "akasa",
     "airline direct (air india express portal)": "air_india_express",
     "ota source 01 (makemytrip)": "ota_source_01",
     "ota source 02 (easemytrip)": "ota_source_02",
@@ -42,6 +42,10 @@ class ScrapingTestRequest(BaseModel):
     departure_date: Optional[date] = None
     booking_window_days: int = 7
     mode: str = "LIVE"
+    engine: Optional[str] = "AUTO"  # AUTO, SCRAPY, PLAYWRIGHT
+    compare: Optional[bool] = False
+    max_results: Optional[int] = Field(15, ge=1, le=20)
+    is_nonstop: Optional[bool] = None
 
 
 async def execute_live_scraping_test(
@@ -74,6 +78,53 @@ async def execute_live_scraping_test(
     is_ota = any(k in raw_query for k in ("ota", "cleartrip", "makemytrip", "easemytrip"))
     source_type = "ota" if is_ota else str(getattr(src, "source_type", "airline") if src else "airline")
 
+    # If payload.compare is requested, execute both engines and return comparison
+    if payload.compare:
+        res_scrapy = await scraper.run(
+            source_name=(src.display_name if src else (payload.source_name or "AirPulse Test Source")),
+            source_type=source_type,
+            base_url=getattr(src, "base_url", None) if src else None,
+            origin=payload.origin,
+            destination=payload.destination,
+            departure=dep,
+            booking_window_days=bw,
+            source_id=str(src.id) if src else None,
+            engine="SCRAPY",
+            max_results=payload.max_results,
+            is_nonstop=payload.is_nonstop,
+        )
+        res_pw = await scraper.run(
+            source_name=(src.display_name if src else (payload.source_name or "AirPulse Test Source")),
+            source_type=source_type,
+            base_url=getattr(src, "base_url", None) if src else None,
+            origin=payload.origin,
+            destination=payload.destination,
+            departure=dep,
+            booking_window_days=bw,
+            source_id=str(src.id) if src else None,
+            engine="PLAYWRIGHT",
+            max_results=payload.max_results,
+            is_nonstop=payload.is_nonstop,
+        )
+        return {
+            "status": "COMPARED",
+            "compare_mode": True,
+            "scrapy_result": res_scrapy,
+            "playwright_result": res_pw,
+            "comparison": {
+                "scrapy_status": res_scrapy.get("status"),
+                "scrapy_quotes": res_scrapy.get("quotes_found", 0),
+                "scrapy_duration_ms": res_scrapy.get("duration_ms", 0),
+                "scrapy_results_matching": res_scrapy.get("results_matching", 0),
+                "scrapy_stop_reason": res_scrapy.get("stop_reason"),
+                "playwright_status": res_pw.get("status"),
+                "playwright_quotes": res_pw.get("quotes_found", 0),
+                "playwright_duration_ms": res_pw.get("duration_ms", 0),
+                "playwright_results_matching": res_pw.get("results_matching", 0),
+                "playwright_stop_reason": res_pw.get("stop_reason"),
+            },
+        }
+
     result = await scraper.run(
         source_name=(src.display_name if src else (payload.source_name or "AirPulse Test Source")),
         source_type=source_type,
@@ -83,6 +134,9 @@ async def execute_live_scraping_test(
         departure=dep,
         booking_window_days=bw,
         source_id=str(src.id) if src else None,
+        engine=payload.engine or "AUTO",
+        max_results=payload.max_results,
+        is_nonstop=payload.is_nonstop,
     )
     return result
 

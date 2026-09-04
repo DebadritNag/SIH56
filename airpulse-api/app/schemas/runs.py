@@ -16,6 +16,8 @@ class SearchRequest(BaseModel):
     passengers: int = Field(1, ge=1, le=9)
     cabin: CabinClass = CabinClass.ECONOMY
     currency: str = "INR"
+    max_results: int = Field(15, ge=1, le=20, description="Bounded maximum fare observations to collect (safety cap 20)")
+    is_nonstop: Optional[bool] = Field(None, description="Filter for nonstop direct flights only")
     requested_at: datetime = Field(default_factory=datetime.utcnow)
     source_id: Optional[UUID] = None
     collection_run_id: Optional[UUID] = None

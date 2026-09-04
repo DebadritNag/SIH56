@@ -780,8 +780,8 @@ class SharedBrowserService:
         self,
         page: Any,
         url: str,
-        nav_timeout_ms: int = 30000,
-        wait_until: str = "domcontentloaded",
+        nav_timeout_ms: int = 15000,
+        wait_until: str = "commit",
     ) -> Tuple[Optional[int], str, str]:
         """Navigates to URL and returns (http_status, page_title, page_content)."""
         try:
@@ -807,9 +807,20 @@ class SharedBrowserService:
                 ) from exc
             raise ScraperError(ScrapeFailureStage.CONNECTION_FAILURE, f"Navigation failed: {exc}") from exc
 
+        # Wait briefly for client-side SPA DOM hydration without hanging on continuous background streaming
+        try:
+            await page.wait_for_timeout(3500)
+        except Exception:
+            pass
+
         http_status = response.status if response else None
-        title = await page.title()
-        content = await page.content() or ""
+        title = ""
+        content = ""
+        try:
+            title = await page.title()
+            content = await page.content() or ""
+        except Exception:
+            pass
         return http_status, title, content
 
     async def check_for_challenges(

@@ -193,6 +193,13 @@ export interface ScrapingTestResult {
   browser_version?: string;
   browser_executable?: string;
   browser_launch_status?: string;
+  collection_engine?: string;
+  comparison?: Record<string, unknown>;
+  results_seen?: number;
+  results_matching?: number;
+  results_collected?: number;
+  max_results?: number;
+  stop_reason?: string;
   extracted_fares: {
     airline: string;
     flight_number: string;

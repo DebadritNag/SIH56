@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -8,15 +8,30 @@ from app.core.enums import SourceType
 
 class SourceBase(BaseModel):
     name: str
+    display_name: Optional[str] = None
     source_type: SourceType
     base_url: Optional[str] = None
     active: bool = True
     collection_method: str = "api"
     max_requests_per_minute: int = 60
+    preferred_engine: str = "AUTO"
+    supported_engines: List[str] = Field(default_factory=lambda: ["SCRAPY", "PLAYWRIGHT"])
+    requires_javascript: bool = False
+    scrapy_enabled: bool = True
+    playwright_enabled: bool = True
+    last_successful_engine: Optional[str] = None
+    last_attempted_engine: Optional[str] = None
 
 
 class SourceCreate(SourceBase):
     pass
+
+
+class SourceEngineUpdate(BaseModel):
+    preferred_engine: Optional[str] = None  # AUTO, SCRAPY, PLAYWRIGHT
+    requires_javascript: Optional[bool] = None
+    scrapy_enabled: Optional[bool] = None
+    playwright_enabled: Optional[bool] = None
 
 
 class SourceResponse(SourceBase):

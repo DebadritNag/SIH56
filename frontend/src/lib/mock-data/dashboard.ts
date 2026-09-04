@@ -480,6 +480,11 @@ export const mockScrapingTestSuccess: ScrapingTestResult = {
   response_hash: '4d8a0c5fe3718b2c45e89d1b649a37c9802f4316ee0a719d26fb563a34ef0281',
   collector_version: 'ota01-v1.4.2',
   parser_version: 'parser-delbom-v2.0',
+  results_seen: 18,
+  results_matching: 17,
+  results_collected: 15,
+  max_results: 15,
+  stop_reason: 'RESULT_LIMIT_REACHED',
   extracted_fares: [
     { airline: 'IndiGo', flight_number: '6E-5021', departure_time: '06:00 IST', cabin: 'Economy', base_fare: 6200, taxes: 1050, total: 7250, validation_status: 'VALID' },
     { airline: 'IndiGo', flight_number: '6E-2041', departure_time: '07:15 IST', cabin: 'Economy', base_fare: 6400, taxes: 1080, total: 7480, validation_status: 'VALID' },
@@ -521,6 +526,11 @@ export const mockScrapingTestFailure: ScrapingTestResult = {
   response_hash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
   collector_version: 'ota03-v1.2.0',
   parser_version: 'parser-ota03-v1.1',
+  results_seen: 0,
+  results_matching: 0,
+  results_collected: 0,
+  max_results: 15,
+  stop_reason: 'BLOCKED',
   extracted_fares: [],
   raw_evidence_json: '{ error: Too Many Requests, retry_after_sec: 300, stage: RATE_LIMIT_ENGAGED}',
   failure_diagnostic: {

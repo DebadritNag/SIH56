@@ -31,7 +31,7 @@ from app.services.reference_data_service import ReferenceDataService
 from app.services.csv_import_service import CSVImportService
 from app.services.audit_service import AuditService
 from app.services.live_scraper import get_live_scraper
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 router = APIRouter(prefix="/ingestion", tags=["Data Ingestion & Collection Subsystem"])
 
@@ -44,6 +44,10 @@ class ScrapingTestRequest(BaseModel):
     departure_date: date
     booking_window_days: int = 7
     mode: str = "LIVE"
+    engine: Optional[str] = "AUTO"
+    compare: Optional[bool] = False
+    max_results: Optional[int] = Field(15, ge=1, le=20)
+    is_nonstop: Optional[bool] = None
 
 
 @router.post("/scraping-test", response_model=APIResponse)
@@ -67,9 +71,13 @@ async def run_scraping_test(
         departure_date=payload.departure_date,
         booking_window_days=payload.booking_window_days,
         mode=payload.mode,
+        engine=payload.engine or "AUTO",
+        compare=payload.compare or False,
+        max_results=payload.max_results,
+        is_nonstop=payload.is_nonstop,
     )
     result = await execute_live_scraping_test(req, db)
-    return APIResponse(success=(result["status"] in ("PASSED", "PARTIAL")), data=result)
+    return APIResponse(success=(result.get("status") in ("PASSED", "PARTIAL", "COMPARED")), data=result)
 
 
 @router.get("/status", response_model=APIResponse)

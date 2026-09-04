@@ -45,3 +45,23 @@ class SourceRepository:
         self.session.add(log)
         await self.session.flush()
         return log
+
+    async def update_engine_config(self, source_id: UUID, config: dict) -> Optional[Source]:
+        src = await self.get_by_id(source_id)
+        if not src:
+            return None
+        meta = dict(src.source_metadata or {})
+        if "preferred_engine" in config and config["preferred_engine"] is not None:
+            meta["preferred_engine"] = config["preferred_engine"].upper()
+        if "supported_engines" in config and config["supported_engines"] is not None:
+            meta["supported_engines"] = config["supported_engines"]
+        if "scrapy_enabled" in config and config["scrapy_enabled"] is not None:
+            meta["scrapy_enabled"] = bool(config["scrapy_enabled"])
+        if "playwright_enabled" in config and config["playwright_enabled"] is not None:
+            meta["playwright_enabled"] = bool(config["playwright_enabled"])
+        if "requires_javascript" in config and config["requires_javascript"] is not None:
+            src.requires_javascript = bool(config["requires_javascript"])
+            meta["requires_javascript"] = bool(config["requires_javascript"])
+        src.source_metadata = meta
+        await self.session.flush()
+        return src

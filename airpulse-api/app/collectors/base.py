@@ -58,10 +58,20 @@ class BaseCollector(ABC):
         raw_payload: Dict[str, Any],
         collection_run_id: Optional[str] = None,
         http_status: int = 200,
+        engine: str = "AUTO",
     ) -> Dict[str, Any]:
         """Encloses raw record in an immutable container with a SHA-256 hash."""
         request_id = str(uuid.uuid4())
         response_hash = compute_payload_hash(raw_payload)
+        provenance = raw_payload.get("provenance") or {
+            "collector": self.source_name,
+            "engine": engine,
+            "engine_version": self.collector_version,
+            "source": self.source_name,
+            "requested_url": raw_payload.get("requested_url"),
+            "observed_at": utc_now().isoformat(),
+            "collection_run_id": collection_run_id,
+        }
         return {
             "id": str(uuid.uuid4()),
             "collection_run_id": collection_run_id,
@@ -77,4 +87,6 @@ class BaseCollector(ABC):
             "response_hash": response_hash,
             "collector_version": self.collector_version,
             "parser_version": "1.0.0",
+            "engine": provenance.get("engine", engine),
+            "provenance": provenance,
         }

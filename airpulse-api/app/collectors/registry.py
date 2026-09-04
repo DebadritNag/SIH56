@@ -78,6 +78,17 @@ class CollectorRegistry:
             except Exception:
                 pass  # fall through to other options
 
+        if method == "scrapy":
+            from app.collectors.scrapy_collector import ScrapyCollector
+            return ScrapyCollector(
+                source_id=str(source_id),
+                source_name=source_name,
+                base_url=base_url,
+                rate_limit_per_minute=rate_limit_per_minute,
+                timeout_seconds=timeout_seconds,
+                max_retries=max_retries,
+            )
+
         if method in ("http", "api") and base_url:
             return StaticCollector(source_id=str(source_id), source_name=source_name, base_url=base_url)
 

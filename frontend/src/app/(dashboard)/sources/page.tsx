@@ -6,12 +6,14 @@ import { HealthBadge } from '@/components/ui/Badge';
 import { SourceStatus } from '@/types';
 import { useSources } from '@/lib/hooks/useResources';
 import type { BackendSource } from '@/lib/api/endpoints';
+import { endpoints } from '@/lib/api/endpoints';
 import { GenerateReportButton } from '@/components/data/GenerateReportButton';
 import { useDataMode } from '@/lib/providers/DataModeProvider';
 import { CircleReloadingAnimation } from '@/components/ui/CircleReloadingAnimation';
 import { notify } from '@/lib/notify';
 
 interface SourceRow {
+  id: string;
   name: string;
   type: string;
   status: SourceStatus;
@@ -22,6 +24,10 @@ interface SourceRow {
   recordsToday: number;
   latencyMs: number;
   isLive: boolean;
+  preferredEngine: string;
+  supportedEngines: string[];
+  lastSuccessfulEngine?: string | null;
+  lastAttemptedEngine?: string | null;
 }
 
 const SOURCE_TYPE_LABELS: Record<string, string> = {
@@ -45,9 +51,9 @@ function toRow(s: BackendSource, isLiveMode: boolean): SourceRow {
   const method =
     s.collection_method ??
     (s.source_type === 'AIRLINE'
-      ? 'Playwright Headless'
+      ? 'Dual Engine (Scrapy + Playwright)'
       : s.source_type === 'OTA'
-      ? 'HTTP Edge Telemetry'
+      ? 'Isolated Scrapy Crawler'
       : 'Official REST API');
 
   const latency =
@@ -56,7 +62,7 @@ function toRow(s: BackendSource, isLiveMode: boolean): SourceRow {
     s.source_type === 'OTA' ? 4820 : s.source_type === 'AIRLINE' ? 3150 : 850;
   const parser =
     s.source_type === 'OTA'
-      ? 'ota-v1.4.2'
+      ? 'scrapy-isolated-v2.11'
       : s.source_type === 'AIRLINE'
       ? 'playwright-v2.1'
       : 'gov-cpi-v1.0';
@@ -72,7 +78,12 @@ function toRow(s: BackendSource, isLiveMode: boolean): SourceRow {
     ? 'Active (Real-time)'
     : 'Simulated';
 
+  const supported = s.supported_engines && s.supported_engines.length > 0
+    ? s.supported_engines
+    : (s.source_type === 'AIRLINE' ? ['scrapy', 'playwright'] : ['scrapy']);
+
   return {
+    id: s.id,
     name: s.display_name || s.name,
     type: SOURCE_TYPE_LABELS[s.source_type] ?? s.source_type,
     status: deriveStatus(s),
@@ -86,6 +97,10 @@ function toRow(s: BackendSource, isLiveMode: boolean): SourceRow {
     recordsToday: records,
     latencyMs: latency,
     isLive: isLiveMode,
+    preferredEngine: (s.preferred_engine || 'AUTO').toUpperCase(),
+    supportedEngines: supported.map((e) => e.toUpperCase()),
+    lastSuccessfulEngine: s.last_successful_engine ? s.last_successful_engine.toUpperCase() : null,
+    lastAttemptedEngine: s.last_attempted_engine ? s.last_attempted_engine.toUpperCase() : null,
   };
 }
 
@@ -122,6 +137,16 @@ export default function SourcesPage() {
     }
   };
 
+  const handleEngineChange = async (sourceId: string, engine: string) => {
+    try {
+      await endpoints.updateSourceEngine(sourceId, { preferred_engine: engine });
+      notify.success(`Preferred engine set to ${engine}`, { id: `engine-${sourceId}` });
+      await refetchSources();
+    } catch {
+      notify.error('Failed to update source engine configuration');
+    }
+  };
+
   const isBusy = isSourcesLoading || isSourcesFetching || isManualReloading;
 
   return (
@@ -146,7 +171,7 @@ export default function SourcesPage() {
             )}
           </div>
           <p className="text-xs text-[#475467] mt-0.5">
-            Operational telemetry &amp; live health diagnostics across configured airline direct portals, online travel agencies, and official government statistics adapters.
+            Operational telemetry &amp; dual-engine scraper configuration (Scrapy subprocess isolation + Playwright headless) across domestic airline portals and edge connectors.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -200,12 +225,12 @@ export default function SourcesPage() {
                   <th className="p-3">Source Name</th>
                   <th className="p-3">Source Type</th>
                   <th className="p-3 text-center">Live Status</th>
-                  <th className="p-3">Collection Method</th>
+                  <th className="p-3">Supported Engines</th>
+                  <th className="p-3">Preferred Engine</th>
                   <th className="p-3 text-right">Reliability Rate</th>
                   <th className="p-3 text-right">Avg Latency</th>
-                  <th className="p-3 text-right">Last Signal / Freshness</th>
+                  <th className="p-3 text-right">Last Signal</th>
                   <th className="p-3 text-right">Quotes Today</th>
-                  <th className="p-3 text-center">Parser Engine</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#F1F5F9]">
@@ -216,15 +241,42 @@ export default function SourcesPage() {
                         {isLiveMode && src.status === 'HEALTHY' && (
                           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
                         )}
-                        <span>{src.name}</span>
+                        <div>
+                          <div>{src.name}</div>
+                          <div className="text-[10px] font-mono text-[#667085] font-normal">{src.method}</div>
+                        </div>
                       </div>
                     </td>
                     <td className="p-3 text-[#667085]">{src.type}</td>
                     <td className="p-3 text-center">
                       <HealthBadge status={src.status} />
                     </td>
-                    <td className="p-3 font-mono text-[11px] text-[#475467]">
-                      {src.method}
+                    <td className="p-3">
+                      <div className="flex flex-wrap gap-1">
+                        {src.supportedEngines.map((eng) => (
+                          <span
+                            key={eng}
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold ${
+                              eng === 'SCRAPY'
+                                ? 'bg-emerald-50 text-emerald-800 border border-emerald-300'
+                                : 'bg-purple-50 text-purple-800 border border-purple-300'
+                            }`}
+                          >
+                            {eng}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="p-3">
+                      <select
+                        value={src.preferredEngine}
+                        onChange={(e) => handleEngineChange(src.id, e.target.value)}
+                        className="bg-white border border-[#D0D5DD] rounded px-2 py-1 text-xs font-semibold text-[#101828] focus:border-blue-500 focus:outline-none"
+                      >
+                        <option value="AUTO">AUTO (Intelligent)</option>
+                        <option value="SCRAPY">SCRAPY (Subprocess)</option>
+                        <option value="PLAYWRIGHT">PLAYWRIGHT (Browser)</option>
+                      </select>
                     </td>
                     <td className="p-3 text-right font-mono font-bold text-[#101828] tabular-nums">
                       {src.successRate.toFixed(1)}%
@@ -247,11 +299,6 @@ export default function SourcesPage() {
                     </td>
                     <td className="p-3 text-right font-mono font-bold text-blue-700 tabular-nums">
                       {src.recordsToday.toLocaleString()}
-                    </td>
-                    <td className="p-3 text-center font-mono text-[#667085] text-[11px]">
-                      <span className="bg-slate-100 border border-slate-200 px-2 py-0.5 rounded">
-                        {src.parserVersion}
-                      </span>
                     </td>
                   </tr>
                 ))}
