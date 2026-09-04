@@ -64,6 +64,12 @@ async def execute_live_scraping_test(
 
     scraper = get_live_scraper()
     dep = payload.departure_date or date.today()
+    bw = payload.booking_window_days
+    if payload.departure_date:
+        delta = (payload.departure_date - date.today()).days
+        if delta >= 0:
+            bw = delta
+
     raw_query = (payload.source_name or (src.display_name if src else "")).lower()
     is_ota = any(k in raw_query for k in ("ota", "cleartrip", "makemytrip", "easemytrip"))
     source_type = "ota" if is_ota else str(getattr(src, "source_type", "airline") if src else "airline")
@@ -75,7 +81,7 @@ async def execute_live_scraping_test(
         origin=payload.origin,
         destination=payload.destination,
         departure=dep,
-        booking_window_days=payload.booking_window_days,
+        booking_window_days=bw,
         source_id=str(src.id) if src else None,
     )
     return result

@@ -238,4 +238,6 @@ export interface ScrapingTestApiResult {
   stages: ScrapingTestStageApi[];
   quotes: Array<Record<string, unknown>>;
   is_live: boolean;
+  is_fallback?: boolean;
+  fallback_reason?: string;
 }

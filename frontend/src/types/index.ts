@@ -187,9 +187,12 @@ export interface ScrapingTestResult {
   response_hash: string;
   collector_version: string;
   parser_version: string;
+  is_fallback?: boolean;
+  fallback_reason?: string;
   extracted_fares: {
     airline: string;
     flight_number: string;
+    departure_date?: string;
     departure_time: string;
     cabin: string;
     base_fare: number;

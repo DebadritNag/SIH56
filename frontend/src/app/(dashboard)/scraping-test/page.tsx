@@ -185,6 +185,7 @@ export default function ScrapingTestPage() {
 
       // Real live fare & flight observations matching portal data
       const fares = (res.quotes || []).map((q: any) => {
+        const depDate = q.departure_date || (q.departure_iso ? q.departure_iso.substring(0, 10) : (res.departure_date || departureDate));
         const depTime = q.departure_time || (q.departure_iso ? q.departure_iso.substring(11, 16) : '06:00');
         const carrierRaw = String(q.carrier ?? q.airline ?? '6E').trim();
         const fullAirlineName =
@@ -210,6 +211,7 @@ export default function ScrapingTestPage() {
         return {
           airline: fullAirlineName,
           flight_number: flightNum,
+          departure_date: depDate,
           departure_time: depTime,
           cabin: String(q.cabin ?? 'Economy'),
           base_fare: base,
@@ -223,6 +225,9 @@ export default function ScrapingTestPage() {
         success: true,
         source: res.source || selectedSource,
         route: res.route || `${origin} → ${destination}`,
+        departure_date: res.departure_date || departureDate,
+        is_fallback: !!res.is_fallback,
+        fallback_reason: res.fallback_reason,
         http_status: res.http_status ?? 200,
         response_size_kb: Math.round(((res.response_hash?.length ?? 0) + 1000) / 100) / 10,
         response_hash: res.response_hash || '—',
@@ -232,10 +237,18 @@ export default function ScrapingTestPage() {
         collector_version: res.collector_version || (selectedSource.includes('IndiGo') ? 'indigo-playwright-v1.2.0' : 'ota-http-telemetry-v1.2.0'),
       } as unknown as ScrapingTestResult);
       setIsRunning(false);
-      notify.success('Live scraping verified', {
-        id: 'scrape-probe',
-        description: `${res.quotes_validated} live flights detected on corridor · SHA-256 evidence stored.`,
-      });
+
+      if (res.is_fallback) {
+        notify.warning('Corridor Fallback Active', {
+          id: 'scrape-probe',
+          description: res.fallback_reason || `Live upstream throttled on hosting; dynamic corridor market model generated for travel date ${res.departure_date || departureDate}.`,
+        });
+      } else {
+        notify.success('Live scraping verified', {
+          id: 'scrape-probe',
+          description: `${res.quotes_validated} live flights detected on corridor · SHA-256 evidence stored.`,
+        });
+      }
     } catch (err) {
       clearInterval(progressTimer);
       setIsRunning(false);
@@ -501,6 +514,10 @@ export default function ScrapingTestPage() {
                     <span className="font-semibold text-[#101828]">{testResult.source} • {testResult.route}</span>
                   </div>
                   <div className="py-1.5 flex justify-between">
+                    <span className="text-[#667085]">Travel Date:</span>
+                    <span className="font-semibold text-blue-700">{testResult.departure_date || departureDate}</span>
+                  </div>
+                  <div className="py-1.5 flex justify-between">
                     <span className="text-[#667085]">HTTP Status / Size:</span>
                     <span className="text-[#101828] font-mono">{testResult.http_status} OK ({testResult.response_size_kb} KB)</span>
                   </div>
@@ -511,6 +528,17 @@ export default function ScrapingTestPage() {
                     </code>
                   </div>
                 </div>
+
+                {/* Fallback Active Diagnostic Banner */}
+                {testResult.is_fallback && (
+                  <div className="p-3 rounded-lg bg-amber-50 border border-amber-300 flex items-start gap-2.5 text-amber-900 text-xs">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold">Resilient Corridor Fallback Engaged:</span>{' '}
+                      {testResult.fallback_reason || `Live upstream connection throttled on hosting; generated dynamic corridor airfare model for ${testResult.departure_date || departureDate}.`}
+                    </div>
+                  </div>
+                )}
 
                 {/* Raw JSON toggle */}
                 {showRawJson && (
@@ -526,7 +554,7 @@ export default function ScrapingTestPage() {
                       Live Corridor Airfare Quotes ({testResult.extracted_fares.length})
                     </h4>
                     <span className="text-[11px] text-[#667085] font-medium">
-                      Matched to MakeMyTrip Market Fare Tiers (INR)
+                      Travel Date: <span className="font-bold text-[#101828]">{testResult.departure_date || departureDate}</span> · Market Fare Tiers (INR)
                     </span>
                   </div>
                   <div className="border border-[#E4E7EC] rounded overflow-hidden text-xs">
@@ -535,7 +563,7 @@ export default function ScrapingTestPage() {
                         <tr>
                           <th className="p-2">Airline / Carrier</th>
                           <th className="p-2">Flight No</th>
-                          <th className="p-2 text-center">Departure</th>
+                          <th className="p-2 text-center">Travel Date & Dep</th>
                           <th className="p-2 text-center">Cabin</th>
                           <th className="p-2 text-right">Base Fare</th>
                           <th className="p-2 text-right">Total Fare (INR)</th>
@@ -554,7 +582,10 @@ export default function ScrapingTestPage() {
                               </div>
                             </td>
                             <td className="p-2 font-mono text-[#667085]">{f.flight_number}</td>
-                            <td className="p-2 text-center font-mono text-[#101828]">{f.departure_time}</td>
+                            <td className="p-2 text-center font-mono text-[#101828]">
+                              <span className="text-[10px] text-[#667085] block">{f.departure_date || testResult.departure_date || departureDate}</span>
+                              {f.departure_time}
+                            </td>
                             <td className="p-2 text-center text-[#667085]">{f.cabin}</td>
                             <td className="p-2 text-right tabular-nums text-[#475467]">{formatINR(f.base_fare)}</td>
                             <td className="p-2 text-right tabular-nums font-bold text-blue-700">{formatINR(f.total)}</td>
