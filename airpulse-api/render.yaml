@@ -23,9 +23,11 @@ services:
         value: "true"
       - key: PLAYWRIGHT_BROWSERS_PATH
         value: "/ms-playwright"
+      - key: MEMORY_CONSTRAINED
+        value: "true"
       # CORS: set to your deployed frontend origin(s), comma-separated
       - key: CORS_ORIGINS
-        value: '["http://localhost:3000"]'
+        value: '["http://localhost:3000","https://sih-56.vercel.app"]'
       # ---- Secrets: set these in the Render dashboard (sync:false = not in repo) ----
       - key: DATABASE_URL
         sync: false

@@ -68,7 +68,11 @@ class Settings(BaseSettings):
     FIXTURES_DIR: str = "./app/collectors/fixtures"
 
     # Security & CORS
-    CORS_ORIGINS: Union[List[str], str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    CORS_ORIGINS: Union[List[str], str] = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "https://sih-56.vercel.app",
+    ]
     ALLOWED_HOSTS: Union[List[str], str] = ["*"]
 
     # Operational Modes & Intervals

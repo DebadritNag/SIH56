@@ -42,7 +42,7 @@ class ScrapingTestRequest(BaseModel):
     source_id: Optional[UUID] = None
     origin: str
     destination: str
-    departure_date: date
+    departure_date: Optional[date] = None
     booking_window_days: int = 7
     mode: str = "LIVE"
     engine: Optional[str] = "AUTO"

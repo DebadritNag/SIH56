@@ -34,3 +34,49 @@ def haversine_distance_km(lat1: float, lon1: float, lat2: float, lon2: float) ->
     )
     c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
     return round(r * c, 2)
+
+
+def is_memory_constrained() -> bool:
+    """Returns True if running in a memory-constrained container (e.g. Render 512MB tier)
+    where spawning a full headless Chromium browser process would trigger an OOM-killer (exit 137)."""
+    import os
+
+    # 1. Explicit override to force browser execution if desired
+    if os.environ.get("ALLOW_HEAVY_BROWSER", "").lower() in ("true", "1", "yes"):
+        return False
+
+    # 2. Check explicit environment flags (Render sets RENDER=true automatically)
+    if os.environ.get("RENDER") or os.environ.get("MEMORY_CONSTRAINED", "").lower() in ("true", "1", "yes"):
+        return True
+
+    # 3. Check cgroups v1 / v2 memory limit on Linux
+    for cgroup_file in (
+        "/sys/fs/cgroup/memory.max",
+        "/sys/fs/cgroup/memory/memory.limit_in_bytes",
+    ):
+        if os.path.exists(cgroup_file):
+            try:
+                with open(cgroup_file, "r") as f:
+                    val = f.read().strip()
+                    if val and val != "max":
+                        limit_bytes = int(val)
+                        if limit_bytes <= 805306368:  # <= 768MB
+                            return True
+            except Exception:
+                pass
+
+    # 4. Check /proc/meminfo total RAM
+    if os.path.exists("/proc/meminfo"):
+        try:
+            with open("/proc/meminfo", "r") as f:
+                for line in f:
+                    if line.startswith("MemTotal:"):
+                        parts = line.split()
+                        if len(parts) >= 2:
+                            kb = int(parts[1])
+                            if kb <= 786432:  # <= 768MB
+                                return True
+        except Exception:
+            pass
+
+    return False

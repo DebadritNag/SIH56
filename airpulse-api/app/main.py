@@ -29,26 +29,13 @@ async def lifespan(app: FastAPI):
         import logging
         logging.getLogger("airpulse").warning("DB not reachable at startup: %s", exc)
 
-    # Startup: Run browser capability discovery and verified self-test
+    # Startup: Run browser capability discovery in background so container binds $PORT instantly
     try:
         from app.services.browser_service import SharedBrowserService
-        self_test_res = await SharedBrowserService.run_startup_self_test()
-        import logging
-        logging.getLogger("airpulse").info(
-            "Browser Engine Startup Self-Test: %s (engine=%s, version=%s, status=%s, js_verified=%s, duration=%sms)",
-            self_test_res.get("self_test_status"),
-            self_test_res.get("browser_engine"),
-            self_test_res.get("browser_version"),
-            self_test_res.get("browser_launch_status"),
-            self_test_res.get("js_execution_verified"),
-            self_test_res.get("duration_ms"),
-        )
-        await SharedBrowserService.get_instance().close_all()
-        import gc
-        gc.collect()
+        asyncio.create_task(SharedBrowserService.run_startup_self_test())
     except Exception as exc:  # noqa: BLE001
         import logging
-        logging.getLogger("airpulse").warning("Browser engine self-test encountered an exception: %s", exc)
+        logging.getLogger("airpulse").warning("Browser engine self-test dispatch encountered an exception: %s", exc)
 
     yield
     # Shutdown
@@ -119,12 +106,19 @@ def _cors_headers(request: Request) -> dict:
     if not origin:
         return {}
     import re
-    allowed = origin in settings.CORS_ORIGINS or bool(re.match(r"https://.*\.vercel\.app", origin))
+    allowed = (
+        origin in settings.CORS_ORIGINS
+        or bool(re.match(r"https://.*\.vercel\.app", origin))
+        or origin.endswith(".vercel.app")
+        or origin == "https://sih-56.vercel.app"
+    )
     if not allowed:
         return {}
     return {
         "Access-Control-Allow-Origin": origin,
         "Access-Control-Allow-Credentials": "true",
+        "Access-Control-Allow-Methods": "*",
+        "Access-Control-Allow-Headers": "*",
         "Vary": "Origin",
     }
 

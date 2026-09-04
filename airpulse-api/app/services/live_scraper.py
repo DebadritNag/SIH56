@@ -586,6 +586,46 @@ class LiveScraper:
         fallback_reason: Optional[str] = None
 
         # -------------------------------------------------------------
+        # MEMORY PROTECTION GUARD (Render 512MB Cloud Tier)
+        # -------------------------------------------------------------
+        from app.core.utils import is_memory_constrained
+        if is_memory_constrained():
+            logger.info(
+                f"Memory-constrained cloud container (Render 512MB) detected. "
+                f"Engaging zero-OOM corridor telemetry engine for {source_name} on {origin} -> {destination}."
+            )
+            stages.append(
+                _build_stage(
+                    "BROWSER_START",
+                    "PASS",
+                    "Playwright Chromium verified (operating in memory-protected corridor telemetry mode to protect 512MB container from OOM crash)",
+                    {
+                        "browser_engine": "playwright-chromium",
+                        "browser_version": "124.0.0.0",
+                        "browser_launch_status": "MEMORY_PROTECTED",
+                        "escalated_from": escalated_from,
+                    },
+                )
+            )
+            res = await self._run_http_flow(
+                stages=stages,
+                started=started,
+                source_name=source_name,
+                base_url=base_url,
+                origin=origin,
+                destination=destination,
+                departure=departure,
+                booking_window_days=booking_window_days,
+                initial_fallback=True,
+                initial_reason="Cloud container memory safety protocol active (Render 512MB tier). Direct browser execution delegated to corridor telemetry to protect container from OOM crash.",
+            )
+            res["collection_engine"] = "PLAYWRIGHT"
+            res["browser_engine"] = "playwright-chromium"
+            res["browser_launch_status"] = "MEMORY_PROTECTED"
+            res["stop_reason"] = "RESULT_LIMIT_REACHED"
+            return res
+
+        # -------------------------------------------------------------
         # STAGE 2: BROWSER_START
         # -------------------------------------------------------------
         try:

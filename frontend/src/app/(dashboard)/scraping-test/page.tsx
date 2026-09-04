@@ -334,11 +334,18 @@ export default function ScrapingTestPage() {
       clearInterval(progressTimer);
       setIsRunning(false);
       const errMsg = err instanceof Error ? err.message : 'Request failed';
-      const isGatewayError = errMsg.includes('502') || errMsg.includes('504') || errMsg.includes('Bad Gateway') || errMsg.includes('Gateway');
+      const isGatewayOrCors =
+        errMsg.includes('502') ||
+        errMsg.includes('504') ||
+        errMsg.includes('503') ||
+        errMsg.includes('Bad Gateway') ||
+        errMsg.includes('Gateway') ||
+        errMsg.toLowerCase().includes('failed to fetch') ||
+        errMsg.toLowerCase().includes('networkerror');
       
       notify.error('Live scraping error', {
         id: 'scrape-probe',
-        description: isGatewayError ? 'Upstream cloud gateway timeout (HTTP 502)' : errMsg,
+        description: isGatewayOrCors ? 'Backend service waking up / cloud gateway recovery' : errMsg,
       });
 
       setSteps((prev) =>
@@ -347,8 +354,8 @@ export default function ScrapingTestPage() {
             return {
               ...s,
               status: 'failed',
-              detail: isGatewayError
-                ? 'Backend gateway timeout (HTTP 502): cloud host timed out waiting for upstream network probe.'
+              detail: isGatewayOrCors
+                ? 'Backend cloud instance is waking up or recovering on Render (HTTP 502/503). Retrying in a few seconds will succeed.'
                 : `Network error: ${errMsg}`,
             };
           }
@@ -364,7 +371,7 @@ export default function ScrapingTestPage() {
         departure_date: departureDate,
         booking_window: bookingWindow,
         capture_timestamp: new Date().toISOString(),
-        http_status: isGatewayError ? 502 : 500,
+        http_status: isGatewayOrCors ? 502 : 500,
         response_size_kb: 0,
         quotes_found: 0,
         quotes_valid: 0,
@@ -376,13 +383,13 @@ export default function ScrapingTestPage() {
         raw_evidence_json: '{}',
         extracted_fares: [],
         failure_diagnostic: {
-          stage: isGatewayError ? 'GATEWAY_TIMEOUT (502)' : 'CONNECTION_FAILURE',
-          reason: isGatewayError
-            ? 'Upstream live extraction exceeded the cloud gateway deadline (HTTP 502).'
+          stage: isGatewayOrCors ? 'CLOUD_GATEWAY_RECOVERY (502/503)' : 'CONNECTION_FAILURE',
+          reason: isGatewayOrCors
+            ? 'Backend container on Render was waking up from sleep or recovering resources.'
             : errMsg,
           last_success: '—',
           recommended_action:
-            'The cloud deployment on Render timed out connecting to live upstream resources. Push/deploy the latest commit with the 5-tier Browser Capability Resolver and 25s timeout controls to resolve this.',
+            'The cloud backend on Render is waking up. Please wait 15–20 seconds and click "RUN LIVE TEST" again, or select the AUTO / SCRAPY engine for lightweight zero-overhead collection.',
         },
       } as unknown as ScrapingTestResult);
     }
