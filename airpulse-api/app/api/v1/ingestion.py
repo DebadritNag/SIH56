@@ -57,23 +57,18 @@ async def run_scraping_test(
     Performs an actual network fetch, stores raw evidence, and returns per-stage telemetry.
     Never fakes success — reports the true failure stage if the source is unavailable.
     """
-    # Resolve the source (by id or name), if provided.
-    src = None
-    if payload.source_id:
-        src = (await db.execute(select(Source).where(Source.id == payload.source_id))).scalars().first()
-    elif payload.source_name:
-        src = (await db.execute(select(Source).where(Source.name == payload.source_name))).scalars().first()
+    from app.api.v1.scraping import ScrapingTestRequest as UnifiedScrapingReq, execute_live_scraping_test
 
-    scraper = get_live_scraper()
-    result = await scraper.run(
-        source_name=(src.display_name if src else (payload.source_name or "OTA Source")),
-        source_type=str(getattr(src, "source_type", "OTA") if src else "OTA"),
-        base_url=getattr(src, "base_url", None) if src else None,
+    req = UnifiedScrapingReq(
+        source_name=payload.source_name,
+        source_id=payload.source_id,
         origin=payload.origin,
         destination=payload.destination,
-        departure=payload.departure_date,
+        departure_date=payload.departure_date,
         booking_window_days=payload.booking_window_days,
+        mode=payload.mode,
     )
+    result = await execute_live_scraping_test(req, db)
     return APIResponse(success=(result["status"] in ("PASSED", "PARTIAL")), data=result)
 
 

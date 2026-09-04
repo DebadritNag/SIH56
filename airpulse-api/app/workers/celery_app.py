@@ -21,7 +21,7 @@ celery_app.conf.update(
 # Celery Beat Periodic Schedule
 celery_app.conf.beat_schedule = {
     "run-collection-pipeline-every-3h": {
-        "task": "app.workers.collection_tasks.run_scheduled_collection",
+        "task": "app.workers.collection_tasks.schedule_collection_run",
         "schedule": settings.COLLECTION_INTERVAL_HOURS * 3600.0,
     },
     "run-source-health-every-15m": {

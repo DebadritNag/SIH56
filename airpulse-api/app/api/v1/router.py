@@ -16,6 +16,7 @@ from app.api.v1 import (
     sources,
     system,
     exports,
+    scraping,
 )
 
 api_router = APIRouter()
@@ -24,6 +25,7 @@ api_router.include_router(health.router)
 api_router.include_router(auth.router)
 api_router.include_router(system.router)
 api_router.include_router(ingestion.router)
+api_router.include_router(scraping.router)
 api_router.include_router(dashboard.router)
 api_router.include_router(fares.router)
 api_router.include_router(routes.router)

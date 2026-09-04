@@ -16,7 +16,7 @@
     "indigo": {
       "carrier_code": "6E",
       "display_name": "IndiGo",
-      "enabled": false,
+      "enabled": true,
       "base_url": "https://www.goindigo.in",
       "search_url_template": "https://www.goindigo.in/booking/search-flights?origin={origin}&destination={destination}&departure={departure_date}&adults={adults}&class={cabin}",
       "selectors": {

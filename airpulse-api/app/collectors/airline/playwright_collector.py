@@ -162,17 +162,7 @@ class PlaywrightCollector(BaseCollector):
                 f"airline_selectors.json and install Playwright to activate.",
             )
 
-        # Lazy, guarded import so a missing Playwright install never crashes the app.
-        try:
-            from playwright.async_api import (  # type: ignore
-                TimeoutError as PlaywrightTimeoutError,
-                async_playwright,
-            )
-        except ImportError as exc:
-            raise ScraperError(
-                ScrapeFailureStage.BROWSER_LAUNCH_FAILURE,
-                "Playwright is not installed. Run: pip install playwright && playwright install chromium",
-            ) from exc
+        from app.services.browser_service import get_shared_browser_service
 
         await self._respect_rate_limit()
 
@@ -181,112 +171,81 @@ class PlaywrightCollector(BaseCollector):
         nav_timeout = int(self._default("nav_timeout_ms", 30000))
         sel_timeout = int(self._default("selector_timeout_ms", 15000))
         wait_until = self._default("wait_until", "networkidle")
-        block_types = set(self._default("block_resource_types", []))
-        user_agent = self._default("user_agent", self.get_source_metadata()["source_name"])
 
-        browser = None
+        browser_service = get_shared_browser_service()
+        page = None
         try:
-            async with async_playwright() as pw:
+            page, context = await browser_service.create_isolated_page(
+                source_key=self.airline_key,
+                block_heavy_resources=True,
+            )
+
+            # Navigate with safe timeout and DNS/connection classification
+            http_status, title, body_text = await browser_service.navigate_safely(
+                page, url, nav_timeout_ms=nav_timeout, wait_until=wait_until
+            )
+
+            if not body_text.strip():
+                raise ScraperError(ScrapeFailureStage.EMPTY_RESPONSE, "Empty page body.")
+
+            # Generic security challenge & block detection
+            challenge_res = await browser_service.check_for_challenges(
+                page, http_status, title, body_text
+            )
+            if challenge_res.detected:
+                stage = challenge_res.stage or ScrapeFailureStage.BLOCKED
+                raise ScraperError(
+                    stage,
+                    challenge_res.reason or "Security challenge detected on carrier portal.",
+                    http_status=http_status,
+                )
+
+            # Wait for results container if specified
+            container_sel = sel.get("results_container")
+            try:
+                if container_sel:
+                    await page.wait_for_selector(container_sel, timeout=sel_timeout)
+            except Exception as exc:
+                self._detect_empty(body_text.lower())
+                raise ScraperError(
+                    ScrapeFailureStage.SELECTOR_NOT_FOUND,
+                    f"Results container selector not found: '{container_sel}'. "
+                    f"The portal DOM likely changed — update airline_selectors.json.",
+                ) from exc
+
+            row_sel = sel.get("flight_row")
+            rows = await page.query_selector_all(row_sel) if row_sel else []
+            if not rows:
+                self._detect_empty(body_text.lower())
+                raise ScraperError(
+                    ScrapeFailureStage.SELECTOR_NOT_FOUND,
+                    f"Flight row selector matched 0 elements: '{row_sel}'. Update selectors.",
+                )
+
+            quotes: List[Dict[str, Any]] = []
+            for row in rows:
                 try:
-                    browser = await pw.chromium.launch(headless=True)
-                except Exception as exc:
-                    raise ScraperError(
-                        ScrapeFailureStage.BROWSER_LAUNCH_FAILURE,
-                        f"Failed to launch Chromium: {exc}",
-                    ) from exc
+                    quote = await self._extract_row(row, sel, search_request, http_status)
+                    if quote:
+                        quotes.append(quote)
+                except Exception:
+                    continue
 
-                context = await browser.new_context(user_agent=user_agent)
-                page = await context.new_page()
+            if not quotes:
+                raise ScraperError(
+                    ScrapeFailureStage.PARSE_ERROR,
+                    "Matched flight rows but could not parse any fare. Update selectors.",
+                )
 
-                # Ethical load reduction: block heavy resources.
-                if block_types:
-                    async def _route(route):
-                        if route.request.resource_type in block_types:
-                            await route.abort()
-                        else:
-                            await route.continue_()
-
-                    await page.route("**/*", _route)
-
-                # Navigate with HTTP/DNS/connection/timeout classification.
-                try:
-                    response = await page.goto(url, wait_until=wait_until, timeout=nav_timeout)
-                except PlaywrightTimeoutError as exc:
-                    raise ScraperError(ScrapeFailureStage.TIMEOUT, f"Navigation timed out after {nav_timeout}ms") from exc
-                except Exception as exc:
-                    msg = str(exc).lower()
-                    if "err_name_not_resolved" in msg or "dns" in msg:
-                        raise ScraperError(ScrapeFailureStage.DNS_FAILURE, str(exc)) from exc
-                    if "err_connection" in msg or "econnrefused" in msg or "connection" in msg:
-                        raise ScraperError(ScrapeFailureStage.CONNECTION_FAILURE, str(exc)) from exc
-                    raise ScraperError(ScrapeFailureStage.CONNECTION_FAILURE, str(exc)) from exc
-
-                http_status = response.status if response else None
-                if http_status is not None and http_status >= 400:
-                    stage = (
-                        ScrapeFailureStage.BLOCKED
-                        if http_status in (401, 403, 429)
-                        else ScrapeFailureStage.HTTP_ERROR
-                    )
-                    raise ScraperError(stage, f"HTTP {http_status} from {url}", http_status=http_status)
-
-                body_text = (await page.content()) or ""
-                lowered = body_text.lower()
-                if not body_text.strip():
-                    raise ScraperError(ScrapeFailureStage.EMPTY_RESPONSE, "Empty page body.")
-
-                # Block / CAPTCHA / no-availability detection before selector work.
-                self._detect_block_or_captcha(lowered)
-                self._detect_empty(lowered)
-
-                # Wait for the results container.
-                container_sel = sel.get("results_container")
-                try:
-                    if container_sel:
-                        await page.wait_for_selector(container_sel, timeout=sel_timeout)
-                except PlaywrightTimeoutError as exc:
-                    # Container never appeared: could be no-availability or selector drift.
-                    self._detect_empty(lowered)
-                    raise ScraperError(
-                        ScrapeFailureStage.SELECTOR_NOT_FOUND,
-                        f"Results container selector not found: '{container_sel}'. "
-                        f"The portal DOM likely changed — update airline_selectors.json.",
-                    ) from exc
-
-                row_sel = sel.get("flight_row")
-                rows = await page.query_selector_all(row_sel) if row_sel else []
-                if not rows:
-                    self._detect_empty(lowered)
-                    raise ScraperError(
-                        ScrapeFailureStage.SELECTOR_NOT_FOUND,
-                        f"Flight row selector matched 0 elements: '{row_sel}'. Update selectors.",
-                    )
-
-                quotes: List[Dict[str, Any]] = []
-                for row in rows:
-                    try:
-                        quote = await self._extract_row(row, sel, search_request, http_status)
-                        if quote:
-                            quotes.append(quote)
-                    except Exception as exc:  # per-row parse errors are non-fatal
-                        # Skip malformed row but keep going; a total parse failure is caught below.
-                        continue
-
-                if not quotes:
-                    raise ScraperError(
-                        ScrapeFailureStage.PARSE_ERROR,
-                        "Matched flight rows but could not parse any fare. Update selectors.",
-                    )
-
-                return quotes
+            return quotes
         except ScraperError:
             raise
-        except Exception as exc:  # pragma: no cover - unexpected
+        except Exception as exc:
             raise ScraperError(ScrapeFailureStage.PARSE_ERROR, f"Unexpected scrape error: {exc}") from exc
         finally:
-            if browser is not None:
+            if page is not None:
                 try:
-                    await browser.close()
+                    await page.close()
                 except Exception:
                     pass
 

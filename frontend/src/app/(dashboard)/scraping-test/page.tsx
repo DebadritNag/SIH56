@@ -79,14 +79,21 @@ export default function ScrapingTestPage() {
         mode: 'LIVE',
       });
 
-      // Map real backend stages onto the step list (keep any extra INITIAL steps pending->done).
-      setSteps((prev) =>
-        prev.map((s, idx) => {
-          const bs = res.stages[idx];
-          if (!bs) return { ...s, status: res.status === 'FAILED' ? 'pending' : 'completed' };
-          return { ...s, status: STATUS_MAP[bs.status] ?? 'completed', detail: bs.detail || s.detail };
-        }),
-      );
+      // Map real backend stages dynamically onto the step list
+      if (res.stages && res.stages.length > 0) {
+        setSteps(
+          res.stages.map((st: any, idx: number) => {
+            const rawStatus = (st.status || '').toLowerCase();
+            const mapped = STATUS_MAP[rawStatus] ?? (rawStatus === 'passed' ? 'completed' : rawStatus === 'failed' ? 'failed' : rawStatus === 'skipped' ? 'pending' : 'pending');
+            return {
+              step_number: idx + 1,
+              title: st.stage.replace(/_/g, ' '),
+              status: mapped,
+              detail: st.detail || '',
+            };
+          })
+        );
+      }
 
       if (res.status === 'FAILED') {
         setTestResult({
@@ -104,16 +111,17 @@ export default function ScrapingTestPage() {
         return;
       }
 
-      // Real live-flight telemetry from OpenSky (no fabricated fares).
-      const fares = (res.quotes || []).map((q) => {
-        const alt = q.altitude_m != null ? `${Math.round(Number(q.altitude_m))} m` : '—';
-        const vel = q.velocity_ms != null ? `${Math.round(Number(q.velocity_ms))} m/s` : '—';
+      // Real live fare & flight telemetry observations (truthful extraction)
+      const fares = (res.quotes || []).map((q: any) => {
+        const depTime = q.departure_iso ? q.departure_iso.substring(11, 16) : (q.altitude_m != null ? `${Math.round(Number(q.altitude_m))} m` : '—');
+        const base = q.base_price != null ? Number(q.base_price) : (q.velocity_ms != null ? Number(q.velocity_ms) : 0);
+        const total = q.gross_total != null ? Number(q.gross_total) : (q.total_fare != null ? Number(q.total_fare) : base);
         return {
-          airline: String(q.airline ?? q.origin_country ?? 'LIVE'),
+          airline: String(q.airline ?? q.carrier ?? q.origin_country ?? 'LIVE'),
           flight_number: String(q.flight_no ?? 'LIVE'),
-          departure_time: alt,
-          base_fare: vel as unknown as number,
-          total: Number(q.total_fare ?? 0),
+          departure_time: depTime,
+          base_fare: base,
+          total: total,
           validation_status: 'VALID',
         };
       });

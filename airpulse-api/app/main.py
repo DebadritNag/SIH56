@@ -127,3 +127,17 @@ async def general_exception_handler(request: Request, exc: Exception):
 
 # Register API v1
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
+
+
+# Root health probes for container runtimes and automated test suites
+@app.get("/health", tags=["Health"])
+async def root_health_check():
+    from app.api.v1.health import health_check
+    return await health_check()
+
+
+@app.get("/ready", tags=["Health"])
+async def root_readiness_check():
+    from app.api.v1.health import readiness_check
+    return await readiness_check()
+
