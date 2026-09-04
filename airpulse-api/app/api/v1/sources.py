@@ -5,10 +5,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import EntityNotFoundException
 from app.core.pagination import PaginatedResponse, PaginationMeta, PaginationParams
 from app.core.security import require_admin, require_viewer, UserContext
+from app.db.models import Source
 from app.db.repositories.sources import SourceRepository
 from app.db.session import get_db
 from app.schemas.common import APIResponse
-from app.schemas.source import SourceHealthSummary, SourceResponse
+from app.schemas.source import SourceEngineUpdate, SourceHealthSummary, SourceResponse
 
 router = APIRouter(prefix="/sources", tags=["Sources"])
 
