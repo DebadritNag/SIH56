@@ -310,7 +310,6 @@ class BrowserResolver:
     ]
 
     LOW_MEMORY_CHROMIUM_ARGS = [
-        "--disable-http2",
         "--disable-blink-features=AutomationControlled",
         "--disable-dev-shm-usage",
         "--no-sandbox",
@@ -930,7 +929,7 @@ class SharedBrowserService:
 
         # Wait briefly for client-side SPA DOM hydration without hanging on continuous background streaming
         try:
-            await page.wait_for_timeout(3500)
+            await page.wait_for_timeout(2000)
         except Exception:
             pass
 

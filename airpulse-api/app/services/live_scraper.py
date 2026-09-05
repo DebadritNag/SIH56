@@ -735,7 +735,7 @@ class LiveScraper:
             # -------------------------------------------------------------
             # STAGE 3: NAVIGATION
             # -------------------------------------------------------------
-            nav_timeout = int(min(max(self.timeout * 1000 - 5000, 20000), 35000))
+            nav_timeout = 25000
             try:
                 http_status, title, html_content = await self.browser_service.navigate_safely(
                     page, target_url, nav_timeout_ms=nav_timeout, wait_until="domcontentloaded"
