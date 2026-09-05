@@ -1,8 +1,9 @@
 'use client';
 
 import React from 'react';
-import { AlertTriangle, Info, ShieldAlert, X, RotateCw } from 'lucide-react';
+import { AlertTriangle, Info, ShieldAlert, X } from 'lucide-react';
 import { clsx } from 'clsx';
+import { AirPulseFlightLoader } from '@/components/ui/AirPulseFlightLoader';
 
 export interface ConfirmActionDialogProps {
   open: boolean;
@@ -77,11 +78,20 @@ export const ConfirmActionDialog: React.FC<ConfirmActionDialogProps> = ({
           </button>
         </div>
 
-        {details && (
+        {isLoading ? (
+          <div className="py-2 border-y border-[#F1F5F9] bg-slate-50/50 rounded p-2">
+            <AirPulseFlightLoader
+              size="sm"
+              variant="inline"
+              label="Executing pipeline collection..."
+              sublabel="Processing flight quotes, bounds validation & PriceGuard models"
+            />
+          </div>
+        ) : details ? (
           <div className="p-3 bg-slate-50 border border-[#E4E7EC] rounded text-xs text-[#475467]">
             {details}
           </div>
-        )}
+        ) : null}
 
         <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-[#F1F5F9]">
           <button
@@ -101,8 +111,7 @@ export const ConfirmActionDialog: React.FC<ConfirmActionDialogProps> = ({
               buttonStyle[variant]
             )}
           >
-            {isLoading && <RotateCw className="w-3.5 h-3.5 animate-spin" />}
-            <span>{confirmLabel}</span>
+            <span>{isLoading ? 'Executing...' : confirmLabel}</span>
           </button>
         </div>
       </div>

@@ -23,6 +23,7 @@ import { notify } from '@/lib/notify';
 import { endpoints } from '@/lib/api/endpoints';
 import { GenerateReportButton } from '@/components/data/GenerateReportButton';
 import { CircleReloadingAnimation } from '@/components/ui/CircleReloadingAnimation';
+import { AirPulseFlightLoader } from '@/components/ui/AirPulseFlightLoader';
 
 
 const LIVE_PIPELINE_STEPS: ScrapingTestStep[] = [
@@ -1051,11 +1052,15 @@ export default function ScrapingTestPage() {
               </div>
             )
           ) : isRunning ? (
-            <CircleReloadingAnimation
-              title="Executing Live Scraping Probe..."
-              subtitle={`Processing Stage ${String(activeStepIndex + 1).padStart(2, '0')}: ${steps[activeStepIndex]?.title || 'Connecting'}. Live telemetry extraction, normalizations, and cryptographic envelope signing in progress.`}
-              badge="LIVE COLLECTION IN PROGRESS"
+            <AirPulseFlightLoader
+              variant="panel"
               size="lg"
+              label="Collecting live fares..."
+              sublabel={`Stage ${String(activeStepIndex + 1).padStart(2, '0')}: ${steps[activeStepIndex]?.title || 'Connecting'} · Real-time telemetry extraction & cryptographic envelope signing`}
+              badge="LIVE COLLECTION IN PROGRESS"
+              route={route.replace('-', ' → ')}
+              source={selectedSource.replace(/OTA Source \d+\s*\((.*?)\)/, '$1').replace(/\s*\(OTA\)/i, '')}
+              window={bookingWindow.split(' ')[0]}
               minHeight="min-h-[380px]"
             />
           ) : (

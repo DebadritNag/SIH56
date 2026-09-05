@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Globe, RotateCw, Radio, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { Globe, RotateCw } from 'lucide-react';
 import { HealthBadge } from '@/components/ui/Badge';
 import { SourceStatus } from '@/types';
 import { useSources } from '@/lib/hooks/useResources';
@@ -9,7 +9,7 @@ import type { BackendSource } from '@/lib/api/endpoints';
 import { endpoints } from '@/lib/api/endpoints';
 import { GenerateReportButton } from '@/components/data/GenerateReportButton';
 import { useDataMode } from '@/lib/providers/DataModeProvider';
-import { CircleReloadingAnimation } from '@/components/ui/CircleReloadingAnimation';
+import { AirPulseFlightLoader } from '@/components/ui/AirPulseFlightLoader';
 import { notify } from '@/lib/notify';
 
 interface SourceRow {
@@ -211,22 +211,24 @@ export default function SourcesPage() {
       {/* Source Health Table with Circular Reloading Animation */}
       <div className="bg-white border border-[#E4E7EC] rounded-lg shadow-xs overflow-hidden">
         {isBusy && SOURCES.length === 0 ? (
-          <CircleReloadingAnimation
-            title="Polling Data Source Health &amp; Telemetry..."
-            subtitle="Testing live socket handshakes, TLS negotiation, and latency across domestic airline portals and edge collectors."
+          <AirPulseFlightLoader
+            variant="panel"
+            size="lg"
+            label="Polling Data Source Health & Telemetry..."
+            sublabel="Testing live socket handshakes, TLS negotiation, and latency across domestic airline portals and edge collectors."
             badge={isLiveMode ? 'LIVE CONNECTOR PROBES' : 'CONNECTOR DIAGNOSTICS'}
             minHeight="min-h-[380px]"
           />
         ) : (
           <div className="overflow-x-auto relative">
             {isBusy && (
-              <div className="absolute inset-0 bg-white/70 backdrop-blur-2xs z-20 flex items-center justify-center">
-                <CircleReloadingAnimation
-                  title="Updating Connector Health..."
-                  subtitle="Verifying response latencies and reliability scores..."
+              <div className="absolute inset-0 bg-white/80 dark:bg-[#0A1428]/80 backdrop-blur-2xs z-20 flex items-center justify-center">
+                <AirPulseFlightLoader
+                  variant="inline"
+                  size="md"
+                  label="Updating Connector Health..."
+                  sublabel="Verifying response latencies and reliability scores across domestic sources..."
                   badge="REFRESHING PROBES"
-                  size="sm"
-                  minHeight="min-h-[220px]"
                 />
               </div>
             )}
