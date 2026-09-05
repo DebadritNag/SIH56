@@ -852,11 +852,23 @@ class SharedBrowserService:
         page = await context.new_page()
 
         if block_heavy_resources:
+            import re
+            heavy_ext_pattern = re.compile(
+                r".*\.(png|jpe?g|gif|webp|ico|mp4|webm|avi|mov)($|\?.*)",
+                re.IGNORECASE,
+            )
+
             async def _route_handler(route):
                 try:
                     req = route.request
-                    if req.resource_type in SAFE_BLOCKED_RESOURCE_TYPES:
-                        await route.abort()
+                    if req.resource_type in ("image", "media"):
+                        # Fulfill with instant 200 OK empty response so CDN sensors and image beacons
+                        # complete in 0ms without network overhead or stream abortion
+                        await route.fulfill(
+                            status=200,
+                            content_type="image/png" if req.resource_type == "image" else "video/mp4",
+                            body=b"",
+                        )
                     else:
                         await route.continue_()
                 except Exception:
@@ -865,7 +877,7 @@ class SharedBrowserService:
                     except Exception:
                         pass
 
-            await page.route("**/*", _route_handler)
+            await page.route(heavy_ext_pattern, _route_handler)
 
         return page, context
 
@@ -873,8 +885,8 @@ class SharedBrowserService:
         self,
         page: Any,
         url: str,
-        nav_timeout_ms: int = 15000,
-        wait_until: str = "commit",
+        nav_timeout_ms: int = 30000,
+        wait_until: str = "domcontentloaded",
     ) -> Tuple[Optional[int], str, str]:
         """Navigates to URL and returns (http_status, page_title, page_content)."""
         try:
@@ -886,10 +898,15 @@ class SharedBrowserService:
         try:
             response = await page.goto(url, wait_until=wait_until, timeout=nav_timeout_ms)
         except PlaywrightTimeoutError as exc:
-            raise ScraperError(
-                ScrapeFailureStage.TIMEOUT,
-                f"Navigation timed out after {nav_timeout_ms}ms to {url}",
-            ) from exc
+            # Fallback retry with rapid commit if domcontentloaded timed out
+            logger.warning(f"Navigation timed out with wait_until='{wait_until}' to {url}; trying rapid commit...")
+            try:
+                response = await page.goto(url, wait_until="commit", timeout=12000)
+            except Exception:
+                raise ScraperError(
+                    ScrapeFailureStage.TIMEOUT,
+                    f"Navigation timed out after {nav_timeout_ms}ms to {url}",
+                ) from exc
         except Exception as exc:
             msg = str(exc).lower()
             if "err_name_not_resolved" in msg or "dns" in msg:

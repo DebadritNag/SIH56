@@ -147,16 +147,17 @@ class PlaywrightEngine(BaseCollectionEngine):
         context = None
         try:
             target_url = adapter.build_url(request)
+            is_ota = adapter.source_id in ("yatra", "ota_source_01", "ota_source_02", "ota_source_03")
             page, context = await browser_service.create_isolated_page(
                 source_key=adapter.source_id,
-                block_heavy_resources=True,
+                block_heavy_resources=not is_ota,
             )
 
             http_status, title, body_text = await browser_service.navigate_safely(
                 page=page,
                 url=target_url,
                 nav_timeout_ms=self.timeout_seconds * 1000,
-                wait_until="commit",
+                wait_until="domcontentloaded",
             )
 
             # Check for security challenges

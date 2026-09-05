@@ -660,10 +660,11 @@ class LiveScraper:
         # -------------------------------------------------------------
         # STAGE 2: BROWSER_START
         # -------------------------------------------------------------
+        is_ota = any(k in norm_name for k in ("ota", "yatra", "cleartrip", "makemytrip", "easemytrip"))
         try:
             page, context = await self.browser_service.create_isolated_page(
                 source_key=airline_key,
-                block_heavy_resources=True,
+                block_heavy_resources=not is_ota,
             )
             cap = self.browser_service.get_capability()
             escalation_prefix = f"AUTO Escalation ({escalated_from} -> PLAYWRIGHT) · " if escalated_from else ""
@@ -734,9 +735,10 @@ class LiveScraper:
             # -------------------------------------------------------------
             # STAGE 3: NAVIGATION
             # -------------------------------------------------------------
+            nav_timeout = int(min(max(self.timeout * 1000 - 5000, 20000), 35000))
             try:
                 http_status, title, html_content = await self.browser_service.navigate_safely(
-                    page, target_url, nav_timeout_ms=22000, wait_until="commit"
+                    page, target_url, nav_timeout_ms=nav_timeout, wait_until="domcontentloaded"
                 )
                 status_text = f"HTTP {http_status}" if http_status else "HTTP 200 OK"
                 stages.append(_build_stage("NAVIGATION", "PASS", f"Connected to {source_name} live portal ({status_text})"))
