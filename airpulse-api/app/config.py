@@ -77,6 +77,7 @@ class Settings(BaseSettings):
 
     # Operational Modes & Intervals
     DEMO_MODE: bool = True
+    ENABLE_MODEL_FALLBACK: bool = False  # Strict live scraping: never mask failures with corridor model
     COLLECTION_INTERVAL_HOURS: int = 3
     SOURCE_HEALTH_INTERVAL_MINUTES: int = 15
 

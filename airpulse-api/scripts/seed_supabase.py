@@ -53,6 +53,8 @@ SOURCES = [
     ("ota_source_01", "OTA Source 01", SourceType.OTA, CollectionMethod.HTTP, None, False, False, 60, 0.93),
     ("ota_source_02", "OTA Source 02", SourceType.OTA, CollectionMethod.HTTP, None, False, False, 70, 0.91),
     ("ota_source_03", "OTA Source 03", SourceType.OTA, CollectionMethod.PLAYWRIGHT, None, False, True, 80, 0.89),
+    ("ota_source_04", "OTA Source 04 (Yatra)", SourceType.OTA, CollectionMethod.SCRAPY, "https://flight.yatra.com", False, False, 85, 0.90),
+    ("yatra", "Yatra", SourceType.OTA, CollectionMethod.SCRAPY, "https://flight.yatra.com", False, False, 86, 0.90),
     ("mospi_esankhyiki", "MoSPI eSankhyiki", SourceType.GOVERNMENT_API, CollectionMethod.API, "https://esankhyiki.mospi.gov.in", True, False, 90, 0.99),
     ("dgca", "DGCA", SourceType.GOVERNMENT_FILE, CollectionMethod.FILE, "https://www.dgca.gov.in", True, False, 95, 0.99),
     ("replay", "Replay Fixtures", SourceType.REPLAY, CollectionMethod.REPLAY, None, True, False, 200, 1.0),

@@ -12,6 +12,18 @@
 
 # testing
 /coverage
+tests/
+test/
+*.test.ts
+*.test.tsx
+*.test.js
+*.test.jsx
+*.spec.ts
+*.spec.tsx
+*.spec.js
+*.spec.jsx
+test-results/
+playwright-report/
 
 # next.js
 /.next/

@@ -61,7 +61,33 @@ class CollectorRegistry:
         if stype == "replay" or method == "replay":
             return ReplayCollector(source_id=str(source_id), source_name=source_name)
 
-        if method == "playwright" or stype == "airline":
+        # Check for Yatra / OTA Source 04
+        s_low = (source_name or "").lower()
+        if "yatra" in s_low or "ota_source_04" in s_low or "ota source 04" in s_low or str(source_id).lower() in ("yatra", "ota_source_04"):
+            from app.collectors.yatra import YatraCollector
+            return YatraCollector(
+                source_id=str(source_id),
+                source_name=source_name or "Yatra",
+                base_url=base_url,
+                rate_limit_per_minute=rate_limit_per_minute,
+                timeout_seconds=timeout_seconds,
+                max_retries=max_retries,
+            )
+
+        if method == "playwright" or stype in ("airline", "ota"):
+            # Check for Google Flights / OTA Source 03 live aggregator
+            if "google" in s_low or "ota_source_03" in s_low or "ota source 03" in s_low or str(source_id) == "6d555db5-5edd-4a25-b0be-90846646eb52":
+                try:
+                    from app.collectors.airline.google_flights_collector import GoogleFlightsCollector
+                    return GoogleFlightsCollector(
+                        source_id=str(source_id),
+                        source_name=source_name or "Live Portal Aggregator (Google Flights)",
+                        rate_limit_per_minute=rate_limit_per_minute,
+                        timeout_seconds=timeout_seconds,
+                    )
+                except Exception:
+                    pass
+
             # Lazy import keeps Playwright fully optional.
             try:
                 from app.collectors.airline.adapters import build_airline_collector

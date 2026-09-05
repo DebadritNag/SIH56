@@ -84,6 +84,10 @@ CHALLENGE_MARKERS = [
     "shieldsquare",
     "akamai ghost",
     "reference #18.",
+    "challenge validation",
+    "cp_clge_done",
+    "_sec/verify",
+    "provider=crypto",
 ]
 
 AUTH_REQUIRED_MARKERS = [
@@ -230,31 +234,44 @@ class ChallengeDetector:
 @dataclass
 class BrowserCapability:
     """Encapsulates the resolved browser engine, version, path, and launch status."""
-    engine: str = "none"  # "playwright-chromium", "google-chrome", "google-chrome-stable", "system-chromium", "msedge", or "none"
+    engine: str = "none"  # "google-chrome", "google-chrome-stable", "playwright-chromium", "system-chromium", "msedge", or "none"
     version: str = "unknown"
     executable_path: str = "none"
     launch_status: str = "UNAVAILABLE"  # "SUCCESS", "FAILED", "UNAVAILABLE"
     channel: Optional[str] = None
     error: Optional[str] = None
+    # Section 2: Startup diagnostics
+    browser_found: bool = False
+    browser_name: str = "none"
+    browser_version: str = "unknown"
+    browser_executable: str = "none"
+    launch_success: bool = False
+    javascript_test_success: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "browser_engine": self.engine,
-            "browser_version": self.version,
-            "browser_executable": self.executable_path,
+            "browser_name": self.browser_name or self.engine,
+            "browser_version": self.browser_version if self.browser_version != "unknown" else self.version,
+            "browser_executable": self.browser_executable if self.browser_executable != "none" else self.executable_path,
             "browser_launch_status": self.launch_status,
+            "browser_found": self.browser_found,
+            "launch_success": self.launch_success,
+            "javascript_test_success": self.javascript_test_success,
+            "channel": self.channel,
+            "error": self.error,
         }
 
 
-class BrowserCapabilityResolver:
+class BrowserResolver:
     """Multi-tier browser detection and launch capability resolver for AirPulse.
 
-    Detection order strictly adhering to specification:
-    1. Playwright-managed Chromium
-    2. Google Chrome (channel='chrome')
-    3. Google Chrome Stable executable (binary search on disk)
-    4. System Chromium (binary search on disk)
-    5. Microsoft Edge if installed (channel='msedge' or binary search)
+    Detection order strictly adhering to Section 2 specification:
+    1. Google Chrome (channel='chrome')
+    2. google-chrome-stable (binary search on disk)
+    3. Playwright-managed Chromium
+    4. system Chromium (binary search on disk)
+    5. Microsoft Edge if available (channel='msedge' or binary search)
     """
 
     CHROME_STABLE_CANDIDATE_PATHS = [
@@ -322,6 +339,24 @@ class BrowserCapabilityResolver:
         return await launcher.launch(**kwargs)
 
     @classmethod
+    async def _run_startup_diagnostics(cls, browser: Any, cap: BrowserCapability) -> BrowserCapability:
+        """Performs startup diagnostics including a JavaScript execution self-test."""
+        try:
+            page = await browser.new_page()
+            js_eval = await page.evaluate("() => 1 + 1 === 2")
+            await page.close()
+            cap.browser_found = True
+            cap.browser_name = cap.engine
+            cap.browser_version = cap.version
+            cap.browser_executable = cap.executable_path
+            cap.launch_success = True
+            cap.javascript_test_success = bool(js_eval)
+        except Exception as diag_err:
+            logger.warning(f"Browser startup diagnostic JS test failed: {diag_err}")
+            cap.javascript_test_success = False
+        return cap
+
+    @classmethod
     async def resolve_installed_browser(cls) -> BrowserCapability:
         """Resolves installed browser capability in a transient Playwright session."""
         try:
@@ -341,43 +376,28 @@ class BrowserCapabilityResolver:
                 executable_path="none",
                 launch_status="UNAVAILABLE",
                 error=str(exc),
+                browser_found=False,
+                launch_success=False,
+                javascript_test_success=False,
             )
 
     @classmethod
     async def resolve_and_launch(cls, pw: Any) -> Tuple[Optional[Any], BrowserCapability]:
         """Tries each browser tier in the specified order, returning (browser_instance, capability).
+        Order:
+        1. Google Chrome (channel='chrome')
+        2. Google Chrome Stable (google-chrome-stable)
+        3. Playwright-managed Chromium
+        4. system Chromium
+        5. Microsoft Edge if available
         If all tiers fail, returns (None, UNAVAILABLE capability)."""
         errors: List[str] = []
 
         # -------------------------------------------------------------
-        # Tier 1: Playwright-managed Chromium
-        # -------------------------------------------------------------
-        pw_exec = getattr(pw.chromium, "executable_path", None)
-        try:
-            logger.info("Resolving Browser Tier 1: Playwright-managed Chromium...")
-            browser = await cls._try_launch(
-                pw.chromium,
-                headless=True,
-                args=cls.LOW_MEMORY_CHROMIUM_ARGS,
-            )
-            cap = BrowserCapability(
-                engine="playwright-chromium",
-                version=browser.version,
-                executable_path=pw_exec or "playwright-managed",
-                launch_status="SUCCESS",
-            )
-            logger.info(f"Tier 1 (Playwright Chromium) resolved successfully: v{cap.version}")
-            return browser, cap
-        except Exception as e1:
-            err1 = f"Tier 1 (Playwright Chromium) failed: {e1}"
-            logger.debug(err1)
-            errors.append(err1)
-
-        # -------------------------------------------------------------
-        # Tier 2: Google Chrome (channel='chrome')
+        # Tier 1: Google Chrome (channel='chrome')
         # -------------------------------------------------------------
         try:
-            logger.info("Resolving Browser Tier 2: Google Chrome (channel='chrome')...")
+            logger.info("Resolving Browser Tier 1: Google Chrome (channel='chrome')...")
             browser = await cls._try_launch(
                 pw.chromium,
                 channel="chrome",
@@ -392,20 +412,21 @@ class BrowserCapabilityResolver:
                 launch_status="SUCCESS",
                 channel="chrome",
             )
-            logger.info(f"Tier 2 (Google Chrome) resolved successfully: v{cap.version}")
+            cap = await cls._run_startup_diagnostics(browser, cap)
+            logger.info(f"Tier 1 (Google Chrome) resolved successfully: v{cap.version}")
             return browser, cap
-        except Exception as e2:
-            err2 = f"Tier 2 (Google Chrome) failed: {e2}"
-            logger.debug(err2)
-            errors.append(err2)
+        except Exception as e1:
+            err1 = f"Tier 1 (Google Chrome channel) failed: {e1}"
+            logger.debug(err1)
+            errors.append(err1)
 
         # -------------------------------------------------------------
-        # Tier 3: Google Chrome Stable executable
+        # Tier 2: Google Chrome Stable executable
         # -------------------------------------------------------------
         chrome_stable_path = cls._find_executable(cls.CHROME_STABLE_CANDIDATE_PATHS, "google-chrome-stable")
         if chrome_stable_path:
             try:
-                logger.info(f"Resolving Browser Tier 3: Chrome Stable executable at {chrome_stable_path}...")
+                logger.info(f"Resolving Browser Tier 2: Chrome Stable executable at {chrome_stable_path}...")
                 browser = await cls._try_launch(
                     pw.chromium,
                     executable_path=chrome_stable_path,
@@ -418,14 +439,40 @@ class BrowserCapabilityResolver:
                     executable_path=chrome_stable_path,
                     launch_status="SUCCESS",
                 )
-                logger.info(f"Tier 3 (Chrome Stable) resolved successfully: v{cap.version}")
+                cap = await cls._run_startup_diagnostics(browser, cap)
+                logger.info(f"Tier 2 (Chrome Stable) resolved successfully: v{cap.version}")
                 return browser, cap
-            except Exception as e3:
-                err3 = f"Tier 3 (Chrome Stable at {chrome_stable_path}) failed: {e3}"
-                logger.debug(err3)
-                errors.append(err3)
+            except Exception as e2:
+                err2 = f"Tier 2 (Chrome Stable at {chrome_stable_path}) failed: {e2}"
+                logger.debug(err2)
+                errors.append(err2)
         else:
-            errors.append("Tier 3: No Google Chrome Stable executable found on disk.")
+            errors.append("Tier 2: No Google Chrome Stable executable found on disk.")
+
+        # -------------------------------------------------------------
+        # Tier 3: Playwright-managed Chromium
+        # -------------------------------------------------------------
+        pw_exec = getattr(pw.chromium, "executable_path", None)
+        try:
+            logger.info("Resolving Browser Tier 3: Playwright-managed Chromium...")
+            browser = await cls._try_launch(
+                pw.chromium,
+                headless=True,
+                args=cls.LOW_MEMORY_CHROMIUM_ARGS,
+            )
+            cap = BrowserCapability(
+                engine="playwright-chromium",
+                version=browser.version,
+                executable_path=pw_exec or "playwright-managed",
+                launch_status="SUCCESS",
+            )
+            cap = await cls._run_startup_diagnostics(browser, cap)
+            logger.info(f"Tier 3 (Playwright Chromium) resolved successfully: v{cap.version}")
+            return browser, cap
+        except Exception as e3:
+            err3 = f"Tier 3 (Playwright Chromium) failed: {e3}"
+            logger.debug(err3)
+            errors.append(err3)
 
         # -------------------------------------------------------------
         # Tier 4: System Chromium
@@ -449,6 +496,7 @@ class BrowserCapabilityResolver:
                     executable_path=system_chromium_path,
                     launch_status="SUCCESS",
                 )
+                cap = await cls._run_startup_diagnostics(browser, cap)
                 logger.info(f"Tier 4 (System Chromium) resolved successfully: v{cap.version}")
                 return browser, cap
             except Exception as e4:
@@ -477,6 +525,7 @@ class BrowserCapabilityResolver:
                 launch_status="SUCCESS",
                 channel="msedge",
             )
+            cap = await cls._run_startup_diagnostics(browser, cap)
             logger.info(f"Tier 5 (Microsoft Edge) resolved successfully: v{cap.version}")
             return browser, cap
         except Exception as e5:
@@ -495,6 +544,7 @@ class BrowserCapabilityResolver:
                         executable_path=edge_path,
                         launch_status="SUCCESS",
                     )
+                    cap = await cls._run_startup_diagnostics(browser, cap)
                     logger.info(f"Tier 5 (Microsoft Edge executable) resolved successfully: v{cap.version}")
                     return browser, cap
                 except Exception as e5_path:
@@ -511,6 +561,9 @@ class BrowserCapabilityResolver:
             executable_path="none",
             launch_status="UNAVAILABLE",
             error=combined_err,
+            browser_found=False,
+            launch_success=False,
+            javascript_test_success=False,
         )
 
     @classmethod
@@ -524,6 +577,10 @@ class BrowserCapabilityResolver:
             if os.path.exists(expanded):
                 return expanded
         return None
+
+
+# Backward-compatibility alias
+BrowserCapabilityResolver = BrowserResolver
 
 
 class SharedBrowserService:

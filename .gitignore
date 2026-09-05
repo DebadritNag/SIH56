@@ -37,8 +37,28 @@ venv/
 env/
 airpulse-api/venv/
 airpulse-api/.venv/
+
+# ---------------------------------------------------------------------------
+# Test files, directories & scratch runners
+# ---------------------------------------------------------------------------
+tests/
+test/
+**/tests/
+**/test/
+test_*.py
+*_test.py
+*.test.*
+*.spec.*
+scratch/
+**/scratch/
 .pytest_cache/
+**/.pytest_cache/
 .coverage
+.coverage.*
+htmlcov/
+coverage/
+test-results/
+playwright-report/
 
 # ---------------------------------------------------------------------------
 # Secrets & Environment Variables — NEVER commit real credentials

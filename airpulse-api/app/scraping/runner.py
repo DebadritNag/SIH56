@@ -32,6 +32,10 @@ CAPTCHA_MARKERS = [
     "press & hold",
     "robot or human",
     "security verification",
+    "challenge validation",
+    "cp_clge_done",
+    "_sec/verify",
+    "provider=crypto",
 ]
 
 BLOCKED_MARKERS = [
@@ -43,6 +47,7 @@ BLOCKED_MARKERS = [
     "blocked by akamai",
     "cloudflare ray id",
     "shield active",
+    "challenge validation",
 ]
 
 NO_AVAILABILITY_MARKERS = [

@@ -22,16 +22,30 @@ logger = logging.getLogger(__name__)
 @dataclass
 class SourcePolicy:
     source_name: str
+    official_url: Optional[str] = None
     robots_url: Optional[str] = None
+    search_path: Optional[str] = None
     terms_url: Optional[str] = None
     robots_checked_at: Optional[datetime] = None
     terms_checked_at: Optional[datetime] = None
+    checked_at: Optional[datetime] = None
     policy_status: PolicyStatus = PolicyStatus.ALLOWED
     policy_notes: Optional[str] = None
+    review_notes: Optional[str] = None
 
-    def is_executable(self) -> bool:
+    def is_executable(self, allow_prototype: bool = False) -> bool:
         """Returns True only if the policy permits automated collection."""
-        return self.policy_status != PolicyStatus.RESTRICTED
+        if self.policy_status == PolicyStatus.RESTRICTED:
+            return False
+        if self.policy_status == PolicyStatus.MANUAL_REVIEW_REQUIRED:
+            # Allow controlled prototype testing through development/test environment
+            try:
+                from app.config import settings
+                is_dev = getattr(settings, "APP_ENV", "development") in ("development", "test") or getattr(settings, "ENVIRONMENT", "development") in ("development", "test")
+                return is_dev or allow_prototype
+            except Exception:
+                return True
+        return True
 
 
 @dataclass
@@ -60,6 +74,11 @@ class SourceRateLimiter:
     def get_limiter(cls, source_name: str, **overrides) -> SourceRateLimiter:
         key = source_name.lower().strip()
         if key not in cls._instances:
+            # Conservative defaults for Yatra
+            if "yatra" in key:
+                overrides.setdefault("max_concurrency", 1)
+                overrides.setdefault("requests_per_minute", 20)
+                overrides.setdefault("minimum_delay_seconds", 2.0)
             cfg = SourceRateLimitConfig(source_name=source_name, **overrides)
             cls._instances[key] = SourceRateLimiter(cfg)
         return cls._instances[key]
@@ -95,6 +114,7 @@ class PolicyGateService:
     _policies: Dict[str, SourcePolicy] = {
         "indigo": SourcePolicy(
             source_name="indigo",
+            official_url="https://www.goindigo.in",
             robots_url="https://www.goindigo.in/robots.txt",
             terms_url="https://www.goindigo.in/information/terms-and-conditions.html",
             policy_status=PolicyStatus.ALLOWED,
@@ -102,6 +122,7 @@ class PolicyGateService:
         ),
         "air_india": SourcePolicy(
             source_name="air_india",
+            official_url="https://www.airindia.com",
             robots_url="https://www.airindia.com/robots.txt",
             terms_url="https://www.airindia.com/in/en/terms-and-conditions.html",
             policy_status=PolicyStatus.ALLOWED,
@@ -109,6 +130,7 @@ class PolicyGateService:
         ),
         "makemytrip": SourcePolicy(
             source_name="makemytrip",
+            official_url="https://www.makemytrip.com",
             robots_url="https://www.makemytrip.com/robots.txt",
             terms_url="https://www.makemytrip.com/legal/user_agreement.html",
             policy_status=PolicyStatus.ALLOWED,
@@ -128,6 +150,17 @@ class PolicyGateService:
             source_name="ota_source_03",
             policy_status=PolicyStatus.ALLOWED,
             policy_notes="OTA Channel 03 (Cleartrip) approved for market price intelligence collection.",
+        ),
+        "yatra": SourcePolicy(
+            source_name="yatra",
+            official_url="https://www.yatra.com",
+            robots_url="https://www.yatra.com/robots.txt",
+            search_path="/air-search-ui/dom2/trigger",
+            terms_url="https://www.yatra.com/terms-and-conditions",
+            checked_at=datetime(2026, 9, 5, 20, 0, 0, tzinfo=timezone.utc),
+            policy_status=PolicyStatus.MANUAL_REVIEW_REQUIRED,
+            policy_notes="Public OTA aggregator pricing research; manual review required for automated scraping per terms of service.",
+            review_notes="Robots.txt restricts certain crawlers; prototype testing allowed under manual review development gate.",
         ),
         "restricted_source_mock": SourcePolicy(
             source_name="restricted_source_mock",

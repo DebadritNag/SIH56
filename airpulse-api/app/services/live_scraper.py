@@ -209,8 +209,10 @@ class LiveScraper:
 
         target_engine = (engine or "AUTO").upper()
         # AUTO Decision: if source is static or allows lightweight HTTP, use Scrapy first.
+        # Yatra OTA protocol strictly enforces Scrapy first.
         # If source is dynamic portal with known JS DOM requirement (Airlines, OTAs), use Playwright directly.
-        use_scrapy = (target_engine == "SCRAPY") or (target_engine == "AUTO" and not is_js_portal)
+        is_yatra = "yatra" in norm_name
+        use_scrapy = (target_engine == "SCRAPY") or (target_engine == "AUTO" and (is_yatra or not is_js_portal))
 
         try:
             try:
@@ -250,7 +252,20 @@ class LiveScraper:
                         timeout=self.timeout,
                     )
             except asyncio.TimeoutError:
-                engine_label = "Scrapy" if use_scrapy else "Browser"
+                from app.config import settings
+                engine_label = "Scrapy" if use_scrapy else "PLAYWRIGHT"
+                if not settings.ENABLE_MODEL_FALLBACK:
+                    logger.warning(f"{engine_label} live collection timed out after {self.timeout}s. Corridor fallback is disabled.")
+                    stages.append(_build_stage("SEARCH", "FAIL", f"Live extraction timed out after {self.timeout}s", {"failure_stage": ScrapeFailureStage.TIMEOUT.value}))
+                    self._fill_skipped_stages(stages)
+                    return self._finalize_result(
+                        stages, started, ScrapeFailureStage.TIMEOUT.value,
+                        f"Live upstream extraction exceeded {self.timeout}s timeout.",
+                        origin, destination, dep, booking_window_days, source_name,
+                        engine=engine_label,
+                        max_results=bounded_max,
+                        stop_reason=StopReason.TIMEOUT.value,
+                    )
                 logger.warning(f"{engine_label} live collection timed out after {self.timeout}s; seamlessly engaging calibrated corridor telemetry stream.")
                 clean_stages = [s for s in stages if s.get("stage") in ("POLICY_CHECK", "BROWSER_START")]
                 if not any(s.get("stage") == "BROWSER_START" for s in clean_stages):
@@ -272,6 +287,22 @@ class LiveScraper:
                 res["stop_reason"] = "RESULT_LIMIT_REACHED"
                 return res
             except Exception as browser_err:
+                from app.config import settings
+                engine_label = "Scrapy" if use_scrapy else "PLAYWRIGHT"
+                if not settings.ENABLE_MODEL_FALLBACK:
+                    logger.error(f"Live collection error: {browser_err}. Corridor fallback is disabled.")
+                    stage_val = getattr(browser_err, "stage", None)
+                    stage_code = stage_val.value if hasattr(stage_val, "value") else (str(stage_val) if stage_val else ScrapeFailureStage.NAVIGATION_ERROR.value)
+                    stages.append(_build_stage("NAVIGATION", "FAIL", f"Live collection error: {browser_err}", {"failure_stage": stage_code}))
+                    self._fill_skipped_stages(stages)
+                    return self._finalize_result(
+                        stages, started, stage_code,
+                        str(browser_err),
+                        origin, destination, dep, booking_window_days, source_name,
+                        engine=engine_label,
+                        max_results=bounded_max,
+                        stop_reason=StopReason.BLOCKED.value if stage_code == "BLOCKED" else StopReason.ERROR.value,
+                    )
                 logger.error(f"Live collection error: {browser_err}; engaging resilient corridor telemetry stream.")
                 clean_stages = [s for s in stages if s.get("stage") in ("POLICY_CHECK", "BROWSER_START")]
                 if not any(s.get("stage") == "BROWSER_START" for s in clean_stages):
@@ -589,7 +620,8 @@ class LiveScraper:
         # MEMORY PROTECTION GUARD (Render 512MB Cloud Tier)
         # -------------------------------------------------------------
         from app.core.utils import is_memory_constrained
-        if is_memory_constrained():
+        from app.config import settings
+        if is_memory_constrained() and settings.ENABLE_MODEL_FALLBACK:
             logger.info(
                 f"Memory-constrained cloud container (Render 512MB) detected. "
                 f"Engaging zero-OOM corridor telemetry engine for {source_name} on {origin} -> {destination}."
@@ -681,10 +713,23 @@ class LiveScraper:
             )
 
         try:
-            # Build target search URL
-            target_url = (
-                f"https://www.google.com/travel/flights?q=One%20way%20flights%20from%20{origin}%20to%20{destination}%20on%20{departure.isoformat()}"
+            from app.schemas.runs import SearchRequest
+            from app.scraping.adapters.registry import AdapterRegistry
+            browser_req = SearchRequest(
+                origin=origin,
+                destination=destination,
+                departure_date=departure,
+                booking_window_days=booking_window_days,
+                max_results=max_results,
+                is_nonstop=is_nonstop,
             )
+            browser_adapter = AdapterRegistry.get_adapter(source_name=source_name, base_url=base_url)
+            if hasattr(browser_adapter, "build_url") and not ("google" in norm_name or "ota_source_03" in norm_name):
+                target_url = browser_adapter.build_url(browser_req)
+            else:
+                target_url = (
+                    f"https://www.google.com/travel/flights?q=One%20way%20flights%20from%20{origin}%20to%20{destination}%20on%20{departure.isoformat()}&curr=INR"
+                )
 
             # -------------------------------------------------------------
             # STAGE 3: NAVIGATION
@@ -696,6 +741,18 @@ class LiveScraper:
                 status_text = f"HTTP {http_status}" if http_status else "HTTP 200 OK"
                 stages.append(_build_stage("NAVIGATION", "PASS", f"Connected to {source_name} live portal ({status_text})"))
             except ScraperError as err:
+                from app.config import settings
+                if not settings.ENABLE_MODEL_FALLBACK:
+                    stage_code = err.stage.value if hasattr(err.stage, "value") else str(err.stage)
+                    stages.append(_build_stage("NAVIGATION", "FAIL", f"Navigation failed: {err.reason}", {"failure_stage": stage_code}))
+                    self._fill_skipped_stages(stages)
+                    return self._finalize_result(
+                        stages, started, stage_code, err.reason,
+                        origin, destination, departure, booking_window_days, source_name,
+                        http_status=err.http_status, engine="PLAYWRIGHT",
+                        max_results=max_results,
+                        stop_reason=StopReason.BLOCKED.value if stage_code == "BLOCKED" else StopReason.ERROR.value,
+                    )
                 logger.warning(f"Browser navigation delayed or failed for {source_name}: {err}; engaging resilient corridor fallback flow.")
                 is_fallback = True
                 fallback_reason = f"Upstream live portal latency exceeded cloud quota ({str(err)[:50]}); engaged resilient corridor telemetry stream."
@@ -782,14 +839,18 @@ class LiveScraper:
             raw_card_texts: List[str] = []
             try:
                 raw_card_texts = await page.evaluate("""() => {
-                    const selector = "li.pIavfa, li[class*='pIavfa'], div[class*='yR1fYc'], ul.Rk10dc > li, .flight-card, [data-test='flight-card'], .fare-row, tr.flight-item, div.fare-card, li";
+                    const selector = "div[role='link'][aria-label], li.pIavfa, li[class*='pIavfa'], div[class*='yR1fYc'], ul.Rk10dc > li, .flight-card, [data-test='flight-card'], .fare-row, tr.flight-item, div.fare-card, li";
                     const elements = document.querySelectorAll(selector);
                     const results = [];
                     for (const el of elements) {
-                        const t = (el.innerText || '').trim();
-                        if (!t || t.length > 1500) continue;
-                        const hasAirline = t.includes("Air India") || t.includes("IndiGo") || t.includes("Akasa Air") || t.includes("SpiceJet") || t.includes("Vistara") || t.includes("Air India Express") || t.includes("6E") || t.includes("AI") || t.includes("QP") || t.includes("SG");
-                        const hasPrice = t.includes("₹") || t.includes("INR") || t.includes("Rs");
+                        let t = (el.innerText || '').trim();
+                        const aria = el.getAttribute('aria-label') || '';
+                        if (aria && (aria.includes('rupee') || aria.includes('INR') || aria.includes('₹') || aria.includes('from') || aria.includes('at'))) {
+                            t = aria + ' ' + t;
+                        }
+                        if (!t || t.length > 2500) continue;
+                        const hasAirline = t.includes("Air India") || t.includes("IndiGo") || t.includes("Akasa Air") || t.includes("Akasa") || t.includes("SpiceJet") || t.includes("Vistara") || t.includes("Air India Express") || t.includes("6E") || t.includes("AI") || t.includes("QP") || t.includes("SG");
+                        const hasPrice = t.includes("₹") || t.includes("INR") || t.includes("Rs") || t.toLowerCase().includes("rupee");
                         const hasTime = t.includes("pm") || t.includes("am") || t.includes("PM") || t.includes("AM") || /\\d{1,2}:\\d{2}/.test(t);
                         if (hasAirline && hasPrice && hasTime) {
                             results.push(t);
@@ -807,14 +868,18 @@ class LiveScraper:
                     await page.evaluate("window.scrollBy(0, 800)")
                     await asyncio.sleep(0.4)
                     more_texts = await page.evaluate("""() => {
-                        const selector = "li.pIavfa, li[class*='pIavfa'], div[class*='yR1fYc'], ul.Rk10dc > li, .flight-card, [data-test='flight-card'], .fare-row, tr.flight-item, div.fare-card, li";
+                        const selector = "div[role='link'][aria-label], li.pIavfa, li[class*='pIavfa'], div[class*='yR1fYc'], ul.Rk10dc > li, .flight-card, [data-test='flight-card'], .fare-row, tr.flight-item, div.fare-card, li";
                         const elements = document.querySelectorAll(selector);
                         const results = [];
                         for (const el of elements) {
-                            const t = (el.innerText || '').trim();
-                            if (!t || t.length > 1500) continue;
-                            const hasAirline = t.includes("Air India") || t.includes("IndiGo") || t.includes("Akasa Air") || t.includes("SpiceJet") || t.includes("Vistara") || t.includes("Air India Express") || t.includes("6E") || t.includes("AI") || t.includes("QP") || t.includes("SG");
-                            const hasPrice = t.includes("₹") || t.includes("INR") || t.includes("Rs");
+                            let t = (el.innerText || '').trim();
+                            const aria = el.getAttribute('aria-label') || '';
+                            if (aria && (aria.includes('rupee') || aria.includes('INR') || aria.includes('₹') || aria.includes('from') || aria.includes('at'))) {
+                                t = aria + ' ' + t;
+                            }
+                            if (!t || t.length > 2500) continue;
+                            const hasAirline = t.includes("Air India") || t.includes("IndiGo") || t.includes("Akasa Air") || t.includes("Akasa") || t.includes("SpiceJet") || t.includes("Vistara") || t.includes("Air India Express") || t.includes("6E") || t.includes("AI") || t.includes("QP") || t.includes("SG");
+                            const hasPrice = t.includes("₹") || t.includes("INR") || t.includes("Rs") || t.toLowerCase().includes("rupee");
                             const hasTime = t.includes("pm") || t.includes("am") || t.includes("PM") || t.includes("AM") || /\\d{1,2}:\\d{2}/.test(t);
                             if (hasAirline && hasPrice && hasTime) {
                                 results.push(t);
@@ -849,6 +914,25 @@ class LiveScraper:
                     pass
 
             if not raw_card_texts:
+                from app.config import settings
+                if not settings.ENABLE_MODEL_FALLBACK:
+                    stages.append(
+                        _build_stage(
+                            "RESULT_DETECTION",
+                            "FAIL",
+                            f"No live flight result cards found in DOM for {source_name} on {origin} → {destination}.",
+                            {"failure_stage": ScrapeFailureStage.NO_AVAILABILITY.value},
+                        )
+                    )
+                    self._fill_skipped_stages(stages)
+                    return self._finalize_result(
+                        stages, started, ScrapeFailureStage.NO_AVAILABILITY.value,
+                        "No flight result cards found in rendered portal DOM.",
+                        origin, destination, departure, booking_window_days, source_name,
+                        http_status=http_status, response_hash=evidence_hash, engine="PLAYWRIGHT",
+                        max_results=max_results,
+                        stop_reason=StopReason.NO_AVAILABILITY.value,
+                    )
                 logger.info(f"No flight result cards parsed from DOM; engaging resilient corridor flight quotes for {origin} -> {destination}")
                 fallback_body = self._generate_fallback_corridor_payload(
                     origin=origin,

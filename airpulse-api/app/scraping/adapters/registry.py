@@ -13,6 +13,7 @@ from app.scraping.adapters.mock_adapters import (
     JsSourceAdapter,
     StaticSourceAdapter,
 )
+from app.scraping.adapters.yatra import YatraAdapter
 from app.scraping.engines.base import RawQuote
 from app.scraping.parsers import parse_flight_cards_html
 
@@ -76,6 +77,8 @@ class AdapterRegistry:
         "test_static_source": StaticSourceAdapter(),
         "test_js_source": JsSourceAdapter(),
         "test_blocked_source": BlockedSourceAdapter(),
+        "yatra": YatraAdapter(),
+        "ota_source_04": YatraAdapter(),
     }
 
     @classmethod
@@ -99,6 +102,10 @@ class AdapterRegistry:
         for key, adapter in cls._registry.items():
             if key.lower() in norm_name or adapter.source_name.lower() in norm_name:
                 return adapter
+
+        # Explicit Yatra matching
+        if "yatra" in norm_name or "ota_source_04" in norm_name or "ota source 04" in norm_name:
+            return YatraAdapter(base_url=base_url)
 
         # Known airline/OTA types
         is_ota = any(k in norm_name for k in ("ota", "makemytrip", "easemytrip", "cleartrip"))

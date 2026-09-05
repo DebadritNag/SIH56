@@ -71,10 +71,17 @@ class ScraperError(Exception):
     silently degrading to replay/synthetic data.
     """
 
-    def __init__(self, stage, reason: str, http_status: Optional[int] = None):
+    def __init__(
+        self,
+        stage,
+        reason: Optional[str] = None,
+        http_status: Optional[int] = None,
+        message: Optional[str] = None,
+    ):
         # ``stage`` is a ScrapeFailureStage (imported lazily to avoid a cycle).
         self.stage = stage
-        self.reason = reason
+        self.reason = reason or message or ""
+        self.message = self.reason
         self.http_status = http_status
         stage_value = getattr(stage, "value", str(stage))
-        super().__init__(f"[{stage_value}] {reason}")
+        super().__init__(f"[{stage_value}] {self.reason}")

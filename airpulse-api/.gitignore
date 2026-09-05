@@ -42,7 +42,14 @@ env/
 ENV/
 .virtualenv/
 
-# Testing / coverage
+# Testing / test files
+tests/
+test/
+test_*.py
+*_test.py
+*.test.*
+*.spec.*
+scratch/
 .pytest_cache/
 .coverage
 .coverage.*
@@ -52,6 +59,8 @@ htmlcov/
 nosetests.xml
 coverage.xml
 *.cover
+test-results/
+playwright-report/
 
 # Type checkers / linters
 .mypy_cache/

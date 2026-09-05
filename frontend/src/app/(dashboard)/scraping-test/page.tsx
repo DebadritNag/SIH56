@@ -468,6 +468,8 @@ export default function ScrapingTestPage() {
               <option>Airline Direct (Air India Portal)</option>
               <option>OTA Source 02 (EaseMyTrip)</option>
               <option>OTA Source 03 (Cleartrip)</option>
+              <option>OTA Source 04 (Yatra)</option>
+              <option>Yatra (OTA)</option>
             </select>
           </div>
 

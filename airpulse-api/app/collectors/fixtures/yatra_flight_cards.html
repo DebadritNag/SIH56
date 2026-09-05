@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Yatra Flight Search - DEL to BOM</title>
+</head>
+<body>
+    <div id="flight-results" class="results-container">
+        <!-- Card 1: IndiGo Non-stop with full component breakdown -->
+        <div class="tuple flight-tuple">
+            <div class="airline-name">IndiGo</div>
+            <div class="flight-no">6E-2045</div>
+            <div class="depart-time">06:00</div>
+            <div class="arrive-time">08:15</div>
+            <div class="stops">Non-stop</div>
+            <div class="fare-details">
+                <span class="base-fare">Base Fare: ₹4,800</span>
+                <span class="taxes">Taxes: ₹1,020</span>
+                <span class="total-price">₹5,820</span>
+            </div>
+        </div>
+
+        <!-- Card 2: Air India Non-stop with total fare only -->
+        <div class="tuple flight-tuple">
+            <div class="airline-name">Air India</div>
+            <div class="flight-no">AI-805</div>
+            <div class="depart-time">07:00</div>
+            <div class="arrive-time">09:10</div>
+            <div class="stops">Non-stop</div>
+            <div class="fare-details">
+                <span class="total-price">₹6,450</span>
+            </div>
+        </div>
+
+        <!-- Card 3: Akasa Air Non-stop with Rs format -->
+        <div class="tuple flight-tuple">
+            <div class="airline-name">Akasa Air</div>
+            <div class="flight-no">QP-1102</div>
+            <div class="depart-time">08:30</div>
+            <div class="arrive-time">10:45</div>
+            <div class="stops">Non-stop</div>
+            <div class="fare-details">
+                <span class="total-price">Rs 5,499</span>
+            </div>
+        </div>
+
+        <!-- Card 4: SpiceJet 1 stop with full components -->
+        <div class="tuple flight-tuple">
+            <div class="airline-name">SpiceJet</div>
+            <div class="flight-no">SG-8169</div>
+            <div class="depart-time">09:15</div>
+            <div class="arrive-time">13:30</div>
+            <div class="stops">1 stop</div>
+            <div class="fare-details">
+                <span class="base-fare">Base Fare: ₹3,950</span>
+                <span class="taxes">Taxes: ₹950</span>
+                <span class="total-price">₹4,900</span>
+            </div>
+        </div>
+
+        <!-- Card 5: IndiGo Non-stop with INR format -->
+        <div class="tuple flight-tuple">
+            <div class="airline-name">IndiGo</div>
+            <div class="flight-no">6E-5128</div>
+            <div class="depart-time">10:00</div>
+            <div class="arrive-time">12:10</div>
+            <div class="stops">Non-stop</div>
+            <div class="fare-details">
+                <span class="total-price">INR 6,150</span>
+            </div>
+        </div>
+
+        <!-- Card 6: Air India Non-stop with comma price -->
+        <div class="tuple flight-tuple">
+            <div class="airline-name">Air India</div>
+            <div class="flight-no">AI-660</div>
+            <div class="depart-time">11:30</div>
+            <div class="arrive-time">13:45</div>
+            <div class="stops">Non-stop</div>
+            <div class="fare-details">
+                <span class="total-price">₹7,200</span>
+            </div>
+        </div>
+
+        <!-- Card 7: Akasa Air Non-stop -->
+        <div class="tuple flight-tuple">
+            <div class="airline-name">Akasa Air</div>
+            <div class="flight-no">QP-1382</div>
+            <div class="depart-time">13:00</div>
+            <div class="arrive-time">15:15</div>
+            <div class="stops">Non-stop</div>
+            <div class="fare-details">
+                <span class="total-price">₹5,750</span>
+            </div>
+        </div>
+
+        <!-- Card 8: IndiGo Non-stop -->
+        <div class="tuple flight-tuple">
+            <div class="airline-name">IndiGo</div>
+            <div class="flight-no">6E-6047</div>
+            <div class="depart-time">14:15</div>
+            <div class="arrive-time">16:30</div>
+            <div class="stops">Non-stop</div>
+            <div class="fare-details">
+                <span class="total-price">₹6,320</span>
+            </div>
+        </div>
+
+        <!-- Card 9: Air India 1-stop -->
+        <div class="tuple flight-tuple">
+            <div class="airline-name">Air India</div>
+            <div class="flight-no">AI-441</div>
+            <div class="depart-time">15:00</div>
+            <div class="arrive-time">19:45</div>
+            <div class="stops">1-stop</div>
+            <div class="fare-details">
+                <span class="total-price">₹5,100</span>
+            </div>
+        </div>
+
+        <!-- Card 10: IndiGo Non-stop -->
+        <div class="tuple flight-tuple">
+            <div class="airline-name">IndiGo</div>
+            <div class="flight-no">6E-2114</div>
+            <div class="depart-time">16:45</div>
+            <div class="arrive-time">19:00</div>
+            <div class="stops">Non-stop</div>
+            <div class="fare-details">
+                <span class="total-price">₹6,890</span>
+            </div>
+        </div>
+
+        <!-- Card 11: Akasa Air Non-stop (Exceeds default 10) -->
+        <div class="tuple flight-tuple">
+            <div class="airline-name">Akasa Air</div>
+            <div class="flight-no">QP-1540</div>
+            <div class="depart-time">18:00</div>
+            <div class="arrive-time">20:15</div>
+            <div class="stops">Non-stop</div>
+            <div class="fare-details">
+                <span class="total-price">₹5,999</span>
+            </div>
+        </div>
+
+        <!-- Card 12: Air India Non-stop -->
+        <div class="tuple flight-tuple">
+            <div class="airline-name">Air India</div>
+            <div class="flight-no">AI-887</div>
+            <div class="depart-time">19:30</div>
+            <div class="arrive-time">21:45</div>
+            <div class="stops">Non-stop</div>
+            <div class="fare-details">
+                <span class="total-price">₹7,450</span>
+            </div>
+        </div>
+
+        <!-- Card 13: IndiGo Non-stop -->
+        <div class="tuple flight-tuple">
+            <div class="airline-name">IndiGo</div>
+            <div class="flight-no">6E-5332</div>
+            <div class="depart-time">20:45</div>
+            <div class="arrive-time">23:00</div>
+            <div class="stops">Non-stop</div>
+            <div class="fare-details">
+                <span class="total-price">₹6,200</span>
+            </div>
+        </div>
+
+        <!-- Card 14: SpiceJet Non-stop -->
+        <div class="tuple flight-tuple">
+            <div class="airline-name">SpiceJet</div>
+            <div class="flight-no">SG-135</div>
+            <div class="depart-time">21:30</div>
+            <div class="arrive-time">23:40</div>
+            <div class="stops">Non-stop</div>
+            <div class="fare-details">
+                <span class="total-price">₹5,650</span>
+            </div>
+        </div>
+
+        <!-- Card 15: Air India Non-stop (15th card - hard cap limit) -->
+        <div class="tuple flight-tuple">
+            <div class="airline-name">Air India</div>
+            <div class="flight-no">AI-310</div>
+            <div class="depart-time">22:15</div>
+            <div class="arrive-time">00:30</div>
+            <div class="stops">Non-stop</div>
+            <div class="fare-details">
+                <span class="total-price">₹6,780</span>
+            </div>
+        </div>
+
+        <!-- Card 16: Exceeds hard cap limit (Should never be extracted) -->
+        <div class="tuple flight-tuple">
+            <div class="airline-name">IndiGo</div>
+            <div class="flight-no">6E-9999</div>
+            <div class="depart-time">23:45</div>
+            <div class="arrive-time">02:00</div>
+            <div class="stops">Non-stop</div>
+            <div class="fare-details">
+                <span class="total-price">₹9,999</span>
+            </div>
+        </div>
+
+        <!-- Card 17: Sold out / unavailable card (should be skipped) -->
+        <div class="tuple flight-tuple">
+            <div class="airline-name">IndiGo</div>
+            <div class="flight-no">6E-1000</div>
+            <div class="depart-time">05:00</div>
+            <div class="arrive-time">07:15</div>
+            <div class="stops">Non-stop</div>
+            <div class="fare-details">
+                <span class="sold-out">Sold Out</span>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

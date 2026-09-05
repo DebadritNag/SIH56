@@ -31,6 +31,9 @@ SOURCE_ALIASES = {
     "ota source 01 (makemytrip)": "ota_source_01",
     "ota source 02 (easemytrip)": "ota_source_02",
     "ota source 03 (cleartrip)": "ota_source_03",
+    "ota source 04 (yatra)": "yatra",
+    "yatra (ota)": "yatra",
+    "yatra": "yatra",
 }
 
 
@@ -78,7 +81,7 @@ async def execute_live_scraping_test(
         dep = today_val + timedelta(days=bw)
 
     raw_query = (payload.source_name or (src.display_name if src else "")).lower()
-    is_ota = any(k in raw_query for k in ("ota", "cleartrip", "makemytrip", "easemytrip"))
+    is_ota = any(k in raw_query for k in ("ota", "cleartrip", "makemytrip", "easemytrip", "yatra"))
     source_type = "ota" if is_ota else str(getattr(src, "source_type", "airline") if src else "airline")
 
     # If payload.compare is requested, execute both engines and return comparison

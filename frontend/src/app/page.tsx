@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -116,7 +117,7 @@ export default function LandingPage() {
       </header>
 
       {/* ============ HERO ============ */}
-      <section className="relative pt-36 pb-20 sm:pt-44">
+      <section className="relative pt-32 pb-8 sm:pt-36 sm:pb-10 lg:pt-36 lg:pb-8">
         {/* animated grid + glow */}
         <div className="pointer-events-none absolute inset-0 ap-grid-bg opacity-60" aria-hidden />
         <div
@@ -124,24 +125,24 @@ export default function LandingPage() {
           aria-hidden
         />
         <div className="relative mx-auto max-w-7xl px-4 sm:px-6">
-          <div className="grid items-center gap-12 lg:grid-cols-2">
-            {/* Left copy */}
-            <div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] gap-8 lg:gap-10 items-center">
+            {/* Block A: Left copy & CTAs */}
+            <div className="order-1 md:col-start-1 md:row-start-1">
               <div className="ap-fade-up inline-flex items-center gap-2 rounded-full border border-sky-400/30 bg-sky-500/10 px-3 py-1 text-xs font-medium text-sky-300">
                 <Sparkles className="h-3.5 w-3.5" />
                 SIH26056 · MoSPI × RBI CPI Augmentation
               </div>
-              <h1 className="ap-fade-up ap-delay-1 mt-5 text-4xl font-bold leading-tight tracking-tight text-white sm:text-5xl lg:text-6xl">
+              <h1 className="ap-fade-up ap-delay-1 mt-4 text-3xl font-bold leading-[1.15] tracking-tight text-white sm:text-4xl md:text-4xl lg:text-5xl xl:text-[56px]">
                 The real-time
                 <span className="bg-gradient-to-r from-sky-400 to-blue-500 bg-clip-text text-transparent"> airfare price index </span>
                 for India
               </h1>
-              <p className="ap-fade-up ap-delay-2 mt-5 max-w-xl text-base leading-relaxed text-slate-300">
+              <p className="ap-fade-up ap-delay-2 mt-4 max-w-xl text-base leading-relaxed text-slate-300">
                 AirPulse automatically collects domestic airfares from airline and OTA portals,
                 preserves immutable cryptographic provenance, and computes a transparent,
                 high-frequency price index to augment the Consumer Price Index.
               </p>
-              <div className="ap-fade-up ap-delay-3 mt-8 flex flex-wrap items-center gap-3">
+              <div className="ap-fade-up ap-delay-3 mt-7 flex flex-wrap items-center gap-3">
                 <Link
                   href="/signup"
                   className="inline-flex items-center gap-2 rounded-lg bg-sky-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-sky-500/20 hover:bg-sky-400 transition-colors cursor-pointer"
@@ -157,77 +158,101 @@ export default function LandingPage() {
                   Enter portal
                 </Link>
               </div>
-              <div className="ap-fade-up ap-delay-4 mt-6 flex items-center gap-2 text-xs text-slate-400">
-                <ShieldCheck className="h-4 w-4 text-emerald-400" />
-                Authorized government economic analysts only · provenance cryptographically logged
+            </div>
+
+            {/* Block B: Right Plane Hero Artwork */}
+            <div className="order-2 md:col-start-2 md:row-start-1 md:row-span-2 relative w-full flex items-center justify-center ap-fade-in ap-delay-2">
+              <div
+                className="relative w-full h-[320px] sm:h-[400px] md:h-[480px] lg:h-[580px] xl:h-[620px] overflow-hidden"
+                style={{
+                  maskImage: "radial-gradient(ellipse 94% 90% at 66% 52%, black 52%, transparent 98%)",
+                  WebkitMaskImage: "radial-gradient(ellipse 94% 90% at 66% 52%, black 52%, transparent 98%)",
+                }}
+              >
+                <Image
+                  src="/plane.png"
+                  alt="Commercial aircraft representing AirPulse domestic airfare intelligence across India"
+                  fill
+                  priority
+                  sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 55vw"
+                  className="object-cover object-[68%_center] lg:object-[64%_center]"
+                  quality={90}
+                />
+                {/* Left edge fade into dark navy #050B18 */}
+                <div
+                  className="pointer-events-none absolute inset-y-0 left-0 w-32 sm:w-44 lg:w-60 bg-gradient-to-r from-[#050B18] via-[#050B18]/90 via-30% to-transparent"
+                  aria-hidden
+                />
+                {/* Bottom edge fade into dark navy #050B18 */}
+                <div
+                  className="pointer-events-none absolute inset-x-0 bottom-0 h-24 sm:h-32 lg:h-40 bg-gradient-to-t from-[#050B18] via-[#050B18]/90 via-30% to-transparent"
+                  aria-hidden
+                />
+                {/* Subtle top edge fade */}
+                <div
+                  className="pointer-events-none absolute inset-x-0 top-0 h-16 sm:h-24 lg:h-28 bg-gradient-to-b from-[#050B18] via-[#050B18]/70 to-transparent"
+                  aria-hidden
+                />
+                {/* Subtle right edge fade */}
+                <div
+                  className="pointer-events-none absolute inset-y-0 right-0 w-16 sm:w-24 lg:w-32 bg-gradient-to-l from-[#050B18] via-[#050B18]/70 to-transparent"
+                  aria-hidden
+                />
               </div>
             </div>
 
-            {/* Right: live APIx card */}
-            <div className="ap-fade-in ap-delay-2">
-              <div className="ap-float relative rounded-2xl border border-white/10 bg-gradient-to-b from-[#0C1A33] to-[#081426] p-6 shadow-2xl">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
-                    National APIx
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-300">
-                    <span className="ap-pulse-ring h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                    Live
-                  </span>
-                </div>
-                <div className="mt-3 flex items-end gap-3">
-                  <CountUp
-                    end={108.43}
-                    decimals={2}
-                    className="text-5xl font-bold tabular-nums text-white"
-                  />
-                  <span className="mb-1 inline-flex items-center gap-1 text-sm font-semibold text-emerald-400">
-                    <TrendingUp className="h-4 w-4" />
-                    +4.82%
-                  </span>
-                </div>
-                <p className="mt-1 text-xs text-slate-400">Base period: Aug 2026 = 100.0 · Laspeyres route basket</p>
+            {/* Block C: Left Trust statement & Compact Metrics */}
+            <div className="order-3 md:col-start-1 md:row-start-2">
+              <div className="ap-fade-up ap-delay-4 flex items-center gap-2 text-xs text-slate-400">
+                <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-400" />
+                <span>Authorized government economic analysts only · provenance cryptographically logged</span>
+              </div>
 
-                {/* mini sparkline (pure SVG, deterministic) */}
-                <div className="mt-5 rounded-lg border border-white/5 bg-black/20 p-3">
-                  <svg viewBox="0 0 320 80" className="h-20 w-full" preserveAspectRatio="none">
-                    <defs>
-                      <linearGradient id="apx" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#38BDF8" stopOpacity="0.35" />
-                        <stop offset="100%" stopColor="#38BDF8" stopOpacity="0" />
-                      </linearGradient>
-                    </defs>
-                    <polyline
-                      fill="none"
-                      stroke="#38BDF8"
-                      strokeWidth="2"
-                      points="0,64 40,60 80,54 120,40 160,44 200,30 240,24 280,18 320,10"
-                    />
-                    <polygon
-                      fill="url(#apx)"
-                      points="0,64 40,60 80,54 120,40 160,44 200,30 240,24 280,18 320,10 320,80 0,80"
-                    />
-                  </svg>
-                </div>
+              {/* Divider & Compact Metrics */}
+              <div className="ap-fade-up ap-delay-4 mt-6 pt-5 border-t border-white/10">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-0">
+                  <div className="sm:pr-4 lg:pr-5">
+                    <div className="flex items-baseline gap-2">
+                      <CountUp
+                        end={108.43}
+                        decimals={2}
+                        className="text-2xl sm:text-3xl font-bold tabular-nums text-white tracking-tight"
+                      />
+                      <span className="inline-flex items-center gap-0.5 text-xs font-semibold text-emerald-400">
+                        <TrendingUp className="h-3 w-3" />
+                        +4.82%
+                      </span>
+                    </div>
+                    <div className="mt-1 text-[11px] font-medium uppercase tracking-wider text-slate-400">
+                      National APIx
+                    </div>
+                  </div>
 
-                <div className="mt-4 grid grid-cols-3 gap-3 text-center">
-                  <div>
-                    <div className="text-lg font-bold tabular-nums text-white">
+                  <div className="sm:px-4 lg:px-5 sm:border-l sm:border-white/10">
+                    <div className="text-2xl sm:text-3xl font-bold tabular-nums text-white tracking-tight">
                       <CountUp end={28452} />
                     </div>
-                    <div className="text-[10px] text-slate-400">quotes / 24h</div>
+                    <div className="mt-1 text-[11px] font-medium uppercase tracking-wider text-slate-400">
+                      Quotes / 24h
+                    </div>
                   </div>
-                  <div>
-                    <div className="text-lg font-bold tabular-nums text-white">
+
+                  <div className="sm:px-4 lg:px-5 sm:border-l sm:border-white/10">
+                    <div className="text-2xl sm:text-3xl font-bold tabular-nums text-white tracking-tight">
                       <CountUp end={94.8} decimals={1} suffix="%" />
                     </div>
-                    <div className="text-[10px] text-slate-400">data confidence</div>
+                    <div className="mt-1 text-[11px] font-medium uppercase tracking-wider text-slate-400">
+                      Data confidence
+                    </div>
                   </div>
-                  <div>
-                    <div className="text-lg font-bold tabular-nums text-white">
+
+                  <div className="sm:pl-4 lg:pl-5 sm:border-l sm:border-white/10">
+                    <div className="text-2xl sm:text-3xl font-bold tabular-nums text-white tracking-tight">
                       <CountUp end={81} />
                     </div>
-                    <div className="text-[10px] text-slate-400">routes</div>
+                    <div className="mt-1 text-[11px] font-medium uppercase tracking-wider text-slate-400">
+                      Routes
+                    </div>
                   </div>
                 </div>
               </div>
@@ -236,7 +261,7 @@ export default function LandingPage() {
         </div>
 
         {/* live route ticker */}
-        <div className="relative mt-14 overflow-hidden border-y border-white/10 bg-[#0A1428]/60 py-3">
+        <div className="relative mt-10 lg:mt-12 overflow-hidden border-y border-white/10 bg-[#0A1428]/60 py-3">
           <div className="ap-ticker-track">
             {[...NAV_TICKER, ...NAV_TICKER].map((t, i) => (
               <span key={i} className="mx-6 inline-flex items-center gap-2 text-sm">
