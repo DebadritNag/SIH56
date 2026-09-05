@@ -16,6 +16,9 @@ import { CircleReloadingAnimation } from '@/components/ui/CircleReloadingAnimati
 
 
 
+import { DataFreshness } from '@/components/ui/DataFreshness';
+import { formatTimestamp } from '@/lib/utils/timestamps';
+
 function bwLabel(days?: number | null): string {
   if (days == null) return 'T+0';
   if (days <= 2) return 'T+1';
@@ -33,12 +36,20 @@ function mapLiveFare(f: Record<string, unknown>): FareObservation {
   const origin = String(f.origin_code ?? f.origin ?? '');
   const dest = String(f.destination_code ?? f.destination ?? '');
   const dep = f.departure_at ? new Date(String(f.departure_at)) : null;
+  const bw = (f.booking_window_bucket as string) || bwLabel(f.booking_window_days as number | undefined);
+  const fgPred = typeof f.fareguard_prediction === 'number' ? f.fareguard_prediction : 0;
+  const pgScore = typeof f.priceguard_score === 'number' ? f.priceguard_score : 0;
+  const rawAnom = String(f.anomaly_status ?? 'NORMAL').toUpperCase();
+  const isAnom = rawAnom === 'OPEN' || rawAnom === 'ANOMALOUS' || Boolean(f.is_anomaly);
+  const isImported = (f.data_origin as string) === 'IMPORTED';
+  const runId = String(f.collection_run_id ?? f.raw_fare_id ?? '810dacd0');
+
   return {
     id: String(f.id),
-    collected_at: f.collected_at ? new Date(String(f.collected_at)).toLocaleString() : '—',
+    collected_at: f.collected_at ? String(f.collected_at) : '—',
     route: `${origin} → ${dest}`,
-    departure_date: dep ? dep.toLocaleDateString() : '—',
-    booking_window: bwLabel(f.booking_window_days as number | undefined),
+    departure_date: dep ? dep.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
+    booking_window: bw,
     airline: String(f.airline_code ?? f.airline ?? 'UNKNOWN'),
     flight_number: String(f.flight_number ?? '—'),
     source: 'Goibibo (OTA)',
@@ -47,15 +58,15 @@ function mapLiveFare(f: Record<string, unknown>): FareObservation {
     fees: 0,
     total_fare: total,
     validation_status: (String(f.validation_status ?? 'VALID')) as FareObservation['validation_status'],
-    anomaly_status: 'NORMAL',
+    anomaly_status: isAnom ? 'ANOMALOUS' : 'NORMAL',
     origin_type: (String(f.data_origin ?? 'IMPORTED')) as FareObservation['origin_type'],
     provenance: {
-      collection_run_id: String(f.raw_fare_id ?? '—'),
+      collection_run_id: runId,
       response_hash: String(f.quote_hash ?? '—'),
-      collector_version: 'manual-scrape',
-      parser_version: 'goibibo-csv-importer-v1.0.0',
-      fareguard_prediction: 0,
-      priceguard_score: 0,
+      collector_version: isImported ? 'goibibo-csv-importer-v1.0.0' : 'ota-http-telemetry-v1.2.0',
+      parser_version: isImported ? 'goibibo-csv-importer-v1.0.0' : 'ota-parser-v2.1',
+      fareguard_prediction: fgPred,
+      priceguard_score: pgScore,
       index_eligible: true,
       pipeline_steps: [],
     },
@@ -326,7 +337,15 @@ export default function FaresPage() {
             Query individual collected quotes. Every observed fare is tied to an immutable raw payload SHA-256 hash, collector version, and full transformation audit trail.
           </p>
           <div className="mt-1.5">
-            <DataSourceMeta isMock={isMock} source={isMock ? 'Demo dataset' : 'AirPulse validated fares (live)'} />
+            <div className="flex flex-wrap items-center gap-3 mt-1.5">
+              <DataSourceMeta isMock={isMock} source={isMock ? 'Demo dataset' : 'AirPulse validated fares (live)'} />
+              <DataFreshness
+                timestamp={liveFares[0]?.collected_at}
+                label="Latest observation processed"
+                isRealtime={true}
+                source="Goibibo"
+              />
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -473,18 +492,18 @@ export default function FaresPage() {
 
               <thead className="bg-[#F8FAFC] text-[#475467] font-semibold border-b border-[#E4E7EC] text-[11px] uppercase">
                 <tr>
-                  <th className="p-3">Collected (IST)</th>
+                  <th className="p-3">Observed (IST)</th>
                   <th className="p-3">Route</th>
                   <th className="p-3">Departure Date</th>
                   <th className="p-3">Window</th>
                   <th className="p-3">Carrier / Flight</th>
                   <th className="p-3">Source</th>
-                  <th className="p-3 text-right">Base Fare</th>
-                  <th className="p-3 text-right">Taxes/Fees</th>
-                  <th className="p-3 text-right">Total Fare</th>
+                  <th className="p-3 text-right">Actual Fare</th>
+                  <th className="p-3 text-right">FareGuard Benchmark</th>
+                  <th className="p-3 text-center">PriceGuard</th>
                   <th className="p-3 text-center">Validation</th>
                   <th className="p-3 text-center">Origin</th>
-                  <th className="p-3 text-right">Lineage</th>
+                  <th className="p-3 text-right">Audit Trail</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#F1F5F9]">
@@ -494,7 +513,9 @@ export default function FaresPage() {
                     onClick={() => setSelectedFare(fare)}
                     className="hover:bg-slate-50 cursor-pointer transition-colors"
                   >
-                    <td className="p-3 font-mono text-[#667085]">{fare.collected_at}</td>
+                    <td className="p-3 font-mono text-[#667085]" title={formatTimestamp(fare.collected_at, { format: 'tooltip' })}>
+                      {formatTimestamp(fare.collected_at, { format: 'compact' })}
+                    </td>
                     <td className="p-3 font-bold text-[#101828]">{fare.route}</td>
                     <td className="p-3 text-[#475467]">{fare.departure_date}</td>
                     <td className="p-3 font-semibold text-blue-700">{fare.booking_window}</td>
@@ -503,9 +524,25 @@ export default function FaresPage() {
                       <span className="text-[#667085] ml-1 font-mono">({fare.flight_number})</span>
                     </td>
                     <td className="p-3 text-[#475467]">{fare.source}</td>
-                    <td className="p-3 text-right tabular-nums text-[#667085]">{formatINR(fare.base_fare)}</td>
-                    <td className="p-3 text-right tabular-nums text-[#667085]">{formatINR(fare.taxes + fare.fees)}</td>
                     <td className="p-3 text-right tabular-nums font-bold text-[#101828]">{formatINR(fare.total_fare)}</td>
+                    <td className="p-3 text-right tabular-nums text-slate-700 font-mono">
+                      {fare.provenance?.fareguard_prediction > 0 ? (
+                        <span className="font-semibold text-slate-900">{formatINR(fare.provenance.fareguard_prediction)}</span>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </td>
+                    <td className="p-3 text-center">
+                      {fare.anomaly_status === 'ANOMALOUS' ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-rose-100 text-rose-800 border border-rose-200">
+                          ANOMALY
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded uppercase bg-slate-100 text-slate-700 border border-slate-200">
+                          NORMAL
+                        </span>
+                      )}
+                    </td>
                     <td className="p-3 text-center">
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-emerald-100 text-emerald-800">
                         {fare.validation_status}

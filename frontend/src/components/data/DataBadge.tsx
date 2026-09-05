@@ -35,13 +35,11 @@ interface DataSourceMetaProps {
   className?: string;
 }
 
+import { formatTimestamp } from '@/lib/utils/timestamps';
+
 function formatTs(ts?: string | null): string {
   if (!ts) return "—";
-  try {
-    return new Date(ts).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" });
-  } catch {
-    return "—";
-  }
+  return formatTimestamp(ts, { format: 'timeOnly' });
 }
 
 /** Inline badge + source + last-updated line for any data surface. */
@@ -51,7 +49,9 @@ export function DataSourceMeta({ isMock, source, lastUpdated, className = "" }: 
       {isMock ? <MockBadge /> : <LiveBadge />}
       <span>Source: {source ?? (isMock ? "Demo dataset" : "AirPulse backend")}</span>
       <span>•</span>
-      <span>Updated: {formatTs(lastUpdated)}</span>
+      <span title={lastUpdated ? `Canonical event: ${formatTimestamp(lastUpdated, { format: 'tooltip' })}` : undefined}>
+        Updated: {formatTs(lastUpdated)}
+      </span>
     </div>
   );
 }

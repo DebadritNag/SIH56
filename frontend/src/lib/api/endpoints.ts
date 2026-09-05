@@ -207,6 +207,7 @@ export const endpoints = {
 
   // Mutations
   triggerCollection: () => postData<unknown>("/ingestion/collect"),
+  triggerReplay: (runId?: string) => postData<unknown>("/ingestion/replay", { run_id: runId }),
 
   // Live scraping verification (real network fetch, per-filter)
   runScrapingTest: (payload: {

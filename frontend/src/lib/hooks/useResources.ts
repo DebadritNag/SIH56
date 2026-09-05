@@ -128,6 +128,24 @@ export function useFares(params?: {
   });
 }
 
+export function useFareProvenance(fareId?: string | null) {
+  const { mode } = useDataMode();
+  return useQuery({
+    queryKey: ["fareProvenance", mode, fareId],
+    queryFn: async ({ signal }) => {
+      if (!fareId || mode === "mock") return null;
+      return endpoints.fareProvenance(fareId, signal);
+    },
+    enabled: !!fareId,
+    refetchInterval: (query) => {
+      const data = query.state.data as Record<string, any> | null;
+      const steps = data?.lineage_steps as Array<Record<string, any>> | undefined;
+      const hasPending = steps?.some((s) => s.status === "PENDING" || s.status === "RUNNING");
+      return hasPending ? 2000 : false;
+    },
+  });
+}
+
 export function useAlerts(params?: { status?: string; page?: number; page_size?: number }) {
   const { mode } = useDataMode();
   return useQuery({

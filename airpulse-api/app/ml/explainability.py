@@ -16,7 +16,13 @@ class ExplainabilityService:
         self.fareguard = fareguard
         self.explainer: Optional[shap.TreeExplainer] = None
         if fareguard.is_trained and fareguard.model is not None:
-            self.explainer = shap.TreeExplainer(fareguard.model)
+            try:
+                self.explainer = shap.TreeExplainer(fareguard.model)
+            except Exception:
+                try:
+                    self.explainer = shap.TreeExplainer(fareguard.model.get_booster())
+                except Exception:
+                    self.explainer = None
 
     def explain_fare(
         self,

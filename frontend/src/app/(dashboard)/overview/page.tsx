@@ -30,6 +30,7 @@ import {
   useSystemTrust,
 } from '@/lib/hooks/useDashboard';
 import { DataSourceMeta } from '@/components/data/DataBadge';
+import { DataFreshness } from '@/components/ui/DataFreshness';
 import { GenerateReportButton } from '@/components/data/GenerateReportButton';
 import { formatPercent, formatINR } from '@/lib/formatters';
 import { DashboardFilters } from '@/types';
@@ -212,12 +213,19 @@ export default function OverviewPage() {
           <p className="text-xs text-[#475467] mt-0.5">
             Real-time domestic airfare inflation, index velocity, and market pressure across India&apos;s monitored aviation network.
           </p>
-          <DataSourceMeta
-            className="mt-1.5"
-            isMock={meta.isMock}
-            source={meta.source}
-            lastUpdated={meta.lastUpdated}
-          />
+          <div className="flex flex-wrap items-center gap-3 mt-1.5">
+            <DataSourceMeta
+              isMock={meta.isMock}
+              source={meta.source}
+              lastUpdated={meta.lastUpdated}
+            />
+            <DataFreshness
+              timestamp={meta.lastUpdated}
+              label="DATA UPDATED"
+              isRealtime={true}
+              source={meta.source}
+            />
+          </div>
         </div>
         <div className="flex items-center gap-2 text-xs">
           <GenerateReportButton

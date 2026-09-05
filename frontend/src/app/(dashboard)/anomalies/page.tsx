@@ -14,6 +14,7 @@ import { GenerateReportButton } from '@/components/data/GenerateReportButton';
 import { MockBadge } from '@/components/data/DataBadge';
 import { useDataMode } from '@/lib/providers/DataModeProvider';
 import { CircleReloadingAnimation } from '@/components/ui/CircleReloadingAnimation';
+import { DataFreshness } from '@/components/ui/DataFreshness';
 
 export default function AnomaliesPage() {
   const [selectedAnomaly, setSelectedAnomaly] = useState<AnomalyItem | null>(null);
@@ -72,6 +73,14 @@ export default function AnomaliesPage() {
           <p className="text-xs text-[#475467] mt-0.5">
             Evaluate statistical anomalies identified by Isolation Forest &amp; FareGuard. Unusual fares are never automatically discarded—investigate cross-source agreement, SHAP drivers, and record audited decisions.
           </p>
+          <div className="mt-1.5">
+            <DataFreshness
+              timestamp={anomalies[0]?.timestamp}
+              label="Latest PriceGuard evaluation"
+              isRealtime={true}
+              source="PriceGuard v1"
+            />
+          </div>
         </div>
         <div className="flex items-center gap-2 text-xs">
           <button

@@ -94,6 +94,8 @@ class ValidatedFareResponse(BaseModel):
     departure_at: datetime
     arrival_at: Optional[datetime] = None
     booking_window_days: Optional[int] = None
+    booking_window_bucket: Optional[str] = None
+    actual_lead_days: Optional[int] = None
     cabin_class: Optional[str] = Field(default=None, validation_alias="cabin")
     fare_class: Optional[str] = None
     refundable: Optional[bool] = None
@@ -111,6 +113,9 @@ class ValidatedFareResponse(BaseModel):
     quote_hash: str
     collected_at: datetime
     created_at: datetime
+    fareguard_prediction: Optional[float] = None
+    priceguard_score: Optional[float] = None
+    anomaly_status: Optional[str] = "NORMAL"
 
 
 class FareFilterParams(BaseModel):

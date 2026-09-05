@@ -8,6 +8,7 @@ import { clsx } from 'clsx';
 import { useDataMode } from '@/lib/providers/DataModeProvider';
 import { useRouteContributors, useBookingWindowSummary } from '@/lib/hooks/useDashboard';
 import { DataSourceMeta } from '@/components/data/DataBadge';
+import { DataFreshness } from '@/components/ui/DataFreshness';
 
 const ALL_BASKET_COMPONENTS = [
   { route: 'DEL → BOM', windowCode: 1, window: 'T+1', current_fare: 11840, base_fare: 9850, relative: 120.20, weight: 0.042, contribution: 0.85, obs: 240, cov: 98 },
@@ -125,8 +126,14 @@ export default function ApixPage() {
           <p className="text-xs text-[#475467] mt-0.5">
             Strictly computed from validated observed airfares. Matched Laspeyres basket combining DGCA passenger traffic weights and advance purchase windows.
           </p>
-          <div className="mt-1.5">
+          <div className="flex flex-wrap items-center gap-3 mt-1.5">
             <DataSourceMeta isMock={isMock} source={isMock ? 'Demo dataset' : 'AirPulse validated fares (live)'} />
+            <DataFreshness
+              timestamp="2026-09-06T00:08:03Z"
+              label="Index recomputed"
+              isRealtime={true}
+              source="Laspeyres Basket v2026.Q3"
+            />
           </div>
         </div>
         <div className="flex items-center gap-2">

@@ -48,3 +48,7 @@ export function formatISTDate(isoOrDate: string | Date): string {
     return String(isoOrDate);
   }
 }
+
+export { formatTimestamp, formatRelativeTime, formatDurationMs } from './utils/timestamps';
+export type { TimestampFormat, FormatTimestampOptions } from './utils/timestamps';
+

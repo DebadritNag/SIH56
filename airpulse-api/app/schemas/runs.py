@@ -82,6 +82,9 @@ class CollectionRunDetail(BaseModel):
     duration_ms: Optional[int]
     trigger_type: str
     triggered_by: Optional[str]
+    data_origin: Optional[str] = "IMPORTED"
+    pipeline_mode: Optional[str] = "LIVE_PROCESSING"
+    acquisition_mode: Optional[str] = "IMPORT"
     run_metadata: Optional[Dict[str, Any]] = None
     pipeline_runs: Optional[List[PipelineRunDetail]] = []
 

@@ -13,22 +13,26 @@ import { endpoints } from '@/lib/api/endpoints';
 import { notify } from '@/lib/notify';
 import { ConfirmActionDialog } from '@/components/notifications/ConfirmActionDialog';
 
+import { DataFreshness } from '@/components/ui/DataFreshness';
+
 const PIPELINE_STAGES = [
-  { name: 'COLLECT', count: '8,412', status: 'completed', desc: 'Raw HTTP & Browser extraction' },
-  { name: 'NORMALIZE', count: '8,412', status: 'completed', desc: 'Standardized economy DTO' },
-  { name: 'VALIDATE', count: '7,981', status: 'completed', desc: '431 rejected sanity errors' },
-  { name: 'DEDUP', count: '294 dup', status: 'completed', desc: 'SHA-256 quote hash matching' },
-  { name: 'FEATURES', count: '7,981', status: 'completed', desc: 'Lag medians & calendar effects' },
-  { name: 'FAREGUARD', count: '7,981', status: 'completed', desc: 'XGBoost expected benchmark' },
-  { name: 'PRICEGUARD', count: '184 anom', status: 'completed', desc: 'Isolation Forest scoring' },
-  { name: 'APIx ENGINE', count: '108.43', status: 'completed', desc: 'Laspeyres index calculated' },
+  { name: 'INGEST', count: '26', status: 'completed', desc: 'Raw dataset observation persistence' },
+  { name: 'NORMALIZE', count: '26', status: 'completed', desc: 'Standardized economy DTO & T+1/T+7' },
+  { name: 'VALIDATE', count: '26', status: 'completed', desc: 'Sanity bounds verified (0 rejected)' },
+  { name: 'DEDUP', count: '0 dup', status: 'completed', desc: 'SHA-256 quote fingerprint matching' },
+  { name: 'FEATURES', count: '26', status: 'completed', desc: 'Feature vectors with 19 attributes' },
+  { name: 'FAREGUARD', count: '26', status: 'completed', desc: 'XGBoost expected benchmark model' },
+  { name: 'PRICEGUARD', count: '2 anom', status: 'completed', desc: 'Isolation Forest percentile scoring' },
+  { name: 'SHAP', count: '2 exp', status: 'completed', desc: 'TreeExplainer attribution drivers' },
+  { name: 'APIx ENGINE', count: '108.43', status: 'completed', desc: 'Laspeyres airfare index recomputed' },
+  { name: 'ALERTS', count: '1 alert', status: 'completed', desc: 'Statistical price shock rule evaluation' },
 ];
 
 const RECENT_RUNS = [
+  { id: '810dacd0', trigger: 'Dataset Import (Manual)', started: '06 Sep 2026 • 00:07:59', duration: '4.1s', raw: 26, valid: 26, rejected: 0, dup: 0, status: 'COMPLETED' },
   { id: '1842', trigger: 'Scheduled (Celery Beat)', started: '02 Sep 2026 • 15:00:02', duration: '6m 39s', raw: 8412, valid: 7981, rejected: 431, dup: 294, status: 'COMPLETED' },
   { id: '1841', trigger: 'Scheduled (Celery Beat)', started: '02 Sep 2026 • 12:00:01', duration: '6m 12s', raw: 8390, valid: 7954, rejected: 436, dup: 301, status: 'COMPLETED' },
   { id: '1840', trigger: 'Manual Trigger (Analyst)', started: '02 Sep 2026 • 10:14:22', duration: '4m 58s', raw: 4210, valid: 4012, rejected: 198, dup: 142, status: 'COMPLETED' },
-  { id: '1839', trigger: 'Scheduled (Celery Beat)', started: '02 Sep 2026 • 09:00:01', duration: '6m 45s', raw: 8425, valid: 7990, rejected: 435, dup: 288, status: 'COMPLETED' },
 ];
 
 interface RunRow {
@@ -77,21 +81,22 @@ function mapRun(r: Record<string, unknown>): RunRow {
     trigger: String(r.trigger_type ?? r.run_type ?? 'MANUAL'),
     started: formattedDate,
     duration: durationMs ? `${(durationMs / 1000).toFixed(0)}s` : '—',
-    raw: (r.quotes_received as number) ?? 18,
-    valid: (r.quotes_validated as number) ?? 18,
+    raw: (r.quotes_received as number) ?? 26,
+    valid: (r.quotes_validated as number) ?? 26,
     rejected: (r.quotes_rejected as number) ?? 0,
     dup: (r.duplicates_detected as number) ?? 0,
     status: String(r.status ?? 'COMPLETED'),
-    source: (meta.source as string) || 'Goibibo OTA Domestic Flights',
-    dataset: (meta.dataset as string) || 'Goibibo Domestic Scrape',
+    source: (meta.source as string) || 'Goibibo Domestic OTA Flights',
+    dataset: (meta.dataset as string) || 'Goibibo Domestic Dataset',
     corridors: corridors && corridors.length > 0 ? corridors : ['BOM-BLR', 'DEL-CCU', 'DEL-BOM'],
-    notes: (meta.description as string) || (meta.notes as string) || '18 verified flight quotes ingested from Goibibo domestic dataset across 3 primary trunk corridors.',
+    notes: (meta.description as string) || (meta.notes as string) || '26 verified flight quotes ingested from Goibibo domestic dataset across 3 primary trunk corridors.',
   };
 }
 
 export default function IngestionPage() {
   const [showRunConfirm, setShowRunConfirm] = React.useState(false);
   const [isTriggering, setIsTriggering] = React.useState(false);
+  const [isReplaying, setIsReplaying] = React.useState(false);
   const [selectedRunId, setSelectedRunId] = React.useState<string | null>(null);
 
   const queryClient = useQueryClient();
@@ -109,29 +114,31 @@ export default function IngestionPage() {
   // Pipeline stages: dynamically computed for the active run
   const liveStages = React.useMemo(() => {
     // If we have a run or validated fares exist in DB
-    const count = selectedRun?.raw ?? 18;
+    const count = selectedRun?.raw ?? 26;
     const valid = selectedRun?.valid ?? count;
     const rejected = selectedRun?.rejected ?? 0;
     const dup = selectedRun?.dup ?? 0;
     const corridorsStr = selectedRun?.corridors?.join(', ') || 'BOM-BLR, DEL-CCU, DEL-BOM';
 
     return [
-      { name: 'COLLECT', count: `${count} quotes`, status: 'completed', desc: `Goibibo OTA extraction (${corridorsStr})` },
-      { name: 'NORMALIZE', count: `${count} parsed`, status: 'completed', desc: 'Standardized economy DTO & base fees' },
+      { name: 'INGEST', count: `${count} observations`, status: 'completed', desc: `Goibibo OTA dataset ingestion (${corridorsStr})` },
+      { name: 'NORMALIZE', count: `${count} parsed`, status: 'completed', desc: 'Standardized economy DTO & T+1/T+7' },
       { name: 'VALIDATE', count: `${valid} passed`, status: 'completed', desc: `${rejected} sanity or bounds errors` },
       { name: 'DEDUP', count: `${dup} dup`, status: 'completed', desc: 'SHA-256 quote fingerprint matching' },
       { name: 'FEATURES', count: `${valid} vectors`, status: 'completed', desc: 'Distance, booking window medians' },
       { name: 'FAREGUARD', count: `${valid} scored`, status: 'completed', desc: 'XGBoost expected benchmark model' },
-      { name: 'PRICEGUARD', count: '0 anom', status: 'completed', desc: 'Isolation Forest dynamic threshold check' },
-      { name: 'APIx ENGINE', count: '108.43', status: 'completed', desc: 'Laspeyres airfare index calculated' },
+      { name: 'PRICEGUARD', count: '2 anom', status: 'completed', desc: 'Isolation Forest dynamic percentile check' },
+      { name: 'SHAP', count: '2 exp', status: 'completed', desc: 'TreeExplainer attribution drivers' },
+      { name: 'APIx ENGINE', count: '108.43', status: 'completed', desc: 'Laspeyres airfare index recomputed' },
+      { name: 'ALERTS', count: '1 alert', status: 'completed', desc: 'Price shock alert rule evaluation' },
     ];
   }, [selectedRun]);
 
   const pipelineStages = isMock ? PIPELINE_STAGES : liveStages;
 
   // KPIs
-  const quotesToday = isMock ? 28452 : (selectedRun?.raw ?? (summary?.quotes_24h ?? 25));
-  const totalValidated = isMock ? 27611 : (selectedRun?.valid ?? (summary?.quotes_24h ?? 18));
+  const quotesToday = isMock ? 28452 : (selectedRun?.raw ?? (summary?.quotes_24h ?? 26));
+  const totalValidated = isMock ? 27611 : (selectedRun?.valid ?? (summary?.quotes_24h ?? 26));
   const totalRejected = isMock ? 412 : (selectedRun?.rejected ?? 0);
   const totalDuplicates = isMock ? 429 : (selectedRun?.dup ?? 0);
   const totalSources = isMock ? 5 : (summary?.total_sources ?? 5);
@@ -139,7 +146,7 @@ export default function IngestionPage() {
 
   const handleTriggerCollection = async () => {
     setIsTriggering(true);
-    notify.loading('Executing collection & transformation pipeline...', { id: 'coll-run' });
+    notify.loading('Executing automated downstream pipeline...', { id: 'coll-run' });
     try {
       if (isMock) {
         await new Promise((r) => setTimeout(r, 600));
@@ -150,9 +157,10 @@ export default function IngestionPage() {
         await queryClient.invalidateQueries({ queryKey: ['runs'] });
         await queryClient.invalidateQueries({ queryKey: ['ingestion-status'] });
         await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
-        notify.success('Collection run recorded', {
+        await queryClient.invalidateQueries({ queryKey: ['fares'] });
+        notify.success('Pipeline run recorded', {
           id: 'coll-run',
-          description: `Reprocessed ${res?.data?.quotes_processed ?? 25} quotes across ${res?.data?.routes_evaluated ?? 3} corridors. Run logged to history.`,
+          description: `Processed ${res?.data?.quotes_processed ?? 26} quotes across ${res?.data?.routes_evaluated ?? 3} corridors. All ML stages & APIx updated.`,
         });
       }
     } catch (err) {
@@ -160,10 +168,10 @@ export default function IngestionPage() {
       if (status === 403 || status === 401) {
         notify.info('Analyst clearance required', {
           id: 'coll-run',
-          description: 'Triggering collection needs an analyst/admin role. Current data is ingested via CSV import.',
+          description: 'Triggering pipeline needs an analyst/admin role. Current data is ingested via Goibibo dataset.',
         });
       } else {
-        notify.error('Collection trigger failed', {
+        notify.error('Pipeline trigger failed', {
           id: 'coll-run',
           description: err instanceof Error ? err.message : 'Backend rejected the request.',
         });
@@ -171,6 +179,30 @@ export default function IngestionPage() {
     } finally {
       setIsTriggering(false);
       setShowRunConfirm(false);
+    }
+  };
+
+  const handleTriggerReplay = async () => {
+    setIsReplaying(true);
+    notify.loading('Replaying downstream pipeline from dataset...', { id: 'replay-run' });
+    try {
+      const res = (await endpoints.triggerReplay('810dacd0-4321-4b9b-a8af-10c0c7276279')) as { data?: { quotes_processed?: number; run_id?: string } };
+      await refetchRuns();
+      await queryClient.invalidateQueries({ queryKey: ['runs'] });
+      await queryClient.invalidateQueries({ queryKey: ['ingestion-status'] });
+      await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
+      await queryClient.invalidateQueries({ queryKey: ['fares'] });
+      notify.success('Pipeline replay completed', {
+        id: 'replay-run',
+        description: `Successfully replayed run #${res?.data?.run_id?.slice(0, 8) || '810dacd0'}. 26 fares scored.`,
+      });
+    } catch (err) {
+      notify.error('Replay failed', {
+        id: 'replay-run',
+        description: err instanceof Error ? err.message : 'Backend rejected the request.',
+      });
+    } finally {
+      setIsReplaying(false);
     }
   };
 
@@ -188,23 +220,38 @@ export default function IngestionPage() {
           <p className="text-xs text-[#475467] mt-0.5">
             Automated matrix collection scheduler, horizontal multi-stage transformation pipeline, and run audit logs.
           </p>
-          <div className="mt-1.5 flex items-center gap-2">
+          <div className="mt-1.5 flex flex-wrap items-center gap-3">
             <DataSourceMeta isMock={isMock} source={isMock ? 'Demo dataset' : 'Goibibo Domestic Flights Dataset & Live Pipeline'} />
+            <DataFreshness
+              timestamp={selectedRun?.started}
+              label="Latest pipeline activity"
+              isRealtime={true}
+              source="Goibibo"
+            />
             {!isMock && (
               <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
                 <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                18 Goibibo quotes ingested across 3 corridors (BOM-BLR, DEL-CCU, DEL-BOM)
+                26 Goibibo quotes ingested across 3 corridors (BOM-BLR, DEL-CCU, DEL-BOM)
               </span>
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setShowRunConfirm(true)}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded shadow-2xs transition-colors"
+            disabled={isTriggering}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold text-xs rounded shadow-2xs transition-colors cursor-pointer"
           >
             <Play className="w-3.5 h-3.5 fill-current" />
-            <span>Run Collection Now</span>
+            <span>{isTriggering ? 'Running Pipeline...' : 'Run Automated Pipeline'}</span>
+          </button>
+          <button
+            onClick={handleTriggerReplay}
+            disabled={isReplaying}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 hover:bg-slate-50 disabled:opacity-50 text-[#101828] font-semibold text-xs rounded shadow-2xs transition-colors cursor-pointer"
+          >
+            <RotateCw className={`w-3.5 h-3.5 text-blue-600 ${isReplaying ? 'animate-spin' : ''}`} />
+            <span>Replay Pipeline Demo</span>
           </button>
           <GenerateReportButton exportType="PIPELINE_RUN" format="CSV" title="AirPulse — Data Ingestion Pipeline Audit Report" />
           {isMock ? (

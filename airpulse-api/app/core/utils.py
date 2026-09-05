@@ -1,13 +1,58 @@
 import hashlib
 import json
 import math
-from datetime import datetime, timezone
-from typing import Any, Dict
+from datetime import date, datetime, timezone
+from typing import Any, Dict, Tuple, Union
 
 
 def utc_now() -> datetime:
     """Returns timezone-aware UTC current time."""
     return datetime.now(timezone.utc)
+
+
+def bucket_from_lead_days(lead_days: int) -> str:
+    """Canonical mapping from lead days to supported booking window bucket."""
+    if lead_days <= 2:
+        return "T+1"
+    elif lead_days <= 10:
+        return "T+7"
+    elif lead_days <= 20:
+        return "T+15"
+    elif lead_days <= 37:
+        return "T+30"
+    else:
+        return "T+45"
+
+
+def calculate_booking_window(
+    departure_date: Union[date, datetime, str],
+    observed_at: Union[date, datetime, str],
+) -> Tuple[int, str]:
+    """Deterministically derives (actual_lead_days, booking_window_bucket).
+    departure_date minus observed_at.
+    Returns:
+        (actual_lead_days: int, booking_window_bucket: str) e.g. (1, 'T+1').
+    """
+    if isinstance(departure_date, str):
+        # Support both 'YYYY-MM-DD' and full ISO timestamp strings
+        if "T" in departure_date or " " in departure_date:
+            departure_date = datetime.fromisoformat(departure_date.replace("Z", "+00:00")).date()
+        else:
+            departure_date = date.fromisoformat(departure_date)
+    elif isinstance(departure_date, datetime):
+        departure_date = departure_date.date()
+
+    if isinstance(observed_at, str):
+        if "T" in observed_at or " " in observed_at:
+            observed_at = datetime.fromisoformat(observed_at.replace("Z", "+00:00")).date()
+        else:
+            observed_at = date.fromisoformat(observed_at)
+    elif isinstance(observed_at, datetime):
+        observed_at = observed_at.date()
+
+    lead_days = max(0, (departure_date - observed_at).days)
+    bucket = bucket_from_lead_days(lead_days)
+    return lead_days, bucket
 
 
 def compute_sha256(content: str) -> str:

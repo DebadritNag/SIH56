@@ -28,6 +28,41 @@ class SourceType(CIEnum):
     SYNTHETIC = "synthetic"
 
 
+class PipelineMode(CIEnum):
+    LIVE_PROCESSING = "live_processing"
+    BATCH = "batch"
+    REPLAY = "replay"
+
+
+class AcquisitionMode(CIEnum):
+    LIVE = "live"
+    IMPORT = "import"
+    REPLAY = "replay"
+    SYNTHETIC = "synthetic"
+
+
+class DataOrigin(CIEnum):
+    LIVE = "LIVE"
+    IMPORT = "IMPORTED"
+    IMPORTED = "IMPORTED"
+    REPLAY = "REPLAY"
+    SYNTHETIC = "SYNTHETIC"
+    REFERENCE = "REFERENCE"
+
+
+class FareGuardStatus(CIEnum):
+    SCORED = "SCORED"
+    MODEL_UNAVAILABLE = "MODEL_UNAVAILABLE"
+    INSUFFICIENT_FEATURES = "INSUFFICIENT_FEATURES"
+    MODEL_ERROR = "MODEL_ERROR"
+    NOT_ELIGIBLE = "NOT_ELIGIBLE"
+
+
+class PriceGuardStatus(CIEnum):
+    SCORED = "SCORED"
+    NOT_SCORED = "NOT_SCORED"
+
+
 class CollectionEngine(CIEnum):
     AUTO = "auto"
     SCRAPY = "scrapy"

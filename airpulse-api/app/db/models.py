@@ -116,6 +116,7 @@ class CollectionRun(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     source_id = Column(UUID(as_uuid=True), ForeignKey("sources.id"), nullable=True, index=True)
     run_type = Column(String(50), default="batch_search", nullable=False)
+    data_origin = Column(_DataOriginType, nullable=True)
     started_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
     finished_at = Column(DateTime(timezone=True), nullable=True)
     status = Column(String(20), nullable=False, default="running")  # queued, running, completed, partial, failed
@@ -249,6 +250,36 @@ class ValidatedFare(Base):
     collected_at = Column(DateTime(timezone=True), nullable=False)
     created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
 
+    prediction = relationship("FarePrediction", uselist=False, foreign_keys="FarePrediction.fare_id", lazy="selectin")
+    anomaly = relationship("Anomaly", uselist=False, foreign_keys="Anomaly.fare_id", lazy="selectin")
+
+    @property
+    def booking_window_bucket(self) -> str:
+        from app.core.utils import bucket_from_lead_days
+        return bucket_from_lead_days(self.booking_window_days or 0)
+
+    @property
+    def actual_lead_days(self) -> int:
+        return self.booking_window_days or 0
+
+    @property
+    def fareguard_prediction(self) -> Optional[float]:
+        if self.prediction and self.prediction.predicted_fare is not None:
+            return float(self.prediction.predicted_fare)
+        return None
+
+    @property
+    def priceguard_score(self) -> Optional[float]:
+        if self.anomaly and self.anomaly.anomaly_percentile is not None:
+            return float(self.anomaly.anomaly_percentile)
+        return None
+
+    @property
+    def anomaly_status(self) -> Optional[str]:
+        if self.anomaly and self.anomaly.severity:
+            return str(self.anomaly.severity).upper()
+        return "NORMAL"
+
 
 class FareIndexEligibility(Base):
     __tablename__ = "fare_index_eligibility"
@@ -378,21 +409,22 @@ class FareFeature(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     fare_id = Column(UUID(as_uuid=True), ForeignKey("validated_fares.id"), nullable=False, index=True)
-    distance_km = Column(Float, nullable=False)
+    route_id = Column(UUID(as_uuid=True), ForeignKey("routes.id"), nullable=True, index=True)
     booking_window_days = Column(Integer, nullable=False)
     day_of_week = Column(Integer, nullable=False)
     is_weekend = Column(Boolean, nullable=False)
-    month = Column(Integer, nullable=False)
-    season = Column(String(20), nullable=False)
     is_festival = Column(Boolean, default=False, nullable=False)
-    festival_name = Column(String(100), nullable=True)
-    fuel_price = Column(Float, nullable=True)
-    synthetic_route_demand_score = Column(Float, nullable=True)
+    season = Column(String(20), nullable=False)
+    distance_km = Column(Float, nullable=False)
     route_recent_median = Column(Float, nullable=True)
+    route_recent_mean = Column(Float, nullable=True)
     route_recent_std = Column(Float, nullable=True)
-    route_recent_volatility = Column(Float, nullable=True)
-    source_reliability_score = Column(Float, default=1.0, nullable=False)
-    generated_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
+    route_volatility = Column(Float, nullable=True)
+    fuel_price = Column(Float, nullable=True)
+    demand_proxy = Column(Float, nullable=True)
+    feature_version = Column(String(50), default="v1.0", nullable=True)
+    features = Column(JSONB, nullable=True)
+    generated_at = Column("created_at", DateTime(timezone=True), default=utc_now, nullable=False)
 
 
 class FarePrediction(Base):
@@ -400,13 +432,13 @@ class FarePrediction(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     fare_id = Column(UUID(as_uuid=True), ForeignKey("validated_fares.id"), nullable=False, index=True)
+    model_id = Column(UUID(as_uuid=True), nullable=True)
     model_version = Column(String(50), nullable=False, index=True)
     predicted_fare = Column(Float, nullable=False)
-    actual_fare = Column(Float, nullable=False)
     residual = Column(Float, nullable=False)
     residual_pct = Column(Float, nullable=False)
-    prediction_lower_bound = Column(Float, nullable=True)
-    prediction_upper_bound = Column(Float, nullable=True)
+    prediction_lower_bound = Column("prediction_lower", Float, nullable=True)
+    prediction_upper_bound = Column("prediction_upper", Float, nullable=True)
     created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
 
 
@@ -434,19 +466,20 @@ class Anomaly(Base):
     created_at = Column("detected_at", DateTime(timezone=True), default=utc_now, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=True)
 
+    @property
+    def is_anomaly(self) -> bool:
+        return self.status == "OPEN" or (self.anomaly_percentile is not None and self.anomaly_percentile > 0.95)
+
 
 class ShapExplanation(Base):
     __tablename__ = "shap_explanations"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    fare_id = Column(UUID(as_uuid=True), ForeignKey("validated_fares.id"), nullable=False, index=True)
-    prediction_id = Column(UUID(as_uuid=True), ForeignKey("fare_predictions.id"), nullable=False, index=True)
+    anomaly_id = Column(UUID(as_uuid=True), ForeignKey("anomalies.id"), nullable=False, index=True)
     model_version = Column(String(50), nullable=False)
     base_value = Column(Float, nullable=False)
     predicted_value = Column(Float, nullable=False)
-    feature_contributions = Column(JSONB, nullable=False)
-    top_positive_features = Column(JSONB, nullable=False)
-    top_negative_features = Column(JSONB, nullable=False)
+    features = Column(JSONB, nullable=False)
     created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
 
 

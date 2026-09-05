@@ -136,7 +136,7 @@ async def get_ingestion_status(
         degraded_sources=degraded_count,
         active_routes=routes_count,
         booking_windows=["T+1", "T+7", "T+15", "T+30", "T+45"],
-        quotes_today=quotes_count or 18,
+        quotes_today=quotes_count,
         latest_pipeline_status=latest_pipe.status if latest_pipe else "Completed",
         latest_apix=idx_val,
     )
@@ -204,6 +204,9 @@ async def get_collection_run_detail(
         id=col_run.id,
         source_id=col_run.source_id,
         run_type=col_run.run_type,
+        data_origin=col_run.data_origin or "IMPORTED",
+        pipeline_mode="LIVE_PROCESSING",
+        acquisition_mode="IMPORT" if col_run.data_origin == "IMPORTED" else "LIVE",
         started_at=col_run.started_at,
         finished_at=col_run.finished_at,
         status=col_run.status,
@@ -218,6 +221,7 @@ async def get_collection_run_detail(
         duration_ms=col_run.duration_ms,
         trigger_type=col_run.trigger_type,
         triggered_by=col_run.triggered_by,
+        run_metadata=col_run.run_metadata,
         pipeline_runs=pipe_details,
     )
     return APIResponse(success=True, data=run_detail)
@@ -228,171 +232,88 @@ async def trigger_manual_collection(
     db: AsyncSession = Depends(get_db),
     current_user: UserContext = Depends(require_analyst),
 ):
-    """Manual pipeline run over the currently ingested fares: recomputes statistical
-    anomalies (PriceGuard) and price-shock alerts from real validated_fares, and records
-    a collection_runs entry and pipeline_runs entry with all 8 pipeline steps."""
-    import json
-    from datetime import datetime, timezone, timedelta
-    from uuid import uuid4
+    """Trigger the live automated downstream pipeline over current imported fare observations.
+    Executes the canonical 10-stage pipeline:
+    INGEST -> NORMALIZE -> VALIDATE -> DEDUP -> FEATURES -> FAREGUARD -> PRICEGUARD -> SHAP -> APIX -> ALERTS.
+    """
+    from app.core.enums import DataOrigin, PipelineMode
+    from app.services.dataset_orchestrator import DatasetIngestionOrchestrator
     from sqlalchemy import text
-    from app.services.anomaly_engine import AnomalyEngine
 
-    start_time = datetime.now(timezone.utc)
-    audit = AuditService(db)
-    result = await AnomalyEngine(db).run()
+    orchestrator = DatasetIngestionOrchestrator(db)
+    result = await orchestrator.run_pipeline(
+        source_name="Goibibo",
+        data_origin=DataOrigin.IMPORTED,
+        pipeline_mode=PipelineMode.LIVE_PROCESSING,
+        trigger_type="MANUAL",
+    )
 
-    # Get fare counts from DB
-    fares_res = await db.execute(text("SELECT count(*) FROM validated_fares"))
-    total_fares = fares_res.scalar() or 0
-    routes_res = await db.execute(text("SELECT count(DISTINCT origin || '-' || destination) FROM validated_fares"))
-    total_routes = routes_res.scalar() or 3
-
-    # Resolve source
-    src_res = await db.execute(text("SELECT id FROM sources WHERE enabled = true ORDER BY priority ASC LIMIT 1"))
-    src = src_res.fetchone()
-    source_id = src[0] if src else None
-
-    finish_time = datetime.now(timezone.utc)
-    duration_ms = max(1200, int((finish_time - start_time).total_seconds() * 1000))
-
-    col_id = uuid4()
-    meta_json = json.dumps({
-        "dataset": "Ingested Domestic Flight Matrix",
-        "source": "Goibibo Domestic OTA Dataset",
-        "trigger": "Manual Ingestion Control Room Trigger",
-        "corridors": ["BOM-BLR", "DEL-CCU", "DEL-BOM"],
-        "fares_reprocessed": total_fares,
-        "anomalies_detected": result.get("anomalies", 0),
-        "alerts_raised": result.get("alerts", 0),
-        "routes_evaluated": total_routes,
-    })
-
-    # Insert CollectionRun
-    insert_col = text("""
-        INSERT INTO collection_runs (
-            id, source_id, run_type, trigger_type, data_origin,
-            started_at, finished_at, status, routes_requested, searches_requested,
-            requests_successful, requests_failed, quotes_received, quotes_validated,
-            quotes_rejected, duplicates_detected, duration_ms, collector_version,
-            parser_version, created_at, metadata
-        ) VALUES (
-            :id, :source_id, 'manual_pipeline', 'MANUAL', 'IMPORTED',
-            :started_at, :finished_at, 'COMPLETED', :routes, :routes,
-            :routes, 0, :quotes, :quotes,
-            0, 0, :duration_ms, 'airpulse-pipeline-v1.2.0',
-            'airpulse-validator-v1.0.0', :started_at,
-            CAST(:meta AS jsonb)
-        )
-    """)
-    await db.execute(insert_col, {
-        "id": col_id,
-        "source_id": source_id,
-        "started_at": start_time,
-        "finished_at": finish_time,
-        "routes": total_routes,
-        "quotes": total_fares,
-        "duration_ms": duration_ms,
-        "meta": meta_json,
-    })
-
-    # Insert PipelineRun
-    pipe_id = uuid4()
-    insert_pipe = text("""
-        INSERT INTO pipeline_runs (
-            id, collection_run_id, pipeline_type, started_at, finished_at,
-            status, records_input, records_processed, records_failed,
-            created_at, metadata
-        ) VALUES (
-            :id, :col_id, 'batch_ingestion', :started_at, :finished_at,
-            'COMPLETED', :quotes, :quotes, 0,
-            :started_at,
-            CAST(:meta AS jsonb)
-        )
-    """)
-    await db.execute(insert_pipe, {
-        "id": pipe_id,
-        "col_id": col_id,
-        "started_at": start_time,
-        "finished_at": finish_time,
-        "quotes": total_fares,
-        "meta": json.dumps({"stages_completed": 8, "anomalies": result.get("anomalies", 0)}),
-    })
-
-    # Insert 8 pipeline steps
-    steps = [
-        (1, "COLLECT", total_fares, total_fares, 0, 150, f"{total_fares} quotes extracted & verified across {total_routes} corridors"),
-        (2, "NORMALIZE", total_fares, total_fares, 0, 80, f"Economy DTO standardized across all {total_fares} active flight quotes"),
-        (3, "VALIDATE", total_fares, total_fares, 0, 60, f"{total_fares}/{total_fares} passed bounds and schema sanity checks"),
-        (4, "DEDUP", total_fares, total_fares, 0, 40, "SHA-256 quote hash deduplication verified; 0 duplicates"),
-        (5, "FEATURES", total_fares, total_fares, 0, 90, "Calculated route distance, lead-time buckets, and departure temporal features"),
-        (6, "FAREGUARD", total_fares, total_fares, 0, 140, "Benchmark expected fare XGBoost model scored"),
-        (7, "PRICEGUARD", total_fares, total_fares, 0, 120, f"Isolation Forest detected {result.get('anomalies', 0)} anomalies across monitored routes"),
-        (8, "APIx ENGINE", total_fares, total_fares, 0, 100, "Airfare Price Index computed: 108.43"),
-    ]
-    step_time = start_time
-    for order, name, inp, out, fail, dur, msg in steps:
-        step_end = step_time + timedelta(milliseconds=dur)
-        insert_step = text("""
-            INSERT INTO pipeline_steps (
-                id, pipeline_run_id, step_name, step_order, status,
-                started_at, finished_at, records_input, records_output, records_failed,
-                duration_ms, message, created_at, metadata
-            ) VALUES (
-                :id, :pipe_id, :step_name, :step_order, 'COMPLETED',
-                :started_at, :finished_at, :records_input, :records_output, :records_failed,
-                :duration_ms, :message, :started_at,
-                CAST('{}' AS jsonb)
-            )
-        """)
-        await db.execute(insert_step, {
-            "id": uuid4(),
-            "pipe_id": pipe_id,
-            "step_name": name,
-            "step_order": order,
-            "started_at": step_time,
-            "finished_at": step_end,
-            "records_input": inp,
-            "records_output": out,
-            "records_failed": fail,
-            "duration_ms": dur,
-            "message": msg,
-        })
-        step_time = step_end
-
-    # Verify actor_id in profiles to satisfy FK constraint
     actor_uuid = None
     raw_uid = getattr(current_user, "user_id", None)
     if raw_uid:
         try:
             from uuid import UUID as PyUUID
             u = PyUUID(str(raw_uid))
-            chk = await db.execute(text("SELECT 1 FROM profiles WHERE id = :uid"), {"uid": u})
-            if chk.scalar():
+            chk_profile = await db.execute(text("SELECT 1 FROM profiles WHERE id = :uid"), {"uid": u})
+            if chk_profile.scalar():
                 actor_uuid = u
         except Exception:
             actor_uuid = None
 
+    audit = AuditService(db)
     await audit.log_event(
         actor_id=actor_uuid,
         action="COLLECTION_MANUAL_TRIGGER",
         entity_type="pipeline_run",
-        entity_id=str(pipe_id),
-        event_metadata={**result, "collection_run_id": str(col_id)},
+        entity_id=str(result.get("pipeline_run_id")),
+        event_metadata=result,
     )
     await db.commit()
 
-    return APIResponse(
-        success=True,
-        data={
-            "collection_run_id": str(col_id),
-            "pipeline_run_id": str(pipe_id),
-            "status": "COMPLETED",
-            "anomalies_detected": result.get("anomalies", 0),
-            "alerts_raised": result.get("alerts", 0),
-            "routes_evaluated": total_routes,
-            "quotes_processed": total_fares,
-        },
+    return APIResponse(success=True, data=result)
+
+
+@router.post("/replay", response_model=APIResponse)
+async def replay_pipeline(
+    db: AsyncSession = Depends(get_db),
+    current_user: UserContext = Depends(require_analyst),
+):
+    """Trigger replay downstream pipeline for demo / reproducibility verification."""
+    from app.core.enums import DataOrigin, PipelineMode
+    from app.services.dataset_orchestrator import DatasetIngestionOrchestrator
+    from sqlalchemy import text
+
+    orchestrator = DatasetIngestionOrchestrator(db)
+    result = await orchestrator.run_pipeline(
+        source_name="Goibibo",
+        data_origin=DataOrigin.REPLAY,
+        pipeline_mode=PipelineMode.REPLAY,
+        trigger_type="REPLAY",
     )
+
+    actor_uuid = None
+    raw_uid = getattr(current_user, "user_id", None)
+    if raw_uid:
+        try:
+            from uuid import UUID as PyUUID
+            u = PyUUID(str(raw_uid))
+            chk_profile = await db.execute(text("SELECT 1 FROM profiles WHERE id = :uid"), {"uid": u})
+            if chk_profile.scalar():
+                actor_uuid = u
+        except Exception:
+            actor_uuid = None
+
+    audit = AuditService(db)
+    await audit.log_event(
+        actor_id=actor_uuid,
+        action="PIPELINE_REPLAY_TRIGGER",
+        entity_type="pipeline_run",
+        entity_id=str(result.get("pipeline_run_id")),
+        event_metadata=result,
+    )
+    await db.commit()
+
+    return APIResponse(success=True, data=result)
 
 
 @router.post("/sources/{source_id}/collect", response_model=APIResponse)

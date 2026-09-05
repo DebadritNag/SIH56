@@ -23,7 +23,7 @@ from uuid import uuid4
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.utils import utc_now
+from app.core.utils import calculate_booking_window, utc_now
 from app.db.models import RawFare, Route, Source, ValidatedFare
 
 IMPORTER_VERSION = "goibibo-csv-importer-v1.0.0"
@@ -94,7 +94,7 @@ class GoibiboCsvImporter:
         origin = origin.upper().strip()
         destination = destination.upper().strip()
         scrape_date = scrape_date or date.today()
-        booking_window = max(0, (departure_date - scrape_date).days)
+        booking_window, bw_bucket = calculate_booking_window(departure_date, scrape_date)
 
         source_id = await self._source_id()
         route_id = await self._route_id(origin, destination)
@@ -110,7 +110,7 @@ class GoibiboCsvImporter:
             departure_requested=departure_date, booking_window_requested=booking_window,
             collected_at=utc_now(), http_status=200,
             raw_payload={"importer": IMPORTER_VERSION, "rows": text[:20000]},
-            response_hash=response_hash, collector_version="manual-scrape",
+            response_hash=response_hash, collector_version=IMPORTER_VERSION,
             parser_version=IMPORTER_VERSION,
         )
         self.session.add(raw_row)
@@ -218,7 +218,7 @@ class GoibiboCsvImporter:
             id=uuid4(), source_id=source_id, data_origin="IMPORTED",
             collected_at=utc_now(), http_status=200,
             raw_payload={"importer": IMPORTER_VERSION, "format": "standard", "rows": text[:20000]},
-            response_hash=response_hash, collector_version="manual-scrape",
+            response_hash=response_hash, collector_version=IMPORTER_VERSION,
             parser_version=IMPORTER_VERSION,
         )
         self.session.add(raw_row)
@@ -239,7 +239,7 @@ class GoibiboCsvImporter:
                 continue
 
             scrape_date = self._parse_date(g(row, "scrape_date")) or default_scrape
-            booking_window = max(0, (dep_date - scrape_date).days)
+            lead_days, bw_bucket = calculate_booking_window(dep_date, scrape_date)
             airline = (g(row, "airline") or "UNKNOWN").strip()
             flight_no = (g(row, "flight_number") or "").strip()
             dep_t = _parse_hhmm(g(row, "departure_time"))
@@ -268,7 +268,7 @@ class GoibiboCsvImporter:
                 id=uuid4(), raw_fare_id=raw_row.id, source_id=source_id, route_id=route_cache[key],
                 data_origin="IMPORTED", airline=airline, flight_number=flight_no or None,
                 origin=origin, destination=dest, departure_at=dep_dt, arrival_at=arr_dt,
-                booking_window_days=booking_window, cabin=cabin, fare_class="ECONOMY",
+                booking_window_days=lead_days, cabin=cabin, fare_class="ECONOMY",
                 base_fare=fare, taxes=0, mandatory_fees=0, convenience_fee=0,
                 total_fare=fare, normalized_total_fare=fare, currency="INR",
                 validation_status="VALID",
