@@ -839,7 +839,7 @@ class LiveScraper:
             raw_card_texts: List[str] = []
             try:
                 raw_card_texts = await page.evaluate("""() => {
-                    const selector = "div[role='link'][aria-label], li.pIavfa, li[class*='pIavfa'], div[class*='yR1fYc'], ul.Rk10dc > li, .flight-card, [data-test='flight-card'], .fare-row, tr.flight-item, div.fare-card, li";
+                    const selector = ".tuple, .flight-tuple, .tuple-wrap, div[class*='flightItem'], div[class*='tuple'], div[role='link'][aria-label], li.pIavfa, li[class*='pIavfa'], div[class*='yR1fYc'], ul.Rk10dc > li, .flight-card, [data-test='flight-card'], .fare-row, tr.flight-item, div.fare-card, li";
                     const elements = document.querySelectorAll(selector);
                     const results = [];
                     for (const el of elements) {
@@ -868,7 +868,7 @@ class LiveScraper:
                     await page.evaluate("window.scrollBy(0, 800)")
                     await asyncio.sleep(0.4)
                     more_texts = await page.evaluate("""() => {
-                        const selector = "div[role='link'][aria-label], li.pIavfa, li[class*='pIavfa'], div[class*='yR1fYc'], ul.Rk10dc > li, .flight-card, [data-test='flight-card'], .fare-row, tr.flight-item, div.fare-card, li";
+                        const selector = ".tuple, .flight-tuple, .tuple-wrap, div[class*='flightItem'], div[class*='tuple'], div[role='link'][aria-label], li.pIavfa, li[class*='pIavfa'], div[class*='yR1fYc'], ul.Rk10dc > li, .flight-card, [data-test='flight-card'], .fare-row, tr.flight-item, div.fare-card, li";
                         const elements = document.querySelectorAll(selector);
                         const results = [];
                         for (const el of elements) {

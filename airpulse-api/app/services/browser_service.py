@@ -310,6 +310,8 @@ class BrowserResolver:
     ]
 
     LOW_MEMORY_CHROMIUM_ARGS = [
+        "--disable-http2",
+        "--disable-blink-features=AutomationControlled",
         "--disable-dev-shm-usage",
         "--no-sandbox",
         "--disable-gpu",
@@ -336,6 +338,8 @@ class BrowserResolver:
     @classmethod
     async def _try_launch(cls, launcher: Any, **kwargs) -> Any:
         """Launches a browser instance using the provided launcher and arguments."""
+        if "ignore_default_args" not in kwargs:
+            kwargs["ignore_default_args"] = ["--enable-automation"]
         return await launcher.launch(**kwargs)
 
     @classmethod
@@ -825,7 +829,9 @@ class SharedBrowserService:
                     viewport={"width": 1280, "height": 800},
                     locale="en-US",
                     extra_http_headers={
+                        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
                         "Accept-Language": "en-US,en;q=0.9",
+                        "Upgrade-Insecure-Requests": "1",
                     },
                 )
                 session = BrowserSession(source_key=source_key, context=context)
@@ -847,11 +853,17 @@ class SharedBrowserService:
 
         if block_heavy_resources:
             async def _route_handler(route):
-                req = route.request
-                if req.resource_type in SAFE_BLOCKED_RESOURCE_TYPES:
-                    await route.abort()
-                else:
-                    await route.continue_()
+                try:
+                    req = route.request
+                    if req.resource_type in SAFE_BLOCKED_RESOURCE_TYPES:
+                        await route.abort()
+                    else:
+                        await route.continue_()
+                except Exception:
+                    try:
+                        await route.continue_()
+                    except Exception:
+                        pass
 
             await page.route("**/*", _route_handler)
 
@@ -886,7 +898,18 @@ class SharedBrowserService:
                 raise ScraperError(
                     ScrapeFailureStage.CONNECTION_FAILURE, f"TCP connection failed: {exc}"
                 ) from exc
-            raise ScraperError(ScrapeFailureStage.CONNECTION_FAILURE, f"Navigation failed: {exc}") from exc
+            if "err_http2" in msg or "protocol_error" in msg:
+                logger.warning(f"HTTP/2 protocol issue during navigation to {url}: {exc}. Retrying navigation with domcontentloaded...")
+                try:
+                    await asyncio.sleep(0.5)
+                    response = await page.goto(url, wait_until="domcontentloaded", timeout=nav_timeout_ms)
+                except Exception as retry_exc:
+                    raise ScraperError(
+                        ScrapeFailureStage.CONNECTION_FAILURE,
+                        f"Navigation failed: {retry_exc}",
+                    ) from retry_exc
+            else:
+                raise ScraperError(ScrapeFailureStage.CONNECTION_FAILURE, f"Navigation failed: {exc}") from exc
 
         # Wait briefly for client-side SPA DOM hydration without hanging on continuous background streaming
         try:

@@ -239,12 +239,14 @@ class YatraAdapter(SourceAdapter):
         raw_max = getattr(request, "max_results", None) or 10
         bounded_max = min(max(1, int(raw_max)), 15)
 
-        # Wait for either flight tuples or challenge validation container
+        # Wait for either flight tuples or search container
         try:
             await page.wait_for_selector(
-                ".tuple, .flight-tuple, .flight-item, [class*='flightItem'], [class*='tuple'], title",
+                ".tuple, .flight-tuple, .flight-item, [class*='flightItem'], [class*='tuple'], .dom2-flight-tuple, #dom2-container",
                 timeout=12000,
             )
+            # Allow brief moment for React/DOM hydration
+            await page.wait_for_timeout(2000)
         except Exception:
             pass
 
