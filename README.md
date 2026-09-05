@@ -34,6 +34,20 @@ AirPulse is **not** a flight-booking app. It is a government-grade analytics pla
 
 ---
 
+## Unique Selling Propositions (USPs)
+
+- **Pure Statistical Integrity (Zero ML Imputation)**: The official Airfare Price Index (APIx) is calculated strictly from verified, observed market quotes using the chained Laspeyres / Jevons index methodology—never from imputed, predicted, or synthetic ML data.
+- **Cryptographic Provenance & Tamper-Proof Audit Trail**: Every raw collection payload (HTML, JSON, CSV) is timestamped in UTC, hashed using SHA-256 before parsing, and permanently archived, ensuring full chain-of-custody institutional verifiability.
+- **Decoupled Dual-Branch Architecture**: The Statistical Index pipeline (Branch A) and Machine Learning QA pipeline (Branch B) run completely independently; any ML training or scoring degradation never halts or delays the publication of the official price index.
+- **Transparent & Explainable Anomaly Detection (Gated SHAP)**: Anomalies flagged by PriceGuard (Isolation Forest) are paired with tree-based SHAP feature attributions, giving economists interpretable marginal rupee impacts (booking window lead days, carrier premiums, holiday surges) rather than opaque black-box flags.
+- **Economic Intelligence: Corrupt Data vs. Price Shocks**: The system strictly differentiates between corrupt records (physical sanity violations like negative fares or invalid IATA pairs) and genuine market price shocks (cross-airline corroboration, festive demand spikes), preventing false-positive data purging.
+- **Standardized Multi-Booking Window Basket**: Eliminates advance-purchase bias caused by airline yield management by segmenting quotes into canonical lead-time buckets (`T+1`, `T+7`, `T+14`, `T+30`), weighted by official DGCA passenger traffic volume statistics.
+- **Native MoSPI eSankhyiki & DGCA Integration**: Incorporates the official MoSPI CPI (General) All-India Combined series as an external reference benchmark and dynamically calibrates route weights using DGCA domestic traffic shares.
+- **Automated Live Pipeline Mode**: New fare data entering the system triggers downstream stages automatically—executing SHA-256 hashing, normalization, validation, deduplication, feature extraction, FareGuard evaluation, PriceGuard anomaly scoring, and index recomputation end-to-end.
+- **Institutional Governance & Role-Based Access (RBAC)**: Government-grade operational model with role-based access (MoSPI Analyst, MoSPI Admin, Auditor, Observer), immutable audit event logging, and on-demand PDF executive dossier generation.
+
+---
+
 ## Official reference data (MoSPI eSankhyiki) & real-fare ingestion
 
 AirPulse integrates the SIH-provided **MoSPI eSankhyiki** portal as an *official / reference*
