@@ -12,14 +12,12 @@ import {
   Calendar,
   AlertTriangle,
   Zap,
-  Bell,
   Database,
   Globe,
   DownloadCloud,
   CheckCircle2,
   GitCompare,
   Cpu,
-  BookOpen,
   Server,
   Activity,
   Download,
@@ -49,48 +47,41 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'EXECUTIVE INTELLIGENCE',
     items: [
       { label: 'Overview', href: '/overview', icon: BarChart3 },
+      { label: 'Market Monitor', href: '/market', icon: Activity },
     ],
   },
   {
-    title: 'MARKET INTELLIGENCE',
+    title: 'MARKET & CORRIDORS',
     items: [
-      { label: 'Market Monitor', href: '/market', icon: Activity },
       { label: 'APIx Index', href: '/apix', icon: TrendingUp },
       { label: 'Route Intelligence', href: '/routes', icon: MapPin },
       { label: 'Booking Windows', href: '/booking-windows', icon: Calendar },
     ],
   },
   {
-    title: 'MONITORING & RISK',
+    title: 'SURVEILLANCE & RISK',
     items: [
       { label: 'Anomaly Center', href: '/anomalies', icon: AlertTriangle },
       { label: 'Price Shocks', href: '/shocks', icon: Zap },
-      { label: 'Alert Center', href: '/alerts', icon: Bell },
+      { label: 'Data Quality Matrix', href: '/data-quality', icon: CheckCircle2 },
     ],
   },
   {
     title: 'DATA OPERATIONS',
     items: [
       { label: 'Fare Explorer', href: '/fares', icon: Database },
-      { label: 'Downloads & Exports', href: '/downloads', icon: Download },
-      { label: 'Data Sources', href: '/sources', icon: Globe },
       { label: 'Data Ingestion', href: '/ingestion', icon: DownloadCloud },
-      { label: 'Scraping Verification', href: '/scraping-test', icon: Terminal },
-      { label: 'Data Quality Matrix', href: '/data-quality', icon: CheckCircle2 },
+      { label: 'Data Sources', href: '/sources', icon: Globe },
+      { label: 'Downloads & Exports', href: '/downloads', icon: Download },
     ],
   },
   {
-    title: 'ANALYTICS & MODELS',
+    title: 'MODELS & INFRASTRUCTURE',
     items: [
-      { label: 'Index Backtesting', href: '/backtesting', icon: GitCompare },
       { label: 'ML Models (FareGuard)', href: '/models', icon: Cpu },
-      { label: 'Official Methodology', href: '/methodology', icon: BookOpen },
-    ],
-  },
-  {
-    title: 'SYSTEM INFRASTRUCTURE',
-    items: [
+      { label: 'Index Backtesting', href: '/backtesting', icon: GitCompare },
       { label: 'Pipeline Monitor', href: '/pipeline', icon: Server },
+      { label: 'Scraping Verification', href: '/scraping-test', icon: Terminal },
       { label: 'System Diagnostics', href: '/system', icon: Shield },
     ],
   },
@@ -107,7 +98,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const badgeByHref: Record<string, number | undefined> = {
     '/anomalies': summary?.open_anomalies,
     '/shocks': summary?.critical_anomalies,
-    '/alerts': summary?.active_alerts,
   };
 
   return (
