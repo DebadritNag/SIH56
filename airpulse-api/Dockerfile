@@ -31,4 +31,4 @@ RUN xvfb-run -a python scripts/check_chrome.py
 
 EXPOSE 10000
 
-CMD ["xvfb-run", "-a", "--server-args=-screen 0 1280x720x24 -nolisten tcp", "python", "-m", "scripts.start_server"]
+CMD ["python", "-u", "-m", "scripts.start_server"]

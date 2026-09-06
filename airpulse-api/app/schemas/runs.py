@@ -81,7 +81,7 @@ class CollectionRunDetail(BaseModel):
     duplicates_detected: int
     duration_ms: Optional[int]
     trigger_type: str
-    triggered_by: Optional[str]
+    triggered_by: Optional[UUID | str]
     data_origin: Optional[str] = "IMPORTED"
     pipeline_mode: Optional[str] = "LIVE_PROCESSING"
     acquisition_mode: Optional[str] = "IMPORT"

@@ -188,9 +188,11 @@ class AnomalyType(CIEnum):
 
 class AnomalyStatus(CIEnum):
     OPEN = "open"
+    UNDER_REVIEW = "under_review"
     REVIEWED = "reviewed"
     CONFIRMED = "confirmed"
     DISMISSED = "dismissed"
+    RESOLVED = "resolved"
 
 
 class ReviewDecision(CIEnum):
@@ -283,4 +285,3 @@ class PolicyStatus(CIEnum):
     RESTRICTED = "RESTRICTED"
     UNKNOWN = "UNKNOWN"
     MANUAL_REVIEW_REQUIRED = "MANUAL_REVIEW_REQUIRED"
-

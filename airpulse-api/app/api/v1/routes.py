@@ -7,7 +7,7 @@ from app.core.security import require_viewer, UserContext
 from app.db.repositories.routes import RouteRepository
 from app.db.session import get_db
 from app.schemas.common import APIResponse
-from app.schemas.route import RouteInsights, RouteResponse
+from app.schemas.route import AdvancePurchasePoint, SourceComparisonItem, RouteInsights, RouteResponse
 
 router = APIRouter(prefix="/routes", tags=["Routes"])
 
