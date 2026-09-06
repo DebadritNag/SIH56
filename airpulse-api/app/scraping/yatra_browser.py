@@ -207,15 +207,20 @@ class YatraBrowserCollector:
                                                    timeout=settings.YATRA_HOMEPAGE_TIMEOUT_MS)
                         self.http_status = response.status if response else None
                     except PlaywrightTimeout:
-                        # A slow load event need not prevent using an already visible form.
-                        # Inspect the same document; never retry navigation after failure.
+                        # A slow load event need not prevent using an already-rendered form.
+                        # Never retry navigation after failure; proceed to the bounded form wait.
                         await self.guard(page)
-                        if not await page.get_by_text('One Way', exact=True).is_visible():
-                            raise
-                        self.events.append(dict(stage='HOMEPAGE',status='FORM_VISIBLE_AFTER_LOAD_TIMEOUT',
+                        self.events.append(dict(stage='HOMEPAGE',status='LOAD_TIMEOUT_PROCEEDING',
                                                 control='One Way'))
                     await self.guard(page)
-                    await self.action(page,'TRIP_TYPE','One Way',lambda:page.get_by_text('One Way',exact=True).click())
+                    # Tolerant trip-type locator: the tab may render as "One Way" / "ONE WAY" /
+                    # "Oneway" and hydrate after DOM load. Wait (bounded) so we never hang on the
+                    # default 15s timeout with an exact-text match.
+                    one_way = page.get_by_text(re.compile(r'^\s*one\s*way\s*$', re.I)).first
+                    await one_way.wait_for(state='visible', timeout=settings.YATRA_FORM_TIMEOUT_MS)
+                    self.events.append(dict(stage='HOMEPAGE',status='FORM_VISIBLE',control='One Way'))
+                    await self.guard(page)
+                    await self.action(page,'TRIP_TYPE','One Way',lambda:one_way.click())
                     await self.action(page,'ORIGIN','Departure From / IATA suggestion',lambda:self.airport(page,'Departure From',request.origin))
                     await self.action(page,'DESTINATION','Arrival At / IATA suggestion',lambda:self.airport(page,'Arrival At',request.destination))
                     await self.action(page,'DATE',date_label(request.departure_date),lambda:self.calendar(page,request.departure_date))
