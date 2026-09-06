@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     YATRA_PROTOTYPE_ENABLED: bool = False
     YATRA_BROWSER_HEADLESS: bool = False
     YATRA_DISABLE_HTTP2: bool = False
+    YATRA_HOMEPAGE_TIMEOUT_MS: int = Field(45000, ge=1000, le=60000)
     YATRA_SAVE_DIAGNOSTICS: bool = False
     LIVE_WORKER_ENABLED: bool = True
     YATRA_REVIEW_NOTES: str = ""

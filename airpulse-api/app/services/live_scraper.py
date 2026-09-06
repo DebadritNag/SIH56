@@ -377,6 +377,12 @@ class LiveScraper:
                 result.update(collector_version='yatra-homepage-v1',browser_engine='Google Chrome',
                     browser_version=resolved.metadata.get('browser_version'),
                     browser_launch_status=resolved.metadata.get('browser_launch_status'))
+                if resolved.failure_code == 'TIMEOUT' and resolved.metadata.get('failed_stage') == 'HOMEPAGE':
+                    result['recommended_remediation'] = (
+                        "Yatra's homepage did not become usable within the bounded navigation timeout. "
+                        "No result cards were reached; reducing Result Limit cannot shorten this stage. "
+                        "Check deployed-host connectivity and memory. No automatic navigation retry was made."
+                    )
                 if resolved.failure_code == 'NETWORK_ERROR':
                     disabled = resolved.metadata.get('http2_disabled', False)
                     result['recommended_remediation'] = (

@@ -202,8 +202,18 @@ class YatraBrowserCollector:
                                 self.blocked = response.status
                     page.on('response',response_received)
                     self.stage,self.control = 'HOMEPAGE','https://www.yatra.com/'
-                    response = await page.goto('https://www.yatra.com/',wait_until='domcontentloaded',timeout=30000)
-                    self.http_status = response.status if response else None
+                    try:
+                        response = await page.goto('https://www.yatra.com/',wait_until='domcontentloaded',
+                                                   timeout=settings.YATRA_HOMEPAGE_TIMEOUT_MS)
+                        self.http_status = response.status if response else None
+                    except PlaywrightTimeout:
+                        # A slow load event need not prevent using an already visible form.
+                        # Inspect the same document; never retry navigation after failure.
+                        await self.guard(page)
+                        if not await page.get_by_text('One Way', exact=True).is_visible():
+                            raise
+                        self.events.append(dict(stage='HOMEPAGE',status='FORM_VISIBLE_AFTER_LOAD_TIMEOUT',
+                                                control='One Way'))
                     await self.guard(page)
                     await self.action(page,'TRIP_TYPE','One Way',lambda:page.get_by_text('One Way',exact=True).click())
                     await self.action(page,'ORIGIN','Departure From / IATA suggestion',lambda:self.airport(page,'Departure From',request.origin))

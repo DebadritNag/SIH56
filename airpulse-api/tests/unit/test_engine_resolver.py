@@ -76,7 +76,9 @@ def test_yatra_observed_card_rejects_nearby_airports_dates_and_bad_fields():
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize('disable_http2', [False, True])
-async def test_yatra_homepage_success_dedups_and_closes_chrome(monkeypatch, disable_http2):
+@pytest.mark.parametrize('result_limit', [5, 10, 15])
+@pytest.mark.parametrize('load_timeout', [False, True])
+async def test_yatra_homepage_success_dedups_and_closes_chrome(monkeypatch, disable_http2, result_limit, load_timeout):
     from unittest.mock import AsyncMock, MagicMock
     from types import SimpleNamespace
     from playwright.async_api import TimeoutError
@@ -84,19 +86,23 @@ async def test_yatra_homepage_success_dedups_and_closes_chrome(monkeypatch, disa
     from app.config import settings
     monkeypatch.setattr(settings,'YATRA_BROWSER_HEADLESS',False)
     monkeypatch.setattr(settings,'YATRA_DISABLE_HTTP2',disable_http2)
-    request = SearchRequest(origin='DEL',destination='BOM',departure_date=date(2026,9,20),booking_window_days=14,max_results=10)
+    request = SearchRequest(origin='DEL',destination='BOM',departure_date=date(2026,9,20),booking_window_days=14,max_results=result_limit)
     page = MagicMock()
     page.url = 'https://flight.yatra.com/air-search?type=O&origin=DEL&destination=BOM&flight_depart_date=20%2F09%2F2026&ADT=1&class=Economy'
     page.goto = AsyncMock(return_value=SimpleNamespace(status=200))
+    if load_timeout:
+        page.goto.side_effect = TimeoutError('DOMContentLoaded delayed')
+    page.get_by_text.return_value.is_visible = AsyncMock(return_value=True)
     page.wait_for_url = AsyncMock()
     page.wait_for_function = AsyncMock(side_effect=TimeoutError('no growth'))
     page.get_by_text.return_value.click = AsyncMock()
     cards = MagicMock()
     cards.first.wait_for = AsyncMock()
     cards.last.scroll_into_view_if_needed = AsyncMock()
-    cards.count = AsyncMock(return_value=3)
+    cards.count = AsyncMock(return_value=22)
     cards.all = AsyncMock(return_value=[SimpleNamespace(is_visible=AsyncMock(return_value=True),inner_html=AsyncMock(return_value=h))
-        for h in (YATRA_CARD,YATRA_CARD,YATRA_CARD.replace('(BOM)','(NMI)'))])
+        for h in [YATRA_CARD,YATRA_CARD,YATRA_CARD.replace('(BOM)','(NMI)')]
+        + [YATRA_CARD.replace('06:50', f'{hour:02d}:50') for hour in range(7, 24)]])
     page.locator.return_value = cards
     browser = SimpleNamespace(version='test',new_context=AsyncMock(return_value=SimpleNamespace(new_page=AsyncMock(return_value=page))),close=AsyncMock())
     launch = AsyncMock(return_value=browser)
@@ -110,7 +116,10 @@ async def test_yatra_homepage_success_dedups_and_closes_chrome(monkeypatch, disa
     collector.calendar = AsyncMock()
     collector.travellers = AsyncMock()
     result = await collector.execute(request)
-    assert result.status=='SUCCESS' and len(result.quotes)==1
+    assert result.status=='SUCCESS' and len(result.quotes)==result_limit
+    assert result.stop_reason == 'RESULT_LIMIT_REACHED'
+    cards.last.scroll_into_view_if_needed.assert_not_awaited()
+    page.goto.assert_awaited_once()
     options = dict(channel='chrome',headless=False)
     if disable_http2:
         options['args'] = ['--disable-http2']
