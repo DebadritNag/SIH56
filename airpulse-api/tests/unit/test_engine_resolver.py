@@ -26,6 +26,29 @@ from app.scraping.engines.scrapy_engine import ScrapyEngine
 from app.scraping.resolver import EngineResolver
 
 
+@pytest.mark.asyncio
+async def test_http_startup_does_not_wait_for_database(monkeypatch):
+    import asyncio
+    from contextlib import asynccontextmanager
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+    from app import main
+    from app.services.browser_service import SharedBrowserService
+    @asynccontextmanager
+    async def stalled_connection():
+        await asyncio.sleep(60)
+        yield None
+    fake_engine = SimpleNamespace(connect=stalled_connection,dispose=AsyncMock())
+    monkeypatch.setattr(main,'engine',fake_engine)
+    monkeypatch.setattr(main.settings,'LIVE_WORKER_ENABLED',False)
+    monkeypatch.setattr(SharedBrowserService,'run_startup_self_test',AsyncMock())
+    context = main.lifespan(main.app)
+    await asyncio.wait_for(context.__aenter__(),timeout=0.5)
+    await asyncio.sleep(0)
+    await asyncio.wait_for(context.__aexit__(None,None,None),timeout=0.5)
+    fake_engine.dispose.assert_awaited_once()
+
+
 YATRA_CARD = '''<div class="airline-name"><span title="Akasa Air">Akasa Air</span><p class="fl-no">QP-1833</p></div>
 <div class="depart-details"><p class="mob-origin">New Delhi(DEL)</p><p class="mob-time">06:50</p><p class="mob-date">20 Sep</p></div>
 <div class="arrival-details"><p class="mob-origin">Mumbai(BOM)</p><p class="mob-time">09:10</p><p class="mob-date">20 Sep</p></div>

@@ -14,7 +14,6 @@ from app.schemas.index import (
     IndexCalculationRequest,
     IndexDetailResponse,
 )
-from app.services.index_engine import IndexEngine
 
 router = APIRouter(prefix="/index", tags=["Index"])
 

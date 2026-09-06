@@ -11,7 +11,6 @@ from app.core.security import require_analyst, require_viewer, UserContext
 from app.db.session import get_db
 from app.schemas.common import APIResponse
 from app.schemas.export import CreateExportRequest, ExportDownloadResponse, ExportJobResponse
-from app.services.export_service import ExportService
 
 router = APIRouter(prefix="/exports", tags=["Export & Download Subsystem"])
 
@@ -26,6 +25,7 @@ async def create_export(
     Creates and initiates an institutional export.
     Generates authentic CSV, XLSX, PDF, PNG, or ZIP datasets from live database records.
     """
+    from app.services.export_service import ExportService
     service = ExportService(db)
     job = await service.create_export_job(payload, user_id=current_user.user_id)
     return APIResponse(
@@ -44,6 +44,7 @@ async def list_exports(
     current_user: UserContext = Depends(require_viewer),
 ):
     """Lists export jobs visible to the current authenticated user."""
+    from app.services.export_service import ExportService
     service = ExportService(db)
     items, total = await service.list_jobs(
         user_id=current_user.user_id,
@@ -73,6 +74,7 @@ async def get_export_job(
     current_user: UserContext = Depends(require_viewer),
 ):
     """Retrieves metadata and generation status for a specific export."""
+    from app.services.export_service import ExportService
     service = ExportService(db)
     job = await service.get_job(job_id)
     return APIResponse(success=True, data=ExportJobResponse.model_validate(job))
@@ -88,6 +90,7 @@ async def download_export(
     Returns short-lived signed URL or secure redirect for authorized download.
     Never exposes permanent public bucket URLs.
     """
+    from app.services.export_service import ExportService
     service = ExportService(db)
     job = await service.get_job(job_id)
     signed_url, expires_at = await service.get_download_url(job)
@@ -112,6 +115,7 @@ async def stream_export_file(
     current_user: UserContext = Depends(require_viewer),
 ):
     """Streams the local file directly if local fallback was used."""
+    from app.services.export_service import ExportService
     service = ExportService(db)
     job = await service.get_job(job_id)
 
@@ -141,6 +145,7 @@ async def retry_export_job(
     current_user: UserContext = Depends(require_viewer),
 ):
     """Retries a failed export."""
+    from app.services.export_service import ExportService
     service = ExportService(db)
     job = await service.get_job(job_id)
     job.status = "QUEUED"
@@ -157,6 +162,7 @@ async def delete_export_job(
     current_user: UserContext = Depends(require_viewer),
 ):
     """Deletes the export metadata."""
+    from app.services.export_service import ExportService
     service = ExportService(db)
     job = await service.get_job(job_id)
     await service.delete_job(job)

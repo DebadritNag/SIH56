@@ -27,9 +27,6 @@ from app.schemas.runs import (
     PipelineStepResponse,
 )
 from app.services.collection_orchestrator import CollectionOrchestrator
-from app.services.ingestion_service import IngestionService
-from app.services.reference_data_service import ReferenceDataService
-from app.services.csv_import_service import CSVImportService
 from app.services.audit_service import AuditService
 from app.services.live_scraper import get_live_scraper
 from pydantic import BaseModel, Field
@@ -322,6 +319,7 @@ async def trigger_source_collection(
     db: AsyncSession = Depends(get_db),
     current_user: UserContext = Depends(require_analyst),
 ):
+    from app.services.ingestion_service import IngestionService
     orchestrator = CollectionOrchestrator(db)
     col_run = await orchestrator.execute_batch_collection(
         source_id=source_id,
@@ -393,6 +391,7 @@ async def upload_dataset_for_import(
     current_user: UserContext = Depends(require_analyst),
 ):
     """Uploads external CSV/XLSX airfare dataset and returns column-mapping preview."""
+    from app.services.csv_import_service import CSVImportService
     preview = await CSVImportService.inspect_uploaded_file(file)
     return APIResponse(success=True, data=preview)
 
@@ -403,6 +402,7 @@ async def sync_reference_dataset(
     db: AsyncSession = Depends(get_db),
     current_user: UserContext = Depends(require_analyst),
 ):
+    from app.services.reference_data_service import ReferenceDataService
     service = ReferenceDataService(db)
     result = await service.sync_mospi_datasets(trigger_type="manual", actor_id=getattr(current_user, "user_id", None))
     return APIResponse(success=True, data=result)

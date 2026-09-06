@@ -29,6 +29,6 @@ RUN useradd --create-home airpulse && chown -R airpulse:airpulse /app
 USER airpulse
 RUN xvfb-run -a python scripts/check_chrome.py
 
-EXPOSE 8000
+EXPOSE 10000
 
-CMD ["sh", "-c", "exec xvfb-run -a --server-args='-screen 0 1280x720x24 -nolisten tcp' python -m uvicorn app.main:app --host 0.0.0.0 --port \"${PORT:-8000}\" --workers 1"]
+CMD ["xvfb-run", "-a", "--server-args=-screen 0 1280x720x24 -nolisten tcp", "python", "-m", "scripts.start_server"]

@@ -23,17 +23,21 @@ async def lifespan(app: FastAPI):
     setup_logging(settings.LOG_LEVEL)
     # Verify DB connectivity but never block startup on a transient DB hiccup
     # (Render health checks must be able to reach the app immediately).
-    try:
-        async with engine.connect() as conn:
-            await conn.execute(text("SELECT 1"))
-    except Exception as exc:  # noqa: BLE001
-        import logging
-        logging.getLogger("airpulse").warning("DB not reachable at startup: %s", exc)
+    async def check_database():
+        try:
+            async with asyncio.timeout(5):
+                async with engine.connect() as conn:
+                    await conn.execute(text("SELECT 1"))
+        except Exception as exc:
+            import logging
+            logging.getLogger("airpulse").warning("Startup database check failed (%s); HTTP remains available", type(exc).__name__)
+    database_check = asyncio.create_task(check_database())
 
     # Startup: Run browser capability discovery in background so container binds $PORT instantly
+    browser_check = None
     try:
         from app.services.browser_service import SharedBrowserService
-        asyncio.create_task(SharedBrowserService.run_startup_self_test())
+        browser_check = asyncio.create_task(SharedBrowserService.run_startup_self_test())
     except Exception as exc:  # noqa: BLE001
         import logging
         logging.getLogger("airpulse").warning("Browser engine self-test dispatch encountered an exception: %s", exc)
@@ -42,10 +46,12 @@ async def lifespan(app: FastAPI):
     worker = asyncio.create_task(worker_loop()) if settings.LIVE_WORKER_ENABLED else None
     yield
     # Shutdown
-    if worker:
-        worker.cancel()
+    for task in (worker, database_check, browser_check):
+        if task is None:
+            continue
+        task.cancel()
         try:
-            await worker
+            await task
         except asyncio.CancelledError:
             pass
     await engine.dispose()

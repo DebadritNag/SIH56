@@ -9,9 +9,6 @@ from app.core.utils import utc_now
 from app.db.session import get_db
 from app.schemas.common import APIResponse
 from app.schemas.runs import DiagnosticsResponse, SelfTestResult
-from app.ml.model_registry import ModelRegistryService
-from app.services.index_engine import IndexEngine
-from app.services.diagnostics_service import DiagnosticsService
 
 router = APIRouter(prefix="/system", tags=["System Diagnostics"])
 
@@ -22,6 +19,7 @@ async def get_system_diagnostics(
     current_user: UserContext = Depends(require_viewer),
 ):
     # 1. Database Check
+    from app.ml.model_registry import ModelRegistryService
     db_connected = False
     try:
         await db.execute(text("SELECT 1"))
@@ -55,6 +53,7 @@ async def run_system_self_test(
 ):
     """Executes a small non-destructive end-to-end integration test of the complete vertical slice:
     DB read/write -> Raw Ingestion -> Normalization -> Validation -> Deduplication -> FareGuard -> PriceGuard -> APIx."""
+    from app.ml.model_registry import ModelRegistryService
     test_results = []
 
     # Test 1: Database Write/Read
@@ -118,6 +117,7 @@ async def get_supabase_diagnostics(
     supabase project / realtime / storage / auth configuration, latest migration, and
     raw/validated fare counts + latest collection.
     """
+    from app.services.diagnostics_service import DiagnosticsService
     service = DiagnosticsService(db)
     data = await service.build_diagnostics()
     return APIResponse(success=True, data=data)
@@ -133,6 +133,7 @@ async def run_realtime_self_test(
     QUEUED -> RUNNING -> COMPLETED (the events Supabase Realtime broadcasts), verify the
     DB write, and clean up. Does not require a connected browser.
     """
+    from app.services.diagnostics_service import DiagnosticsService
     service = DiagnosticsService(db)
     result = await service.realtime_self_test()
     return APIResponse(success=result["success"], data=result)
