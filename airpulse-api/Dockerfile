@@ -7,6 +7,13 @@ ENV PYTHONUNBUFFERED=1 \
     YATRA_BROWSER_HEADLESS=false \
     YATRA_DISABLE_HTTP2=true
 
+# Limit numerical-library thread pools when analytics is loaded beside Chrome.
+ENV OMP_NUM_THREADS=1 \
+    OPENBLAS_NUM_THREADS=1 \
+    MKL_NUM_THREADS=1 \
+    NUMEXPR_NUM_THREADS=1 \
+    MALLOC_ARENA_MAX=2
+
 WORKDIR /app
 
 # Install system dependencies
