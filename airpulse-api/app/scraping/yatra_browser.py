@@ -3,7 +3,9 @@
 No direct trigger URL, shared browser, stealth, or retry after an access block.
 """
 import hashlib
+import asyncio
 import logging
+from weakref import WeakKeyDictionary
 import re
 import time
 from contextlib import suppress
@@ -19,6 +21,7 @@ from app.scraping.adapters.yatra import parse_inr_price
 from app.services.browser_service import get_shared_browser_service
 
 CARDS = '.flightItem:not(.banner) .flight-det'
+_browser_slots = WeakKeyDictionary()
 
 
 def date_label(day):
@@ -159,6 +162,13 @@ class YatraBrowserCollector:
         await page.get_by_text('Done',exact=True).click()
 
     async def execute(self,request):
+        # Probe requests and durable jobs share a single Chrome slot per API process.
+        loop = asyncio.get_running_loop()
+        slot = _browser_slots.setdefault(loop, asyncio.Lock())
+        async with slot:
+            return await self._execute(request)
+
+    async def _execute(self,request):
         started = time.monotonic()
         browser = None
         page = None
