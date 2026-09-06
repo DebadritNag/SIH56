@@ -1,7 +1,7 @@
 from datetime import date
 from typing import Optional
 from uuid import UUID
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import EntityNotFoundException
 from app.core.pagination import PaginatedResponse, PaginationMeta, PaginationParams
@@ -63,14 +63,20 @@ async def calculate_index_on_demand(
     db: AsyncSession = Depends(get_db),
     current_user: UserContext = Depends(require_analyst),
 ):
-    engine = IndexEngine(db)
-    res = await engine.calculate_daily_index(
-        index_date=req.index_date,
-        basket_version=req.basket_version or "domestic-basket-2026Q3",
-        methodology_version=req.methodology_version or "apix-v1.2",
-    )
+    from uuid import uuid4
+    from app.core.utils import utc_now
+    from app.services.live_processing import calculate_live_index
+    if req.index_date != utc_now().date() or req.scope.value != 'national' or req.frequency.value != 'daily':
+        raise HTTPException(422, 'Observed live index calculation supports the current national daily basket')
+    from app.services.live_store import rows
+    baskets = await rows(db,'SELECT version FROM index_baskets WHERE active ORDER BY created_at DESC LIMIT 1')
+    if req.basket_version and (not baskets or baskets[0]['version'] != req.basket_version):
+        raise HTTPException(422, 'Requested basket is not the active observed-fare basket')
+    if req.methodology_version and req.methodology_version != 'apix-live-matched-v1':
+        raise HTTPException(422, 'Requested methodology is not supported by this observed-fare calculator')
+    res = await calculate_live_index(db,uuid4())
     await db.commit()
-    return APIResponse(success=True, data=AirfareIndexResponse.model_validate(res))
+    return APIResponse(success=True, data=res)
 
 
 @router.get('/{index_id}/components', response_model=APIResponse)
