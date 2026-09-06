@@ -377,6 +377,16 @@ class LiveScraper:
                 result.update(collector_version='yatra-homepage-v1',browser_engine='Google Chrome',
                     browser_version=resolved.metadata.get('browser_version'),
                     browser_launch_status=resolved.metadata.get('browser_launch_status'))
+                if resolved.failure_code == 'NETWORK_ERROR':
+                    disabled = resolved.metadata.get('http2_disabled', False)
+                    result['recommended_remediation'] = (
+                        f"Effective Chrome setting: YATRA_DISABLE_HTTP2={str(disabled).lower()}. "
+                        + ("HTTP/2 compatibility mode was already enabled. The homepage connection still failed; "
+                           "this run does not establish Yatra availability from the deployed host. "
+                           if disabled else
+                           "Set YATRA_DISABLE_HTTP2=true in Render and redeploy to test HTTP/1.1 compatibility. ")
+                        + "No results were collected and no automatic navigation retry was made."
+                    )
             if resolved.status == "SUCCESS" and resolved.quotes:
                 result.update(status="PARTIAL", quotes=resolved.quotes, quotes_found=len(resolved.quotes),
                               failure_stage=None, failure_reason=None,

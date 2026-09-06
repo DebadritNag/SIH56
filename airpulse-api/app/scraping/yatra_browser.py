@@ -3,6 +3,7 @@
 No direct trigger URL, shared browser, stealth, or retry after an access block.
 """
 import hashlib
+import logging
 import re
 import time
 from contextlib import suppress
@@ -172,6 +173,11 @@ class YatraBrowserCollector:
                     launch_options = dict(channel='chrome', headless=settings.YATRA_BROWSER_HEADLESS)
                     if settings.YATRA_DISABLE_HTTP2:
                         launch_options['args'] = ['--disable-http2']
+                    logging.getLogger(__name__).info(
+                        'Yatra Chrome launch: headless=%s http2_disabled=%s args=%s',
+                        settings.YATRA_BROWSER_HEADLESS, settings.YATRA_DISABLE_HTTP2,
+                        launch_options.get('args', []),
+                    )
                     browser = await pw.chromium.launch(**launch_options)
                     self.browser_version = browser.version
                     context = await browser.new_context(locale='en-IN')
