@@ -121,8 +121,8 @@ class YatraAdapter(SourceAdapter):
         return True
 
     def requires_javascript(self, request: SearchRequest) -> bool:
-        """AUTO mode attempts Scrapy HTTP collection first."""
-        return False
+        """The observed homepage search requires React control interactions."""
+        return True
 
     def build_url(self, request: SearchRequest) -> str:
         """

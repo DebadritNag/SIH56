@@ -163,7 +163,7 @@ async def consume_one(session_factory=AsyncSessionLocal):
             await db.commit()
             await rows(db,'SELECT id FROM pipeline_runs WHERE id=:id FOR UPDATE',id=job['id'])
             if job['pipeline_type']=='live_acquisition':
-                result = await asyncio.wait_for(execute_acquisition(db,job),timeout=90)
+                result = await asyncio.wait_for(execute_acquisition(db,job),timeout=180)
             else:
                 from app.services.live_processing import process_live_fares
                 # Serialize canonical dedup and index writes across consumers.

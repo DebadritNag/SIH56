@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     # Runtime environment (development | staging | production)
     ENVIRONMENT: str = "development"
     YATRA_PROTOTYPE_ENABLED: bool = False
+    YATRA_BROWSER_HEADLESS: bool = False
+    YATRA_SAVE_DIAGNOSTICS: bool = False
     LIVE_WORKER_ENABLED: bool = True
     YATRA_REVIEW_NOTES: str = ""
 

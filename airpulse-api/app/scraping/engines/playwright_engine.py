@@ -116,6 +116,10 @@ class PlaywrightEngine(BaseCollectionEngine):
                 stop_reason=metrics["stop_reason"],
             )
 
+        if adapter.source_id == 'yatra':
+            from app.scraping.yatra_browser import YatraBrowserCollector
+            return await YatraBrowserCollector().execute(request)
+
         browser_service = get_shared_browser_service()
         # Capability starts UNAVAILABLE before the lazy browser has been resolved.
         try:

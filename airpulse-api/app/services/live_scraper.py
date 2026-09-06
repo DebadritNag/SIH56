@@ -373,6 +373,10 @@ class LiveScraper:
                                           results_seen=resolved.results_seen, results_matching=resolved.results_matching,
                                           results_collected=resolved.results_collected, stop_reason=resolved.stop_reason)
             result["metadata"] = resolved.metadata
+            if resolved.metadata.get('workflow') == 'homepage-one-way':
+                result.update(collector_version='yatra-homepage-v1',browser_engine='Google Chrome',
+                    browser_version=resolved.metadata.get('browser_version'),
+                    browser_launch_status=resolved.metadata.get('browser_launch_status'))
             if resolved.status == "SUCCESS" and resolved.quotes:
                 result.update(status="PARTIAL", quotes=resolved.quotes, quotes_found=len(resolved.quotes),
                               failure_stage=None, failure_reason=None,
