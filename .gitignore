@@ -85,3 +85,9 @@ goibibo-*.csv
 *Annexure*.xlsx
 Annexures_*.xlsx
 *.csv
+
+# ---------------------------------------------------------------------------
+# SQL migration files (applied to Supabase directly via MCP; not tracked)
+# ---------------------------------------------------------------------------
+*.sql
+airpulse-api/supabase/migrations/
