@@ -38,8 +38,16 @@ async def lifespan(app: FastAPI):
         import logging
         logging.getLogger("airpulse").warning("Browser engine self-test dispatch encountered an exception: %s", exc)
 
+    from app.services.live_acquisition import worker_loop
+    worker = asyncio.create_task(worker_loop()) if settings.LIVE_WORKER_ENABLED else None
     yield
     # Shutdown
+    if worker:
+        worker.cancel()
+        try:
+            await worker
+        except asyncio.CancelledError:
+            pass
     await engine.dispose()
 
 
@@ -157,4 +165,3 @@ async def root_health_check():
 async def root_readiness_check():
     from app.api.v1.health import readiness_check
     return await readiness_check()
-

@@ -122,13 +122,11 @@ async def get_dashboard_summary(
         0,
     )
 
-    # Index derived from real median fare when available (indexed to a base fare of 5000 = 100).
-    if has_real and median_fare:
-        computed_index = round((median_fare / 5000.0) * 100.0, 2)
-        source_note = "AirPulse validated fares (live)"
-    else:
-        computed_index = 108.43
-        source_note = "representative (no fares in selection)"
+    from app.services.live_store import rows as stored_rows
+    stored = await stored_rows(db, "SELECT * FROM airfare_index WHERE index_type='national' ORDER BY index_date DESC,calculated_at DESC LIMIT 1")
+    latest = stored[0] if stored else {}
+    computed_index = float(latest['index_value']) if latest else None
+    source_note = "Persisted APIx" if latest else "No calculated APIx available"
 
     summary = {
         "filters_applied": {
@@ -140,9 +138,9 @@ async def get_dashboard_summary(
         "latest_index": computed_index,
         "median_fare": round(median_fare, 2) if median_fare else None,
         "avg_fare": round(avg_fare, 2) if avg_fare else None,
-        "daily_change_pct": 0.0 if has_real else 1.24,
-        "weekly_change_pct": 0.0 if has_real else 2.23,
-        "monthly_change_pct": 0.0 if has_real else 4.82,
+        "daily_change_pct": latest.get("daily_change_pct"),
+        "weekly_change_pct": latest.get("weekly_change_pct"),
+        "monthly_change_pct": latest.get("monthly_change_pct"),
         "active_routes": active_routes,
         "quotes_24h": real_count,
         "observations_total": real_count,
@@ -153,7 +151,7 @@ async def get_dashboard_summary(
         "healthy_sources": total_sources,
         "total_sources": total_sources,
         "coverage_quality_score": round(min(0.99, 0.6 + real_routes * 0.1), 3) if has_real else 0.0,
-        "market_pressure": "ELEVATED" if computed_index > 107 else ("STABLE" if computed_index < 103 else "MODERATE"),
+        "market_pressure": "UNKNOWN" if computed_index is None else ("ELEVATED" if computed_index > 107 else ("STABLE" if computed_index < 103 else "MODERATE")),
         "data_confidence_pct": 100.0 if has_real else 0.0,
     }
     return APIResponse(success=True, data=summary)
@@ -170,39 +168,18 @@ async def get_index_trend(
     db: AsyncSession = Depends(get_db),
     current_user: UserContext = Depends(require_viewer),
 ):
-    """Real index trend: daily median normalized fare (indexed) grouped by departure date.
-    Falls back to an empty series (honest) when no fares match — the frontend then shows
-    an explicit empty/represenative state rather than fake data."""
-    selected_windows = _parse_int_list(booking_windows) or [1, 7, 15, 30, 45]
-    route_list = _parse_str_list(routes)
-    conds = _fare_conditions(from_date, to_date, selected_windows, route_list)
-
-    day = func.date(ValidatedFare.departure_at)
-    q = select(
-        day.label("d"),
-        func.percentile_cont(0.5).within_group(ValidatedFare.normalized_total_fare).label("med"),
-        func.count(ValidatedFare.id).label("n"),
-    )
-    if conds:
-        q = q.where(and_(*conds))
-    q = q.group_by(day).order_by(day)
-
-    trend: List[Dict[str, Any]] = []
-    try:
-        rows = (await db.execute(q)).all()
-        for r in rows:
-            med = float(r.med) if r.med is not None else 0.0
-            idx = round((med / 5000.0) * 100.0, 2)
-            trend.append({
-                "date": r.d.isoformat() if hasattr(r.d, "isoformat") else str(r.d),
-                "index_value": idx, "apix": idx,
-                "median_fare": round(med, 2), "sample_count": int(r.n),
-                "coverage_pct": 100.0,
-            })
-    except Exception:
-        await db.rollback()
-
-    return APIResponse(success=True, data=trend)
+    from app.services.live_store import rows as stored_rows
+    # The stored national basket is not a route-filtered index.
+    if routes or sources or booking_windows:
+        return APIResponse(success=True, data=[])
+    records = await stored_rows(db, """SELECT DISTINCT ON (index_date) * FROM airfare_index
+        WHERE index_type='national' AND (CAST(:start AS date) IS NULL OR index_date>=CAST(:start AS date))
+        AND (CAST(:end AS date) IS NULL OR index_date<=CAST(:end AS date))
+        ORDER BY index_date,calculated_at DESC""", start=from_date, end=to_date)
+    return APIResponse(success=True, data=[dict(date=str(r['index_date']),
+        index_value=float(r['index_value']), apix=float(r['index_value']),
+        sample_count=(r['metadata'] or {}).get('sample_count', 0),
+        coverage_pct=float((r['metadata'] or {}).get('matched_weight_coverage', 0))*100) for r in records])
 
 
 @router.get("/top-route-movements", response_model=APIResponse)

@@ -269,8 +269,8 @@ export default function OverviewPage() {
             className="h-full"
             basePeriod={
               isFiltered
-                ? `Filtered APIx (${filters.bookingWindows.length}/5 windows)`
-                : 'Base: Aug 2026 = 100.00'
+                ? 'National basket; selection does not recalculate APIx'
+                : 'Configured observed-fare base period'
             }
           />
         </div>
@@ -282,17 +282,17 @@ export default function OverviewPage() {
             value={formatPercent(dashboardSummary.monthly_change_pct, { includeSign: true })}
             subtitle="vs Previous 30-Day Index"
             change={{
-              value: `${dashboardSummary.daily_change_pct > 0 ? '↑' : '↓'} ${Math.abs(
-                dashboardSummary.daily_change_pct
+              value: `${(dashboardSummary.daily_change_pct ?? 0) > 0 ? '↑' : '↓'} ${Math.abs(
+                (dashboardSummary.daily_change_pct ?? 0)
               ).toFixed(2)} pp`,
-              type: dashboardSummary.daily_change_pct > 0 ? 'positive' : 'negative',
+              type: (dashboardSummary.daily_change_pct ?? 0) > 0 ? 'positive' : 'negative',
               label: 'momentum',
             }}
             footer={
               <div className="flex items-center justify-between text-[11px]">
                 <span className="text-[#667085]">Daily Shift:</span>
                 <span className="font-semibold text-emerald-700">
-                  {dashboardSummary.daily_change_pct > 0 ? '+' : ''}
+                  {(dashboardSummary.daily_change_pct ?? 0) > 0 ? '+' : ''}
                   {dashboardSummary.daily_change_pct}%
                 </span>
               </div>

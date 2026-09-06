@@ -5,10 +5,10 @@ import { MarketPressureBadge } from './Badge';
 import { MarketPressure } from '@/types';
 
 interface PrimaryIndexCardProps {
-  indexValue: number;
+  indexValue: number | null;
   basePeriod?: string;
-  dailyChange: number;
-  monthlyChange: number;
+  dailyChange: number | null;
+  monthlyChange: number | null;
   confidenceScore: number;
   pressure: MarketPressure;
   className?: string;
@@ -40,7 +40,7 @@ export const PrimaryIndexCard: React.FC<PrimaryIndexCardProps> = ({
       <div className="my-3 flex items-baseline justify-between">
         <div>
           <div className="text-4xl font-bold text-[#101828] tabular-nums tracking-tight">
-            {indexValue.toFixed(2)}
+            {indexValue?.toFixed(2) ?? "Unavailable"}
           </div>
           <span className="text-xs text-[#667085] font-medium">{basePeriod}</span>
         </div>
@@ -49,10 +49,10 @@ export const PrimaryIndexCard: React.FC<PrimaryIndexCardProps> = ({
         <div className="flex flex-col items-end gap-1">
           <div className="flex items-center gap-1 text-sm font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded border border-emerald-200 tabular-nums">
             <ArrowUpRight className="w-4 h-4 text-emerald-600" />
-            +{dailyChange.toFixed(2)}% Today
+            {dailyChange == null ? "Daily change unavailable" : `${dailyChange >= 0 ? "+" : ""}${dailyChange.toFixed(2)}% Today`}
           </div>
           <div className="text-xs text-[#475467] font-medium tabular-nums">
-            +{monthlyChange.toFixed(2)}% in 30 Days
+            {monthlyChange == null ? "Monthly change unavailable" : `${monthlyChange >= 0 ? "+" : ""}${monthlyChange.toFixed(2)}% in 30 Days`}
           </div>
         </div>
       </div>

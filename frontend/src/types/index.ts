@@ -4,6 +4,7 @@ export type AnomalySeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 export type AnomalyStatus = 'open' | 'investigating' | 'confirmed' | 'dismissed';
 export type PipelineStatus = 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'PARTIAL' | 'FAILED';
 export type MarketPressure =
+  | 'UNKNOWN'
   | 'NORMAL'
   | 'ELEVATED'
   | 'HIGH PRESSURE'
@@ -13,10 +14,10 @@ export type MarketPressure =
   | 'COLLAPSING';
 
 export interface DashboardSummary {
-  latest_index: number;
-  daily_change_pct: number;
-  weekly_change_pct: number;
-  monthly_change_pct: number;
+  latest_index: number | null;
+  daily_change_pct: number | null;
+  weekly_change_pct: number | null;
+  monthly_change_pct: number | null;
   active_routes: number;
   quotes_24h: number;
   open_anomalies: number;

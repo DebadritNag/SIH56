@@ -13,6 +13,7 @@ from uuid import uuid4
 
 import pandas as pd
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.utils import bucket_from_lead_days, utc_now
 from app.services.live_store import rows, insert, audit
@@ -22,12 +23,16 @@ IST = timezone(timedelta(hours=5, minutes=30))
 
 def normalize_quote(raw):
     q = raw['raw_payload']
+    if raw.get('data_origin') != 'LIVE':
+        raise ValueError('Live ingestion accepts only live raw observations')
     observed = datetime.fromisoformat(q['provenance']['observed_at'].replace('Z', '+00:00'))
     if observed.tzinfo is None:
         raise ValueError('Observation timestamp has no timezone')
     origin, destination = q['origin'], q['destination']
     if origin == destination or len(origin) != 3 or len(destination) != 3:
         raise ValueError('Invalid route')
+    if origin != raw['origin_requested'] or destination != raw['destination_requested'] or str(q['departure_date']) != str(raw['departure_requested']):
+        raise ValueError('Observed itinerary does not match the collection request')
     if q.get('currency') != 'INR':
         raise ValueError('Unsupported currency')
     amount = Decimal(str(q['gross_total']))
@@ -45,7 +50,8 @@ def normalize_quote(raw):
     if days < 0:
         raise ValueError('Departure precedes observation date')
     fingerprint = '|'.join(map(str, [raw['source_id'], origin, destination, departure.isoformat(),
-                                    q['carrier'], q.get('flight_number'), amount, q.get('cabin_class', 'economy')]))
+                                    q['carrier'], q.get('flight_number'), amount, q.get('cabin_class', 'economy'),
+                                    observed.astimezone(IST).date()]))
     return dict(raw_fare_id=raw['id'], collection_run_id=raw['collection_run_id'], source_id=raw['source_id'],
                 data_origin='LIVE', airline=q['carrier'], flight_number=q.get('flight_number'),
                 origin=origin, destination=destination, departure_at=departure, arrival_at=arrival,
@@ -61,7 +67,9 @@ async def calculate_live_index(db, pipeline_id):
     if not baskets or not baskets[0]['base_period_start'] or not baskets[0]['base_period_end']:
         return {'status': 'INSUFFICIENT_DATA', 'reason': 'No configured observed base period'}
     basket = baskets[0]
-    weights = await rows(db, 'SELECT * FROM index_basket_routes WHERE basket_id=:id AND weight>0', id=basket['id'])
+    weights = await rows(db, '''SELECT * FROM index_basket_routes WHERE basket_id=:id AND weight>0
+        AND (effective_from IS NULL OR effective_from<=CURRENT_DATE)
+        AND (effective_to IS NULL OR effective_to>=CURRENT_DATE)''', id=basket['id'])
     today = utc_now().date()
     fares = await rows(db, """SELECT v.* FROM validated_fares v
         WHERE v.validation_status='VALID' AND NOT v.is_duplicate AND v.cabin='economy'
@@ -174,6 +182,7 @@ async def process_live_fares(db, run_id, pipeline_id):
     await stage('FEATURES',len(feature_rows),message='Only prior observed fares used; missing external features retained as null')
 
     predicted, scored, explained = 0, 0, 0
+    scoring_outcomes = []
     from app.ml.model_registry import ModelRegistryService
     import asyncio
     try:
@@ -195,14 +204,18 @@ async def process_live_fares(db, run_id, pipeline_id):
             frame.loc[i,'residual_pct'] = 100*residual/prediction
             pairs.append((i,fare,prediction_id))
             predicted += 1
-        await stage('FAREGUARD',predicted)
+        await stage('FAREGUARD',predicted,'COMPLETED' if predicted == len(feature_rows) else 'SKIPPED',
+                    '' if predicted == len(feature_rows) else 'Model returned invalid/non-positive expectations; outputs withheld')
+        if not pairs:
+            raise ValueError('NO_VALID_FAREGUARD_PREDICTIONS')
         pg = ModelRegistryService.get_priceguard()
-        if not pg.is_trained or pg.training_scores is None or not pairs:
+        if not pg.is_trained or pg.training_scores is None:
             raise ValueError('PRICEGUARD_MODEL_UNAVAILABLE')
         scores = await asyncio.to_thread(pg.score_batch,frame.loc[[i for i,_,_ in pairs]])
-        explainer = ModelRegistryService.get_explainer()
+        anomalous = []
         for (i,fare,pred_id), score in zip(pairs,scores):
             scored += 1
+            scoring_outcomes.append({'fare_id':str(fare['id']),**score})
             if not score['is_anomaly']:
                 continue
             anom_id = await insert(db,'anomalies',fare_id=fare['id'],prediction_id=pred_id,
@@ -211,27 +224,38 @@ async def process_live_fares(db, run_id, pipeline_id):
                 anomaly_percentile=score['anomaly_percentile'],actual_fare=float(fare['total_fare']),
                 expected_fare=float(frame.loc[i,'predicted_fare']),residual=float(frame.loc[i,'residual']),
                 residual_pct=float(frame.loc[i,'residual_pct']),evidence={'data_origin':'LIVE','pipeline_run_id':str(pipeline_id)})
-            if explainer.explainer is not None:
-                explanation = await asyncio.to_thread(explainer.explain_fare,frame.loc[i],
-                    float(fare['total_fare']),float(frame.loc[i,'predicted_fare']),score['anomaly_percentile'])
-                await insert(db,'shap_explanations',anomaly_id=anom_id,model_version=fg.version,
-                    base_value=explanation['base_value'],predicted_value=explanation['predicted_fare'],features=explanation['drivers'])
-                explained += 1
+            anomalous.append((anom_id,i,fare,score))
             await insert(db,'alerts',alert_type='FARE_ANOMALY',severity=score['severity'].upper(),status='OPEN',
                 title='Live fare requires analyst review',message='Statistically unusual valid fare; not automatically excluded from APIx.',
                 route_id=fare['route_id'],source_id=fare['source_id'],anomaly_id=anom_id,
                 metadata={'pipeline_run_id':str(pipeline_id)})
-        await stage('PRICEGUARD',scored)
+        await stage('PRICEGUARD',scored,metadata={'scores':scoring_outcomes})
+        if anomalous:
+            explainer = ModelRegistryService.get_explainer()
+            if explainer.explainer is None:
+                raise ValueError('SHAP_EXPLAINER_UNAVAILABLE')
+            for anom_id,i,fare,score in anomalous:
+                explanation = await asyncio.to_thread(explainer.explain_fare,frame.loc[i],
+                    float(fare['total_fare']),float(frame.loc[i,'predicted_fare']),score['anomaly_percentile'])
+                for driver in explanation['drivers']:
+                    if isinstance(driver.get('value'),float) and not math.isfinite(driver['value']):
+                        driver['value'] = None
+                await insert(db,'shap_explanations',anomaly_id=anom_id,model_version=fg.version,
+                    base_value=explanation['base_value'],predicted_value=explanation['predicted_fare'],features=explanation['drivers'])
+                explained += 1
         await stage('SHAP',explained, message='Only actual TreeExplainer outputs persisted')
+    except SQLAlchemyError:
+        # Persistence errors invalidate the transaction and must fail the job.
+        raise
     except Exception as exc:
         # Model errors must not manufacture outputs or abort the index branch.
         for name in ('FAREGUARD','PRICEGUARD','SHAP'):
             if not any(s['stage']==name for s in stages):
                 await stage(name,0,'SKIPPED',str(exc)[:300])
 
-    index = await calculate_live_index(db,pipeline_id)
+    index = await calculate_live_index(db,pipeline_id) if accepted else {'status':'INSUFFICIENT_DATA','reason':'No new valid observations in this run'}
     await stage('APIX',1 if index['status']=='COMPLETED' else 0,
-                'COMPLETED' if index['status']=='COMPLETED' else 'SKIPPED',metadata=index)
+                'COMPLETED' if index['status']=='COMPLETED' else 'SKIPPED',message=index.get('reason',''),metadata=index)
     await stage('ALERTS',len(await rows(db,"SELECT id FROM alerts WHERE metadata->>'pipeline_run_id'=:id",id=str(pipeline_id))))
     return dict(records_input=len(raw),records_processed=len(accepted),records_failed=len(rejected),
                 duplicates=duplicates,fareguard_scored=predicted,priceguard_scored=scored,shap_count=explained,

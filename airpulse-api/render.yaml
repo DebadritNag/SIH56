@@ -21,8 +21,14 @@ services:
         value: INFO
       - key: AUTH_STRICT
         value: "true"
+      - key: LIVE_WORKER_ENABLED
+        value: "true"
+      - key: YATRA_PROTOTYPE_ENABLED
+        value: "true"
+      - key: YATRA_REVIEW_NOTES
+        value: "Operator-requested bounded Yatra research prototype; max 15 observations, no challenge bypass, no automatic failed-request retries."
       - key: PLAYWRIGHT_BROWSERS_PATH
-        value: "/ms-playwright"
+        value: "/opt/render/project/src/airpulse-api/.cache/ms-playwright"
       - key: MEMORY_CONSTRAINED
         value: "true"
       # CORS: set to your deployed frontend origin(s), comma-separated

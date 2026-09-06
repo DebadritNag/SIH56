@@ -20,7 +20,8 @@ export function formatINR(val: number, options?: { compact?: boolean }): string 
   }).format(val);
 }
 
-export function formatPercent(val: number, options?: { includeSign?: boolean; decimals?: number }): string {
+export function formatPercent(val: number | null, options?: { includeSign?: boolean; decimals?: number }): string {
+  if (val == null) return "Unavailable";
   if (val === undefined || val === null || isNaN(val)) return '0.00%';
   const decimals = options?.decimals ?? 2;
   const sign = options?.includeSign && val > 0 ? '+' : '';

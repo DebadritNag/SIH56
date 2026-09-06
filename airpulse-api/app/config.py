@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     # Runtime environment (development | staging | production)
     ENVIRONMENT: str = "development"
     YATRA_PROTOTYPE_ENABLED: bool = False
+    LIVE_WORKER_ENABLED: bool = True
     YATRA_REVIEW_NOTES: str = ""
 
     # Supabase PostgreSQL (asyncpg for async, psycopg2 for sync/migrations)

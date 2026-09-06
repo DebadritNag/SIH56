@@ -19,7 +19,7 @@ from app.services.index_engine import IndexEngine
 router = APIRouter(prefix="/index", tags=["Index"])
 
 
-@router.get("", response_model=PaginatedResponse[AirfareIndexResponse])
+@router.get("")
 async def list_indices(
     frequency: str = Query("daily"),
     scope: str = Query("national"),
@@ -30,28 +30,16 @@ async def list_indices(
     db: AsyncSession = Depends(get_db),
     current_user: UserContext = Depends(require_viewer),
 ):
-    repo = IndexRepository(db)
-    items, total = await repo.query_indices(
-        frequency=frequency,
-        scope=scope,
-        scope_id=scope_id,
-        start_date=start_date,
-        end_date=end_date,
-        limit=pagination.page_size,
-        offset=pagination.offset,
-    )
-    total_pages = (total + pagination.page_size - 1) // pagination.page_size
-
-    return PaginatedResponse(
-        success=True,
-        data=[AirfareIndexResponse.model_validate(i) for i in items],
-        meta=PaginationMeta(
-            page=pagination.page,
-            page_size=pagination.page_size,
-            total=total,
-            total_pages=total_pages,
-        ),
-    )
+    from app.services.live_store import rows
+    where = """index_type=:scope AND (CAST(:scope_id AS text) IS NULL OR route_id::text=CAST(:scope_id AS text))
+        AND (CAST(:start AS date) IS NULL OR index_date>=:start)
+        AND (CAST(:end AS date) IS NULL OR index_date<=:end)"""
+    params = dict(scope=scope,scope_id=scope_id,start=start_date,end=end_date)
+    items = await rows(db,f"SELECT * FROM airfare_index WHERE {where} ORDER BY index_date DESC,calculated_at DESC LIMIT :limit OFFSET :offset",
+                       **params,limit=pagination.page_size,offset=pagination.offset)
+    total = (await rows(db,f"SELECT count(*) AS n FROM airfare_index WHERE {where}",**params))[0]['n']
+    return dict(success=True,data=items,meta=dict(page=pagination.page,page_size=pagination.page_size,
+        total=total,total_pages=(total+pagination.page_size-1)//pagination.page_size))
 
 
 @router.get("/latest", response_model=APIResponse)
@@ -62,25 +50,11 @@ async def get_latest_index(
     db: AsyncSession = Depends(get_db),
     current_user: UserContext = Depends(require_viewer),
 ):
-    repo = IndexRepository(db)
-    index_rec = await repo.get_latest(frequency=frequency, scope=scope, scope_id=scope_id)
-    if not index_rec:
-        # Fallback default representation
-        return APIResponse(
-            success=True,
-            data={
-                "index_date": str(date.today()),
-                "frequency": frequency,
-                "scope": scope,
-                "index_value": 108.43,
-                "base_value": 100.0,
-                "weighted_average_fare": 6240.50,
-                "route_count": 20,
-                "coverage_quality_score": 0.94,
-                "methodology_version": "apix-v1.2",
-            },
-        )
-    return APIResponse(success=True, data=AirfareIndexResponse.model_validate(index_rec))
+    from app.services.live_store import rows
+    records = await rows(db, """SELECT * FROM airfare_index WHERE index_type=:scope
+        AND (CAST(:scope_id AS text) IS NULL OR route_id::text=CAST(:scope_id AS text))
+        ORDER BY index_date DESC,calculated_at DESC LIMIT 1""", scope=scope, scope_id=scope_id)
+    return APIResponse(success=True, data=records[0] if records else None)
 
 
 @router.post("/calculate", response_model=APIResponse)
@@ -97,3 +71,10 @@ async def calculate_index_on_demand(
     )
     await db.commit()
     return APIResponse(success=True, data=AirfareIndexResponse.model_validate(res))
+
+
+@router.get('/{index_id}/components', response_model=APIResponse)
+async def persisted_components(index_id: UUID, db: AsyncSession = Depends(get_db), current_user: UserContext = Depends(require_viewer)):
+    from app.services.live_store import rows
+    return APIResponse(success=True, data=await rows(db, '''SELECT c.*,r.route_code FROM index_components c
+        JOIN routes r ON r.id=c.route_id WHERE airfare_index_id=:id ORDER BY r.route_code,c.booking_window_days''',id=index_id))

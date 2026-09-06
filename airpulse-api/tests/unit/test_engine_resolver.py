@@ -26,6 +26,53 @@ from app.scraping.engines.scrapy_engine import ScrapyEngine
 from app.scraping.resolver import EngineResolver
 
 
+def test_live_request_rejects_invalid_scope():
+    from app.api.v1.live import LiveRequest
+    from datetime import timedelta
+    from pydantic import ValidationError
+    with pytest.raises(ValidationError):
+        LiveRequest(origin='DEL',destination='DEL',departure_date=date.today()+timedelta(days=7))
+    with pytest.raises(ValidationError):
+        LiveRequest(origin='DEL',destination='BOM',departure_date=date.today()-timedelta(days=1))
+    with pytest.raises(ValidationError):
+        LiveRequest(origin='DEL',destination='BOM',departure_date=date.today()+timedelta(days=7),max_results=16)
+
+
+def test_live_canonical_provenance_and_daily_dedup():
+    from app.services.live_processing import normalize_quote
+    from datetime import datetime, timezone, timedelta
+    from uuid import uuid4
+    now = datetime.now(timezone.utc)
+    depart = (now+timedelta(days=7)).date()
+    raw = dict(id=uuid4(),source_id=uuid4(),collection_run_id=uuid4(),data_origin='LIVE',
+        origin_requested='DEL',destination_requested='BOM',departure_requested=depart,
+        raw_payload=dict(origin='DEL',destination='BOM',currency='INR',gross_total=6500,
+            carrier='Example',flight_number='TEST123',departure_date=str(depart),departure_time='12:30',
+            provenance={'observed_at':now.isoformat()}))
+    first = normalize_quote(raw)
+    assert first['base_fare'] is None and first['taxes'] is None
+    assert first['total_fare']==6500 and first['collected_at']==now
+    assert normalize_quote(raw)['quote_hash']==first['quote_hash']
+    raw['raw_payload']['provenance']['observed_at']=(now+timedelta(days=1)).isoformat()
+    assert normalize_quote(raw)['quote_hash']!=first['quote_hash']
+    raw['data_origin']='IMPORTED'
+    with pytest.raises(ValueError,match='only live'):
+        normalize_quote(raw)
+
+
+@pytest.mark.asyncio
+async def test_live_policy_failure_has_no_collection_engine(monkeypatch):
+    from app.config import settings
+    from app.services.live_scraper import LiveScraper
+    from datetime import timedelta
+    monkeypatch.setattr(settings,'YATRA_PROTOTYPE_ENABLED',False)
+    result = await LiveScraper().run(source_name='yatra',source_type='ota',origin='DEL',destination='BOM',
+        departure=date.today()+timedelta(days=7),booking_window_days=7,engine='AUTO',max_results=10)
+    assert result['failure_stage']=='POLICY_RESTRICTED'
+    assert result['collection_engine']=='NONE'
+    assert result['stop_reason']=='POLICY_RESTRICTED'
+
+
 @pytest.mark.asyncio
 async def test_yatra_subprocess_uses_source_parser():
     from app.scraping.adapters.yatra import YatraAdapter

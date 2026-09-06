@@ -25,7 +25,8 @@ import type {
   BackendSystemDiagnostics,
 } from "@/lib/api/endpoints";
 
-function derivePressure(monthlyChange: number): DashboardSummary["market_pressure"] {
+function derivePressure(monthlyChange: number | null): DashboardSummary["market_pressure"] {
+  if (monthlyChange == null) return "UNKNOWN";
   if (monthlyChange >= 6) return "SURGING";
   if (monthlyChange >= 3) return "ELEVATED";
   if (monthlyChange <= -3) return "COLLAPSING";
@@ -55,7 +56,7 @@ export function mapDashboardSummary(b: BackendDashboardSummary): DashboardSummar
 }
 
 export function mapNationalTrend(points: BackendIndexTrendPoint[]): NationalTrendPoint[] {
-  if (!points || points.length === 0) return mockNationalTrend;
+  if (!points || points.length === 0) return [];
   return points.map((p, i) => {
     const prev = i > 0 ? points[i - 1].index_value : p.index_value;
     const daily = prev ? ((p.index_value - prev) / prev) * 100 : 0;

@@ -9,10 +9,10 @@ import { getData, getPaginated, postData, patchData, type Paginated } from "@/li
 
 // --- Raw backend response shapes --------------------------------------------
 export interface BackendDashboardSummary {
-  latest_index: number;
-  daily_change_pct: number;
-  weekly_change_pct: number;
-  monthly_change_pct: number;
+  latest_index: number | null;
+  daily_change_pct: number | null;
+  weekly_change_pct: number | null;
+  monthly_change_pct: number | null;
   active_routes: number;
   quotes_24h: number;
   open_anomalies: number;

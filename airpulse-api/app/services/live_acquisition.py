@@ -8,7 +8,7 @@ import asyncio
 import hashlib
 import json
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta
 from uuid import UUID, uuid4
 
 from sqlalchemy import text
@@ -28,7 +28,7 @@ async def enqueue_collection(db, request, actor=None):
     if source is None:
         raise ValueError('Requested source is not an enabled live prototype')
     # Serialize launch decisions per source across workers; prevent duplicate busy runs.
-    await rows(db, 'SELECT id FROM sources WHERE id=:id FOR UPDATE', id=source['id'])
+    source = (await rows(db, 'SELECT * FROM sources WHERE id=:id FOR UPDATE', id=source['id']))[0]
     busy = await rows(db, """SELECT p.id FROM pipeline_runs p JOIN collection_runs c ON c.id=p.collection_run_id
         WHERE c.source_id=:source AND p.pipeline_type='live_acquisition' AND p.status IN ('QUEUED','RUNNING') LIMIT 1""", source=source['id'])
     if busy:
@@ -55,8 +55,10 @@ async def enqueue_ingestion(db, run_id, actor=None):
     meta = run['metadata'] or {}
     existing = meta.get('ingestion_run_id')
     if existing:
-        return {'collection_run_id':str(run_id),'pipeline_run_id':existing,'status':meta['ingestion_state']}
-    if meta.get('ingestion_state') != 'READY_FOR_INGESTION':
+        previous = await rows(db,'SELECT status FROM pipeline_runs WHERE id=:id',id=UUID(existing))
+        if not previous or previous[0]['status'] != 'FAILED':
+            return {'collection_run_id':str(run_id),'pipeline_run_id':existing,'status':meta['ingestion_state']}
+    if meta.get('ingestion_state') != 'READY_FOR_INGESTION' and not (existing and meta.get('ingestion_state') == 'FAILED' and run['quotes_received']):
         raise ValueError('Collection has no staged live observations ready for ingestion')
     job_id = await insert(db,'pipeline_runs',collection_run_id=run_id,pipeline_type='live_ingestion',status='QUEUED',
         records_input=run['quotes_received'],metadata={'data_origin':'LIVE'})
@@ -75,6 +77,8 @@ async def get_live_run(db, run_id):
     run['pipelines'] = await rows(db,'SELECT * FROM pipeline_runs WHERE collection_run_id=:id ORDER BY created_at',id=run_id)
     run['stages'] = await rows(db,"""SELECT s.* FROM pipeline_steps s JOIN pipeline_runs p ON p.id=s.pipeline_run_id
         WHERE p.collection_run_id=:id ORDER BY p.created_at,s.step_order,s.created_at""",id=run_id)
+    for stage in run['stages']:
+        stage['status'] = (stage.get('metadata') or {}).get('outcome', stage['status'])
     run['quotes'] = await rows(db,'SELECT id,collected_at,response_hash,raw_payload FROM raw_fares WHERE collection_run_id=:id ORDER BY created_at,id LIMIT 15',id=run_id)
     return run
 
@@ -103,15 +107,19 @@ async def execute_acquisition(db, job):
         await insert(db,'raw_fares',collection_run_id=run_id,source_id=source['id'],data_origin='LIVE',
             origin_requested=request.origin,destination_requested=request.destination,
             departure_requested=request.departure_date,booking_window_requested=request.booking_window_days,
-            collected_at=started,http_status=result.get('http_status'),raw_payload=payload,response_hash=checksum,
+            collected_at=datetime.fromisoformat(provenance['observed_at'].replace('Z','+00:00')),http_status=result.get('http_status'),raw_payload=payload,response_hash=checksum,
             collector_version='yatra-v2',parser_version='yatra-v2')
         count += 1
     state = 'READY_FOR_INGESTION' if count else 'FAILED'
     result.pop('quotes',None)
     result.update(ready_for_ingestion=bool(count),raw_rows=count)
+    if count:
+        result.update(status='COMPLETED', recommended_remediation='Raw observations saved. Send to ingestion to update analytics.')
     for i, st in enumerate(result.get('stages',[])):
+        if st['stage'] == 'RAW_STORAGE':
+            continue
         await insert(db,'pipeline_steps',pipeline_run_id=job['id'],step_name=st['stage'],step_order=i,
-            status=st['status'].upper().replace('PASSED','COMPLETED'),started_at=started,finished_at=utc_now(),
+            status={'PASS':'COMPLETED','FAIL':'FAILED','PASSED':'COMPLETED'}.get(st['status'].upper(),st['status'].upper()),finished_at=utc_now(),
             records_output=count if st['stage']=='RAW_STORAGE' else 0,message=st.get('detail'))
     await insert(db,'pipeline_steps',pipeline_run_id=job['id'],step_name='RAW_STORAGE',step_order=99,
         status='COMPLETED' if count else 'SKIPPED',started_at=started,finished_at=utc_now(),records_output=count,
@@ -131,15 +139,29 @@ async def execute_acquisition(db, job):
 
 async def consume_one(session_factory=AsyncSessionLocal):
     async with session_factory() as db:
+        # A crashed process must not silently repeat a source request. Active jobs
+        # retain a row lock and are skipped by this bounded stale-job recovery.
+        stale = await rows(db,"""SELECT id,collection_run_id FROM pipeline_runs
+            WHERE pipeline_type IN ('live_acquisition','live_ingestion') AND status='RUNNING'
+            AND started_at < now()-interval '10 minutes' FOR UPDATE SKIP LOCKED""")
+        for old in stale:
+            await db.execute(text("UPDATE pipeline_runs SET status='FAILED',finished_at=now(),error_summary='Worker interrupted; no automatic retry' WHERE id=:id"),{'id':old['id']})
+            await db.execute(text("""UPDATE collection_runs SET status='FAILED',finished_at=now(),
+                metadata=metadata || '{"ingestion_state":"FAILED"}'::jsonb WHERE id=:id"""),{'id':old['collection_run_id']})
+        await db.commit()
         jobs = await rows(db,"""SELECT * FROM pipeline_runs WHERE pipeline_type IN ('live_acquisition','live_ingestion')
             AND status='QUEUED' ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1""")
         if not jobs:
             return False
         job = jobs[0]
-        # Keep a transactional row lock: crash rolls back all work, leaving QUEUED.
-        # No canonical record is visible until final commit.
+        # Commit the claim so API polling can see RUNNING. No canonical record
+        # becomes visible until the following processing transaction commits.
         try:
             await db.execute(text("UPDATE pipeline_runs SET status='RUNNING',started_at=now() WHERE id=:id"),{'id':job['id']})
+            if job['pipeline_type']=='live_acquisition':
+                await db.execute(text("UPDATE collection_runs SET status='RUNNING',started_at=now() WHERE id=:id"),{'id':job['collection_run_id']})
+            await db.commit()
+            await rows(db,'SELECT id FROM pipeline_runs WHERE id=:id FOR UPDATE',id=job['id'])
             if job['pipeline_type']=='live_acquisition':
                 result = await asyncio.wait_for(execute_acquisition(db,job),timeout=90)
             else:
@@ -147,11 +169,12 @@ async def consume_one(session_factory=AsyncSessionLocal):
                 # Serialize canonical dedup and index writes across consumers.
                 await db.execute(text('SELECT pg_advisory_xact_lock(26056)'))
                 result = await asyncio.wait_for(process_live_fares(db,job['collection_run_id'],job['id']),timeout=240)
-                result['status'] = 'PARTIAL' if any(s['status']=='SKIPPED' for s in result['stages']) else 'COMPLETED'
+                result['status'] = ('FAILED' if result['records_failed'] and not result['records_processed'] else
+                    'PARTIAL' if result['records_failed'] or any(s['status']=='SKIPPED' for s in result['stages']) else 'COMPLETED')
                 await db.execute(text("""UPDATE collection_runs SET quotes_validated=:count,quotes_rejected=:failed,
                     duplicates_detected=:dupes,metadata=metadata || CAST(:meta AS jsonb) WHERE id=:id"""),
                     {'id':job['collection_run_id'],'count':result['records_processed'],'failed':result['records_failed'],
-                     'dupes':result['duplicates'],'meta':json.dumps({'ingestion_state':'COMPLETED','processing':result},default=str)})
+                     'dupes':result['duplicates'],'meta':json.dumps({'ingestion_state':result['status'],'processing':result},default=str)})
             await db.execute(text("""UPDATE pipeline_runs SET status=CAST(:status AS pipeline_status),finished_at=now(),
                 records_processed=:count,records_failed=:failed,metadata=metadata || CAST(:meta AS jsonb) WHERE id=:id"""),
                 {'id':job['id'],'status':result['status'],'count':result['records_processed'],
@@ -165,7 +188,7 @@ async def consume_one(session_factory=AsyncSessionLocal):
             logger.exception('Live job failed: %s',job['id'])
             await db.execute(text("""UPDATE pipeline_runs SET status='FAILED',finished_at=now(),error_summary=:error WHERE id=:id"""),
                              {'id':job['id'],'error':str(exc)[:1000]})
-            await db.execute(text("""UPDATE collection_runs SET metadata=metadata || '{"ingestion_state":"FAILED"}'::jsonb WHERE id=:id"""),
+            await db.execute(text("""UPDATE collection_runs SET status='FAILED',finished_at=now(),metadata=metadata || '{"ingestion_state":"FAILED"}'::jsonb WHERE id=:id"""),
                              {'id':job['collection_run_id']})
             await audit(db,job['collection_run_id'],'LIVE_JOB_FAILED',{'pipeline_run_id':str(job['id']),'error':str(exc)[:300]})
             await db.commit()

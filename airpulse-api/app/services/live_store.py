@@ -19,6 +19,11 @@ async def insert(db, table, **values):
                'audit_events', 'airfare_index', 'index_components'}
     if table not in allowed:
         raise ValueError('Unknown persistence table')
+    # Hosted pipeline_steps uses pipeline_status, which has no SKIPPED member.
+    # Preserve the semantic outcome without requiring another schema migration.
+    if table == 'pipeline_steps' and values.get('status') == 'SKIPPED':
+        values['status'] = 'PARTIAL'
+        values['metadata'] = {**(values.get('metadata') or {}), 'outcome': 'SKIPPED'}
     values.setdefault('id', uuid4())
     expressions = []
     for key, value in values.items():

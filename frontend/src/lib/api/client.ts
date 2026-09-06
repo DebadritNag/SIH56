@@ -118,7 +118,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
         ? (payload as { error?: { code?: string; message?: string; details?: unknown } }).error
         : undefined;
     throw new ApiError(
-      errObj?.message || `Request failed with status ${res.status}`,
+      errObj?.message || (payload && typeof payload === 'object' && 'detail' in payload && typeof payload.detail === 'string' ? payload.detail : `Request failed with status ${res.status}`),
       res.status,
       errObj?.code,
       errObj?.details,

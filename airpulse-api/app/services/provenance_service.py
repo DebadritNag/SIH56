@@ -41,8 +41,8 @@ class ProvenanceService:
         raw_fare = raw_res.scalars().first()
 
         # 3. Source lookup
-        source_name = "Goibibo"
-        source_display = "Goibibo (Domestic OTA)"
+        source_name = "Unknown"
+        source_display = "Unknown source"
         source_id = val_fare.source_id or (raw_fare.source_id if raw_fare else None)
         if source_id:
             s_res = await self.session.execute(select(Source).where(Source.id == source_id))
@@ -89,7 +89,7 @@ class ProvenanceService:
                 ValidatedFare.collection_run_id == val_fare.collection_run_id
             ) if val_fare.collection_run_id else select(func.count(ValidatedFare.id))
         )
-        quote_pool_count = total_quotes_res.scalar() or 26
+        quote_pool_count = total_quotes_res.scalar() or 0
 
         # Lineage determination
         is_imported = (val_fare.data_origin == "IMPORTED")
@@ -123,9 +123,27 @@ class ProvenanceService:
             priceguard_status = "PENDING"
             priceguard_detail = "PriceGuard scoring pending"
 
+        live_score = None
+        if val_fare.data_origin == 'LIVE' and val_fare.collection_run_id:
+            from app.services.live_store import rows
+            stage_rows = await rows(self.session, '''SELECT s.* FROM pipeline_steps s
+                JOIN pipeline_runs p ON p.id=s.pipeline_run_id WHERE p.collection_run_id=:id
+                AND p.pipeline_type='live_ingestion' ORDER BY p.created_at DESC''',id=val_fare.collection_run_id)
+            for stage in stage_rows:
+                if stage['step_name'] == 'PRICEGUARD':
+                    live_score = next((score for score in (stage['metadata'] or {}).get('scores',[])
+                                       if score['fare_id']==str(fare_id)),None)
+                    if live_score:
+                        priceguard_status = 'SCORED'
+                        priceguard_detail = f"Isolation Forest percentile: {live_score['anomaly_percentile']*100:.1f}%"
+                    elif (stage['metadata'] or {}).get('outcome') == 'SKIPPED':
+                        priceguard_status = 'NOT_SCORED'
+                        priceguard_detail = stage.get('message') or 'Scoring unavailable'
+                    break
+
         # Canonical timestamps
         observed_time = val_fare.collected_at.isoformat() if val_fare.collected_at else None
-        ingested_time = raw_fare.collected_at.isoformat() if (raw_fare and raw_fare.collected_at) else observed_time
+        ingested_time = val_fare.created_at.isoformat() if val_fare.created_at else None
         raw_stored_time = raw_fare.created_at.isoformat() if (raw_fare and raw_fare.created_at) else ingested_time
         validated_time = val_fare.created_at.isoformat() if val_fare.created_at else None
         features_time = feat.generated_at.isoformat() if feat else None
@@ -262,7 +280,8 @@ class ProvenanceService:
                 "severity": anom.severity if anom else "normal",
                 "anomaly_percentile": anom.anomaly_percentile if anom else 0.0,
                 "anomaly_type": anom.anomaly_type if anom else None,
-            } if anom else {"status": priceguard_status, "is_anomaly": False},
+            } if anom else {"status": priceguard_status, "is_anomaly": live_score['is_anomaly'] if live_score else None,
+                           "anomaly_percentile": live_score['anomaly_percentile'] if live_score else None},
             "shap_attribution": (lambda s: {
                 "base_value": s.base_value,
                 "predicted_value": s.predicted_value,

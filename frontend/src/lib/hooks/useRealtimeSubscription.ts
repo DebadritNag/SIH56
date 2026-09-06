@@ -23,8 +23,8 @@ export type RealtimeStatus = "disabled" | "connecting" | "connected" | "error";
 
 // Map each realtime table to the query keys it should invalidate on change.
 const TABLE_INVALIDATIONS: Record<string, string[][]> = {
-  collection_runs: [["ingestion-status"], ["runs"], ["dashboard-summary"]],
-  pipeline_runs: [["ingestion-status"], ["runs"]],
+  collection_runs: [["live-runs"], ["live-run"], ["fares"], ["ingestion-status"], ["runs"], ["dashboard-summary"]],
+  pipeline_runs: [["live-runs"], ["live-run"], ["ingestion-status"], ["runs"]],
   // A completed APIx pipeline step should refresh the dashboard + index views.
   pipeline_steps: [
     ["ingestion-status"],

@@ -352,7 +352,8 @@ class LiveScraper:
         if not permitted:
             result = self._finalize_result(stages, started, "POLICY_RESTRICTED", stages[0]["detail"],
                                           origin, destination, departure, days, source_name,
-                                          engine="SCRAPY", max_results=limit)
+                                          engine="NONE", max_results=limit, stop_reason="POLICY_RESTRICTED")
+            result['collection_engine'] = 'NONE'
         else:
             request = SearchRequest(origin=origin, destination=destination, departure_date=departure,
                                     booking_window_days=days, max_results=limit, is_nonstop=is_nonstop)
@@ -2028,6 +2029,9 @@ class LiveScraper:
         browser_ver = cap.version if cap else "N/A"
         browser_exec = cap.executable_path if cap else "N/A"
         browser_status = cap.launch_status if cap else "SKIPPED_LIGHTWEIGHT_HTTP"
+        if engine == 'NONE':
+            browser_status = 'NOT_STARTED'
+            engine_version = 'NOT_STARTED'
 
         if not stop_reason:
             if failure_stage in (ScrapeFailureStage.BLOCKED.value, ScrapeFailureStage.CHALLENGE_DETECTED.value):
@@ -2054,6 +2058,7 @@ class LiveScraper:
             "recommended_remediation": remediation,
             "collector_version": engine_version,
             "engine": engine,
+            "collection_engine": engine,
             "browser_engine": browser_engine,
             "browser_version": browser_ver,
             "browser_executable": browser_exec,
