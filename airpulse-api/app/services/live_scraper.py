@@ -2002,6 +2002,13 @@ class LiveScraper:
             )
         elif failure_stage in (ScrapeFailureStage.BLOCKED.value, ScrapeFailureStage.CHALLENGE_DETECTED.value, ScrapeFailureStage.CAPTCHA_DETECTED.value):
             remediation = "Source returned an access challenge. Collection stopped. Imported datasets remain available separately."
+        elif failure_stage == 'NETWORK_ERROR':
+            remediation = (
+                "Chrome launched, but navigation failed at the network layer. For ERR_HTTP2_PROTOCOL_ERROR, "
+                "deploy with YATRA_DISABLE_HTTP2=true to test HTTP/1.1 compatibility. "
+                "This does not establish that Yatra is accessible from Render. No fares were substituted; "
+                "HTTP 403/429 or an access challenge still stops collection."
+            )
         elif failure_stage == ScrapeFailureStage.RATE_LIMITED.value:
             remediation = "Upstream rate limit reached (HTTP 429). Adaptive rate limiter engaged. Retry after cooldown."
         elif failure_stage == ScrapeFailureStage.TIMEOUT.value:

@@ -29,6 +29,8 @@ services:
         value: "/ms-playwright"
       - key: YATRA_BROWSER_HEADLESS
         value: "false"
+      - key: YATRA_DISABLE_HTTP2
+        value: "true"
       - key: MEMORY_CONSTRAINED
         value: "true"
       # CORS: set to your deployed frontend origin(s), comma-separated

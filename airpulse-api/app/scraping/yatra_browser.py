@@ -169,7 +169,10 @@ class YatraBrowserCollector:
         try:
             async with async_playwright() as pw:
                 try:
-                    browser = await pw.chromium.launch(channel='chrome',headless=settings.YATRA_BROWSER_HEADLESS)
+                    launch_options = dict(channel='chrome', headless=settings.YATRA_BROWSER_HEADLESS)
+                    if settings.YATRA_DISABLE_HTTP2:
+                        launch_options['args'] = ['--disable-http2']
+                    browser = await pw.chromium.launch(**launch_options)
                     self.browser_version = browser.version
                     context = await browser.new_context(locale='en-IN')
                     page = await context.new_page()
@@ -241,6 +244,8 @@ class YatraBrowserCollector:
                         except Exception:
                             pass
                     code = 'BLOCKED' if isinstance(exc,PermissionError) else 'TIMEOUT' if isinstance(exc,PlaywrightTimeout) else 'BROWSER_UNAVAILABLE' if self.stage=='BROWSER_LAUNCH' else 'CONTROL_ERROR'
+                    if code == 'CONTROL_ERROR' and 'net::ERR_' in str(exc):
+                        code = 'NETWORK_ERROR'
                     result.status = result.failure_code = code
                     result.stop_reason = 'BLOCKED' if code=='BLOCKED' else 'TIMEOUT' if code=='TIMEOUT' else 'ERROR'
                     result.failure_message = f'{self.stage} [{self.control}]: {exc}'
@@ -260,6 +265,7 @@ class YatraBrowserCollector:
             result.http_status = self.blocked or self.http_status
             result.duration_ms = int((time.monotonic()-started)*1000)
             result.metadata = dict(workflow='homepage-one-way',channel='chrome',headless=settings.YATRA_BROWSER_HEADLESS,
+                                   http2_disabled=settings.YATRA_DISABLE_HTTP2,
                                    browser_version=self.browser_version,browser_launch_status='SUCCESS' if self.browser_version else 'UNAVAILABLE',
                                    final_url=self.final_url,
                                    failed_stage=self.stage if result.status!='SUCCESS' else None,control=self.control,stages=self.events)

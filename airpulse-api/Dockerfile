@@ -25,7 +25,8 @@ COPY . .
 
 # Fail the image build if the exact production browser cannot launch. This
 # renders only a local HTML string and makes no request to Yatra.
-RUN useradd --create-home airpulse && chown -R airpulse:airpulse /app
+RUN useradd --create-home airpulse && chown -R airpulse:airpulse /app \
+    && install -d -o root -g root -m 1777 /tmp/.X11-unix
 USER airpulse
 RUN xvfb-run -a python scripts/check_chrome.py
 

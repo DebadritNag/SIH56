@@ -75,13 +75,15 @@ def test_yatra_observed_card_rejects_nearby_airports_dates_and_bad_fields():
 
 
 @pytest.mark.asyncio
-async def test_yatra_homepage_success_dedups_and_closes_chrome(monkeypatch):
+@pytest.mark.parametrize('disable_http2', [False, True])
+async def test_yatra_homepage_success_dedups_and_closes_chrome(monkeypatch, disable_http2):
     from unittest.mock import AsyncMock, MagicMock
     from types import SimpleNamespace
     from playwright.async_api import TimeoutError
     from app.scraping.yatra_browser import YatraBrowserCollector
     from app.config import settings
     monkeypatch.setattr(settings,'YATRA_BROWSER_HEADLESS',False)
+    monkeypatch.setattr(settings,'YATRA_DISABLE_HTTP2',disable_http2)
     request = SearchRequest(origin='DEL',destination='BOM',departure_date=date(2026,9,20),booking_window_days=14,max_results=10)
     page = MagicMock()
     page.url = 'https://flight.yatra.com/air-search?type=O&origin=DEL&destination=BOM&flight_depart_date=20%2F09%2F2026&ADT=1&class=Economy'
@@ -109,7 +111,11 @@ async def test_yatra_homepage_success_dedups_and_closes_chrome(monkeypatch):
     collector.travellers = AsyncMock()
     result = await collector.execute(request)
     assert result.status=='SUCCESS' and len(result.quotes)==1
-    launch.assert_awaited_once_with(channel='chrome',headless=False)
+    options = dict(channel='chrome',headless=False)
+    if disable_http2:
+        options['args'] = ['--disable-http2']
+    launch.assert_awaited_once_with(**options)
+    assert result.metadata['http2_disabled'] == disable_http2
     browser.close.assert_awaited_once()
     assert page.goto.call_args.args[0]=='https://www.yatra.com/'
 
