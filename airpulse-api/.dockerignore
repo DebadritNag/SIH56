@@ -1,0 +1,15 @@
+.env
+.env.*
+.git
+.venv
+venv
+__pycache__
+**/__pycache__
+.pytest_cache
+.cache
+scratch
+tests
+*.log
+*.csv
+*.xlsx
+supabase/.temp

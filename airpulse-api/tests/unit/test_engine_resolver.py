@@ -26,6 +26,85 @@ from app.scraping.engines.scrapy_engine import ScrapyEngine
 from app.scraping.resolver import EngineResolver
 
 
+YATRA_CARD = '''<div class="airline-name"><span title="Akasa Air">Akasa Air</span><p class="fl-no">QP-1833</p></div>
+<div class="depart-details"><p class="mob-origin">New Delhi(DEL)</p><p class="mob-time">06:50</p><p class="mob-date">20 Sep</p></div>
+<div class="arrival-details"><p class="mob-origin">Mumbai(BOM)</p><p class="mob-time">09:10</p><p class="mob-date">20 Sep</p></div>
+<div class="stops-details"><span class="mob-duration">Non Stop</span></div>
+<p autom="durationLabel">2h 20m</p><p class="ow-price-above-btn">₹6,310</p>'''
+
+
+def test_yatra_observed_card_rejects_nearby_airports_dates_and_bad_fields():
+    from app.scraping.yatra_browser import parse_card, verify_search_url, date_label
+    request = SearchRequest(origin='DEL',destination='BOM',departure_date=date(2026,9,20),booking_window_days=14,max_results=10)
+    url = 'https://flight.yatra.com/air-search?type=O&origin=DEL&destination=BOM&flight_depart_date=20%2F09%2F2026&ADT=1&class=Economy'
+    query = verify_search_url(url,request)
+    parsed = parse_card(YATRA_CARD,query,url,'2026-09-06T00:00:00+00:00')
+    assert parsed['gross_total']==6310 and parsed['origin']=='DEL' and parsed['destination']=='BOM'
+    assert parsed['base_price'] is None and parsed['tax_amount'] is None
+    for card in [YATRA_CARD.replace('(DEL)','(DXN)'),YATRA_CARD.replace('(BOM)','(NMI)'),
+                 YATRA_CARD.replace('20 Sep','21 Sep'),YATRA_CARD.replace('06:50','26:50'),
+                 YATRA_CARD.replace('₹6,310','Unavailable')]:
+        assert parse_card(card,query,url,'2026-09-06T00:00:00+00:00') is None
+    for changed in [url.replace('type=O','type=R'),url.replace('ADT=1','ADT=2'),url.replace('destination=BOM','destination=NMI')]:
+        with pytest.raises(ValueError):
+            verify_search_url(changed,request)
+    assert date_label(date(2026,9,21)) == 'Choose Monday, September 21st, 2026'
+
+
+@pytest.mark.asyncio
+async def test_yatra_homepage_success_dedups_and_closes_chrome(monkeypatch):
+    from unittest.mock import AsyncMock, MagicMock
+    from types import SimpleNamespace
+    from playwright.async_api import TimeoutError
+    from app.scraping.yatra_browser import YatraBrowserCollector
+    from app.config import settings
+    monkeypatch.setattr(settings,'YATRA_BROWSER_HEADLESS',False)
+    request = SearchRequest(origin='DEL',destination='BOM',departure_date=date(2026,9,20),booking_window_days=14,max_results=10)
+    page = MagicMock()
+    page.url = 'https://flight.yatra.com/air-search?type=O&origin=DEL&destination=BOM&flight_depart_date=20%2F09%2F2026&ADT=1&class=Economy'
+    page.goto = AsyncMock(return_value=SimpleNamespace(status=200))
+    page.wait_for_url = AsyncMock()
+    page.wait_for_function = AsyncMock(side_effect=TimeoutError('no growth'))
+    page.get_by_text.return_value.click = AsyncMock()
+    cards = MagicMock()
+    cards.first.wait_for = AsyncMock()
+    cards.last.scroll_into_view_if_needed = AsyncMock()
+    cards.count = AsyncMock(return_value=3)
+    cards.all = AsyncMock(return_value=[SimpleNamespace(is_visible=AsyncMock(return_value=True),inner_html=AsyncMock(return_value=h))
+        for h in (YATRA_CARD,YATRA_CARD,YATRA_CARD.replace('(BOM)','(NMI)'))])
+    page.locator.return_value = cards
+    browser = SimpleNamespace(version='test',new_context=AsyncMock(return_value=SimpleNamespace(new_page=AsyncMock(return_value=page))),close=AsyncMock())
+    launch = AsyncMock(return_value=browser)
+    manager = MagicMock()
+    manager.__aenter__ = AsyncMock(return_value=SimpleNamespace(chromium=SimpleNamespace(launch=launch)))
+    manager.__aexit__ = AsyncMock()
+    monkeypatch.setattr('app.scraping.yatra_browser.async_playwright',lambda:manager)
+    collector = YatraBrowserCollector()
+    collector.guard = AsyncMock()
+    collector.airport = AsyncMock()
+    collector.calendar = AsyncMock()
+    collector.travellers = AsyncMock()
+    result = await collector.execute(request)
+    assert result.status=='SUCCESS' and len(result.quotes)==1
+    launch.assert_awaited_once_with(channel='chrome',headless=False)
+    browser.close.assert_awaited_once()
+    assert page.goto.call_args.args[0]=='https://www.yatra.com/'
+
+
+@pytest.mark.asyncio
+async def test_yatra_missing_chrome_is_explicit(monkeypatch):
+    from unittest.mock import AsyncMock, MagicMock
+    from types import SimpleNamespace
+    from app.scraping.yatra_browser import YatraBrowserCollector
+    manager = MagicMock()
+    manager.__aenter__ = AsyncMock(return_value=SimpleNamespace(chromium=SimpleNamespace(launch=AsyncMock(side_effect=RuntimeError('chrome not found')))))
+    manager.__aexit__ = AsyncMock()
+    monkeypatch.setattr('app.scraping.yatra_browser.async_playwright',lambda:manager)
+    result = await YatraBrowserCollector().execute(SearchRequest(origin='DEL',destination='BOM',departure_date=date(2026,9,20),booking_window_days=14))
+    assert result.failure_code=='BROWSER_UNAVAILABLE' and result.quotes==[]
+    assert result.metadata['failed_stage']=='BROWSER_LAUNCH'
+
+
 def test_live_request_rejects_invalid_scope():
     from app.api.v1.live import LiveRequest
     from datetime import timedelta

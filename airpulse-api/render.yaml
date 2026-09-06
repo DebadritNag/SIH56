@@ -1,16 +1,14 @@
 services:
   - type: web
     name: airpulse-api
-    runtime: python
+    runtime: docker
     region: singapore
     plan: free
     rootDir: airpulse-api
-    buildCommand: pip install -r requirements.txt && (playwright install --with-deps chromium || playwright install chromium)
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     healthCheckPath: /api/v1/health
     envVars:
-      - key: PYTHON_VERSION
-        value: "3.11.9"
       - key: ENVIRONMENT
         value: production
       - key: APP_ENV
@@ -28,7 +26,9 @@ services:
       - key: YATRA_REVIEW_NOTES
         value: "Operator-requested bounded Yatra research prototype; max 15 observations, no challenge bypass, no automatic failed-request retries."
       - key: PLAYWRIGHT_BROWSERS_PATH
-        value: "/opt/render/project/src/airpulse-api/.cache/ms-playwright"
+        value: "/ms-playwright"
+      - key: YATRA_BROWSER_HEADLESS
+        value: "false"
       - key: MEMORY_CONSTRAINED
         value: "true"
       # CORS: set to your deployed frontend origin(s), comma-separated

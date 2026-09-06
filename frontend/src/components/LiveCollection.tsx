@@ -22,6 +22,8 @@ export default function LiveCollection() {
   const ingest = useMutation({ mutationFn: () => postData(`/live/runs/${runId}/ingest`), onSuccess: () => cache.invalidateQueries({ queryKey: ["live-run", runId] }) });
   const run = detail.data;
   const state = run?.metadata?.ingestion_state;
+  const ingestionFailed = run?.pipelines?.some(p => p.pipeline_type === "live_ingestion" && p.status === "FAILED");
+  const ingestionLabel = state === "FAILED" && !ingestionFailed ? "NOT STARTED" : state ?? "PENDING";
   useEffect(() => {
     if (["COMPLETED", "PARTIAL"].includes(state ?? "")) {
       for (const key of ["dashboard-summary", "apix-latest", "apix-trend", "fares", "anomalies", "alerts", "runs", "ingestion-status"]) cache.invalidateQueries({ queryKey: [key] });
@@ -45,7 +47,7 @@ export default function LiveCollection() {
     {error && <p role="alert" className="rounded border border-red-400 p-4">{error instanceof Error ? error.message : "Unable to load live collection"}</p>}
     <label className="flex items-center gap-3">Recent runs<select className={inputClass} value={runId ?? ""} onChange={e => setSelected(e.target.value)}><option value="" disabled>No runs yet</option>{recent.data?.map(r => <option key={r.id} value={r.id}>{new Date(r.created_at).toLocaleString()} · {r.status} · {r.quotes_received} fares</option>)}</select></label>
     {run && <section className="space-y-4 rounded border p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-semibold">Collection {run.status} · Ingestion {state ?? "PENDING"}</h2><p className="text-xs text-slate-500">Run {run.id}</p></div><button className="rounded bg-emerald-700 px-4 py-2 text-white disabled:opacity-40" disabled={!(state === "READY_FOR_INGESTION" || (state === "FAILED" && run.quotes_received > 0 && run.pipelines?.some(p => p.pipeline_type === "live_ingestion" && p.status === "FAILED"))) || ingest.isPending} onClick={() => ingest.mutate()}>{state === "FAILED" ? "Retry ingestion" : "Send to ingestion"}</button></div>
+      <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-semibold">Collection {run.status} · Ingestion {ingestionLabel}</h2><p className="text-xs text-slate-500">Run {run.id}</p></div><button className="rounded bg-emerald-700 px-4 py-2 text-white disabled:opacity-40" disabled={!(state === "READY_FOR_INGESTION" || (state === "FAILED" && run.quotes_received > 0 && run.pipelines?.some(p => p.pipeline_type === "live_ingestion" && p.status === "FAILED"))) || ingest.isPending} onClick={() => ingest.mutate()}>{ingestionFailed ? "Retry ingestion" : "Send to ingestion"}</button></div>
       {run.metadata?.result?.failure_stage && <p role="alert" className="text-red-600">{run.metadata.result.failure_stage}: {run.metadata.result.failure_reason}</p>}
       {run.pipelines?.map(p => <div key={p.id} className="text-sm">{p.pipeline_type}: {p.status}{p.error_summary && <p role="alert">{p.error_summary}</p>}</div>)}
       <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr><th className="p-2">Stage</th><th>Status</th><th>Output</th><th>Detail</th></tr></thead><tbody>{run.stages?.map(s => <tr key={s.id} className="border-t"><td className="p-2">{s.step_name}</td><td>{s.status}</td><td>{s.records_output}</td><td>{s.message}</td></tr>)}</tbody></table></div>

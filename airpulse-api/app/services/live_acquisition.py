@@ -108,7 +108,7 @@ async def execute_acquisition(db, job):
             origin_requested=request.origin,destination_requested=request.destination,
             departure_requested=request.departure_date,booking_window_requested=request.booking_window_days,
             collected_at=datetime.fromisoformat(provenance['observed_at'].replace('Z','+00:00')),http_status=result.get('http_status'),raw_payload=payload,response_hash=checksum,
-            collector_version='yatra-v2',parser_version='yatra-v2')
+            collector_version=result.get('collector_version','yatra-homepage-v1'),parser_version='yatra-homepage-v1')
         count += 1
     state = 'READY_FOR_INGESTION' if count else 'FAILED'
     result.pop('quotes',None)
