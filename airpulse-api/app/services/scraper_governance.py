@@ -29,7 +29,7 @@ class SourcePolicy:
     robots_checked_at: Optional[datetime] = None
     terms_checked_at: Optional[datetime] = None
     checked_at: Optional[datetime] = None
-    policy_status: PolicyStatus = PolicyStatus.ALLOWED
+    policy_status: PolicyStatus = PolicyStatus.MANUAL_REVIEW_REQUIRED
     policy_notes: Optional[str] = None
     review_notes: Optional[str] = None
 
@@ -41,10 +41,13 @@ class SourcePolicy:
             # Allow controlled prototype testing through development/test environment
             try:
                 from app.config import settings
-                is_dev = getattr(settings, "APP_ENV", "development") in ("development", "test") or getattr(settings, "ENVIRONMENT", "development") in ("development", "test")
-                return is_dev or allow_prototype
+                return bool(
+                    self.source_name == "yatra"
+                    and settings.YATRA_PROTOTYPE_ENABLED
+                    and settings.YATRA_REVIEW_NOTES.strip()
+                )
             except Exception:
-                return True
+                return False
         return True
 
 
@@ -156,7 +159,7 @@ class PolicyGateService:
             official_url="https://www.yatra.com",
             robots_url="https://www.yatra.com/robots.txt",
             search_path="/air-search-ui/dom2/trigger",
-            terms_url="https://www.yatra.com/terms-and-conditions",
+            terms_url="https://www.yatra.com/online/yatra-user-agreement.html",
             checked_at=datetime(2026, 9, 5, 20, 0, 0, tzinfo=timezone.utc),
             policy_status=PolicyStatus.MANUAL_REVIEW_REQUIRED,
             policy_notes="Public OTA aggregator pricing research; manual review required for automated scraping per terms of service.",

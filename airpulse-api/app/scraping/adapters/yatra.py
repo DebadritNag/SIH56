@@ -82,8 +82,8 @@ def parse_inr_price(text: Optional[str]) -> Optional[float]:
             except ValueError:
                 continue
         if valid_prices:
-            # The gross total fare is the maximum currency amount in the block
-            return max(valid_prices)
+            # Multiple amounts are ambiguous (old fare, discount, or upgrade).
+            return valid_prices[0] if len(set(valid_prices)) == 1 else None
 
     # 3. Fallback: if text itself is just a clean number string (e.g. '6,529' or '6529')
     cleaned = text.replace("\u20b9", "").replace("Rs.", "").replace("Rs", "").replace("INR", "").strip()
@@ -149,7 +149,7 @@ class YatraAdapter(SourceAdapter):
         cabin_clean = "Economy" if "eco" in cabin_raw.lower() else ("Business" if "bus" in cabin_raw.lower() else "Economy")
 
         return (
-            f"https://flight.yatra.com/air-search-ui/dom2/trigger"
+            f"{self._base_url}"
             f"?type=O&viewName=normal&flexi=0&noOfSegments=1"
             f"&origin={origin}&originCode={origin}"
             f"&destination={destination}&destinationCode={destination}"
@@ -340,8 +340,8 @@ class YatraAdapter(SourceAdapter):
                 continue
 
             # Airline identification
-            airline_name = "IndiGo"
-            carrier_code = "6E"
+            airline_name = None
+            carrier_code = None
             for code, name in CARRIER_MAP.items():
                 if name.lower() in card_text.lower() or f"{code}-" in card_text or f"{code} " in card_text:
                     airline_name = name
@@ -356,15 +356,15 @@ class YatraAdapter(SourceAdapter):
                 airline_name = CARRIER_MAP.get(carrier_code, airline_name)
             else:
                 # Do NOT generate synthetic flight numbers if unobservable
-                flight_no = f"{carrier_code}"
+                flight_no = None
 
             # Times extraction
             times = _TIME_RE.findall(card_text)
-            dep_time = f"{times[0][0]}:{times[0][1]}" if len(times) >= 1 else "06:00"
-            arr_time = f"{times[1][0]}:{times[1][1]}" if len(times) >= 2 else "08:15"
+            dep_time = f"{times[0][0]}:{times[0][1]}" if len(times) >= 1 else None
+            arr_time = f"{times[1][0]}:{times[1][1]}" if len(times) >= 2 else None
 
             # Stops extraction
-            stops_count = 0
+            stops_count = None
             text_lower = card_text.lower()
             if any(m in text_lower for m in ("non-stop", "non stop", "0 stop", "direct")):
                 stops_count = 0
@@ -372,6 +372,8 @@ class YatraAdapter(SourceAdapter):
                 stops_count = 1
             elif "2 stop" in text_lower or "2-stop" in text_lower:
                 stops_count = 2
+            if request.is_nonstop is True and stops_count != 0:
+                continue
 
             # Cabin
             cabin_str = getattr(request, "cabin", "economy")
@@ -389,7 +391,7 @@ class YatraAdapter(SourceAdapter):
             # Attempt to extract explicit base fare or taxes if present
             base_fare = None
             taxes = None
-            mandatory_fees = 0.0
+            mandatory_fees = None
             components_complete = False
 
             base_match = re.search(r"base\s*(?:fare)?\s*[:₹\s]*([0-9,]+)", card_text, re.I)
@@ -411,8 +413,7 @@ class YatraAdapter(SourceAdapter):
                     pass
 
             if base_fare is not None and taxes is not None:
-                components_complete = True
-                mandatory_fees = round(max(0.0, price - (base_fare + taxes)), 2)
+                components_complete = abs(price - (base_fare + taxes)) < 0.01
 
             provenance = {
                 "source": "Yatra",
@@ -423,6 +424,9 @@ class YatraAdapter(SourceAdapter):
                 "http_status": http_status,
                 "components_complete": components_complete,
                 "stops": stops_count,
+                "airline_name": airline_name,
+                "raw_card": str(card),
+                "raw_price_text": total_el.get_text(strip=True) if total_el else card_text,
             }
 
             quotes.append(
@@ -435,14 +439,14 @@ class YatraAdapter(SourceAdapter):
                     destination=destination,
                     departure_date=dep_date_str,
                     currency="INR",
-                    base_price=base_fare or 0.0,
-                    tax_amount=taxes or 0.0,
+                    base_price=base_fare,
+                    tax_amount=taxes,
                     mandatory_fees=mandatory_fees,
                     gross_total=price,
                     provenance=provenance,
                     cabin_class=cabin_val,
-                    fare_class="STANDARD",
-                    is_non_stop=(stops_count == 0),
+                    fare_class=None,
+                    is_non_stop=(stops_count == 0) if stops_count is not None else None,
                 )
             )
 

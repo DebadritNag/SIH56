@@ -22,6 +22,8 @@ class Settings(BaseSettings):
 
     # Runtime environment (development | staging | production)
     ENVIRONMENT: str = "development"
+    YATRA_PROTOTYPE_ENABLED: bool = False
+    YATRA_REVIEW_NOTES: str = ""
 
     # Supabase PostgreSQL (asyncpg for async, psycopg2 for sync/migrations)
     # DATABASE_URL: direct connection (session mode) used by app + workers.

@@ -30,22 +30,22 @@ class Provenance:
 
 @dataclass
 class RawQuote:
-    carrier: str
-    flight_number: str
-    departure_time: str
-    arrival_time: str
+    carrier: Optional[str]
+    flight_number: Optional[str]
+    departure_time: Optional[str]
+    arrival_time: Optional[str]
     origin: str
     destination: str
     departure_date: str
     currency: str
-    base_price: float
-    tax_amount: float
-    mandatory_fees: float
+    base_price: Optional[float]
+    tax_amount: Optional[float]
+    mandatory_fees: Optional[float]
     gross_total: float
     provenance: Dict[str, Any]
     cabin_class: str = "economy"
-    fare_class: str = "STANDARD"
-    is_non_stop: bool = True
+    fare_class: Optional[str] = "STANDARD"
+    is_non_stop: Optional[bool] = True
     seats_available: Optional[int] = None
 
     def to_dict(self) -> Dict[str, Any]:

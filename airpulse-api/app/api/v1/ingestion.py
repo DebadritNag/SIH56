@@ -47,7 +47,7 @@ class ScrapingTestRequest(BaseModel):
     mode: str = "LIVE"
     engine: Optional[str] = "AUTO"
     compare: Optional[bool] = False
-    max_results: Optional[int] = Field(15, ge=1, le=20)
+    max_results: Optional[int] = Field(10, ge=1, le=15)
     is_nonstop: Optional[bool] = None
 
 

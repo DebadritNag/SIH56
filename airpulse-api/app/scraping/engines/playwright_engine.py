@@ -117,6 +117,11 @@ class PlaywrightEngine(BaseCollectionEngine):
             )
 
         browser_service = get_shared_browser_service()
+        # Capability starts UNAVAILABLE before the lazy browser has been resolved.
+        try:
+            await browser_service._ensure_browser()
+        except Exception:
+            logger.warning("Browser initialization failed", exc_info=True)
         capability = browser_service.get_capability()
 
         # Strict browser availability gate
@@ -275,13 +280,23 @@ class PlaywrightEngine(BaseCollectionEngine):
                     return_metrics=True,
                 )
 
+            body_text = await page.content()
+            challenge_res = await browser_service.check_for_challenges(
+                page=page, http_status=http_status, title=await page.title(), content=body_text,
+            )
+            if challenge_res.detected:
+                stage = challenge_res.stage or ScrapeFailureStage.BLOCKED
+                return EngineResult(status=stage.value, engine=CollectionEngine.PLAYWRIGHT.value,
+                                    source_id=adapter.source_id, http_status=http_status,
+                                    failure_code=stage.value, failure_message=challenge_res.reason,
+                                    stop_reason=StopReason.BLOCKED.value)
             evidence = await browser_service.capture_audit_evidence(page, http_status=http_status)
             duration_ms = int((time.monotonic() - started_at) * 1000)
 
             if not quotes:
                 outcome = (
                     EngineOutcome.NO_AVAILABILITY.value
-                    if adapter.is_empty_availability(body_text, http_status) or metrics.get("results_seen", 0) == 0
+                    if adapter.is_empty_availability(body_text, http_status)
                     else EngineOutcome.CONTENT_NOT_FOUND.value
                 )
                 return EngineResult(

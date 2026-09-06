@@ -33,6 +33,7 @@ build/
 dist/
 *.egg-info/
 .venv/
+.uv-cache/
 venv/
 env/
 airpulse-api/venv/

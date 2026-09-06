@@ -54,8 +54,6 @@ NO_AVAILABILITY_MARKERS = [
     "no flights found",
     "no flights available",
     "no direct or connecting flights",
-    "sold out",
-    "no seats available",
     "zero flights on this route",
 ]
 
@@ -133,6 +131,8 @@ class AirPulseIsolatedSpider:
                 "COOKIES_ENABLED": True,
                 "LOG_LEVEL": "ERROR",
                 "USER_AGENT": default_ua,
+                "RETRY_ENABLED": False,
+                "HTTPERROR_ALLOW_ALL": True,
             }
 
             def __init__(self, *args, **kwargs):
@@ -162,37 +162,21 @@ class AirPulseIsolatedSpider:
                         dont_filter=True,
                     )
 
+            async def start(self):
+                # Scrapy 2.13+ uses start(); retain compatibility with older workers.
+                for request in self.start_requests():
+                    yield request
+
             def parse(self, response: Response):
                 captured_result["pages_requested"] = captured_result.get("pages_requested", 0) + 1
                 captured_result["http_status"] = response.status
                 if not captured_result["body_text"]:
                     captured_result["body_text"] = response.text
                 captured_result["headers"] = {k.decode("utf-8"): [v.decode("utf-8") for v in vals] for k, vals in response.headers.items()}
-
-                # Evaluate matching fares on current page
-                from app.scraping.parsers import parse_flight_cards_html
-                quotes = parse_flight_cards_html(
-                    html_content=response.text,
-                    origin=search_req.get("origin", "DEL"),
-                    destination=search_req.get("destination", "BOM"),
-                    departure_date=str(search_req.get("departure_date", "2026-09-10")),
-                    source_name=source_name,
-                    engine_name="SCRAPY",
-                    http_status=response.status,
-                    max_results=bounded_max,
-                    is_nonstop=search_req.get("is_nonstop"),
-                    cabin=search_req.get("cabin"),
-                    return_metrics=False,
-                )
-                self.matching_count += len(quotes)
-
-                # Stop enqueuing further result pages once enough matching fares exist
-                if self.matching_count >= bounded_max:
-                    return
-
-                next_page = response.css("a.next-page::attr(href), a[rel='next']::attr(href), a.pagination-next::attr(href)").get()
-                if next_page:
-                    yield response.follow(next_page, callback=self.parse)
+                captured_result["final_url"] = response.url
+                # A controlled probe requests one results page. Classification and
+                # source-specific parsing happen only after access checks below.
+                return
 
             def errback(self, failure):
                 captured_result["error"] = str(failure.value)
@@ -223,9 +207,12 @@ class AirPulseIsolatedSpider:
                 "duration_ms": duration_ms,
                 "raw_artifact_id": None,
                 "raw_payload_hash": None,
+                "stop_reason": "TIMEOUT" if status == "TIMEOUT" else "ERROR",
                 "metadata": {"url": url},
             }
 
+        input_data["final_url"] = captured_result.get("final_url", url)
+        input_data["pages_requested"] = captured_result["pages_requested"]
         return cls._process_response(
             http_status=captured_result.get("http_status") or 200,
             body_text=captured_result.get("body_text") or "",
@@ -252,6 +239,10 @@ class AirPulseIsolatedSpider:
         search_req = input_data.get("search_request", {})
         bounded_max = min(max(1, int(search_req.get("max_results", input_data.get("max_results", 15)))), 20)
         pages_requested = int(input_data.get("pages_requested", 1) or 1)
+        if source_id in ("yatra", "ota_source_04"):
+            bounded_max = min(bounded_max, 15)
+        from bs4 import BeautifulSoup
+        title = BeautifulSoup(body_text, "html.parser").title
 
         base_res = {
             "engine": "SCRAPY",
@@ -266,7 +257,13 @@ class AirPulseIsolatedSpider:
             "pages_requested": pages_requested,
             "max_results": bounded_max,
             "stop_reason": "PAGE_EXHAUSTED",
-            "metadata": {"headers": headers, "body_length": len(body_text)},
+            "metadata": {
+                "body_length": len(body_text.encode("utf-8")),
+                "title": title.get_text(strip=True) if title else None,
+                "url": input_data.get("request_spec", {}).get("url"),
+                "final_url": input_data.get("final_url", input_data.get("request_spec", {}).get("url")),
+                "content_type": next((v for k, v in headers.items() if k.lower() == "content-type"), None),
+            },
         }
 
         # 1. Check HTTP Status Codes
@@ -306,7 +303,7 @@ class AirPulseIsolatedSpider:
                 "failure_message": f"HTTP {http_status} Authentication Required.",
             }
 
-        if http_status >= 500:
+        if http_status >= 400:
             return {
                 **base_res,
                 "status": "HTTP_ERROR",
@@ -372,12 +369,15 @@ class AirPulseIsolatedSpider:
                 "failure_message": "Response body is empty.",
             }
 
-        # 5. Check if Confirmed Client-Side JS Shell
-        is_js_shell = (
-            any(marker in body_lower for marker in JS_SHELL_MARKERS)
-            or any(bool(re.search(pat, body_lower)) for pat in JS_SHELL_PATTERNS)
-            or input_data.get("requires_js_adapter", False)
+        from app.scraping.adapters.registry import AdapterRegistry
+        from app.schemas.runs import SearchRequest
+        adapter = AdapterRegistry.get_adapter(source_id=source_id, source_name=source_name)
+        request = SearchRequest(**search_req)
+        adapter_quotes = adapter.parse_scrapy_response(
+            {"body": body_text, "http_status": http_status, "url": base_res["metadata"]["final_url"]}, request
         )
+        # Parse real server-rendered fares before considering a JS shell.
+        is_js_shell = not adapter_quotes and http_status == 200 and adapter.is_js_shell(body_text, http_status)
         if is_js_shell:
             return {
                 **base_res,
@@ -410,6 +410,13 @@ class AirPulseIsolatedSpider:
                 cabin=search_req.get("cabin"),
                 return_metrics=True,
             )
+            # A registered source parser is authoritative; generic heuristics must
+            # never manufacture records rejected by the Yatra adapter.
+            if adapter.source_id == "yatra":
+                parsed_quotes = adapter_quotes
+                metrics = {"results_seen": len(adapter_quotes), "results_matching": len(adapter_quotes),
+                           "results_collected": len(adapter_quotes),
+                           "stop_reason": "RESULT_LIMIT_REACHED" if len(adapter_quotes) >= request.max_results else "PAGE_EXHAUSTED"}
 
             if parsed_quotes:
                 return {

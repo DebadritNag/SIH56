@@ -116,8 +116,9 @@ class YatraCollector(BaseCollector):
             q_dict["dst"] = q_dict.get("destination") or search_request.destination.upper()
             q_dict["flight_no"] = q_dict.get("flight_number")
             dep_d = q_dict.get("departure_date") or str(search_request.departure_date)
-            dep_t = q_dict.get("departure_time") or "06:00"
-            q_dict["departure_iso"] = f"{dep_d}T{dep_t}:00Z"
+            dep_t = q_dict.get("departure_time")
+            # Indian domestic schedules are local IST, not UTC.
+            q_dict["departure_iso"] = f"{dep_d}T{dep_t}:00+05:30" if dep_t else None
             raw_quotes.append(q_dict)
 
         # Cap strictly at bounded_max

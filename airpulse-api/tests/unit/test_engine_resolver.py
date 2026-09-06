@@ -26,6 +26,55 @@ from app.scraping.engines.scrapy_engine import ScrapyEngine
 from app.scraping.resolver import EngineResolver
 
 
+@pytest.mark.asyncio
+async def test_yatra_subprocess_uses_source_parser():
+    from app.scraping.adapters.yatra import YatraAdapter
+    request = SearchRequest(origin="DEL", destination="BOM", departure_date=date(2026, 9, 13),
+                            booking_window_days=7, max_results=10)
+    result = await ScrapyEngine().execute(request, YatraAdapter(), mock_response={
+        "http_status": 200,
+        "body": '<div class="tuple">AI-805 <span class="total-price">INR 6,450</span></div>'
+                '<div class="tuple">Sold Out</div>',
+    })
+    assert result.status == "SUCCESS"
+    assert result.quotes_found == 1
+    quote = result.quotes[0]
+    assert quote["gross_total"] == 6450
+    assert quote["departure_time"] is None
+    assert quote["tax_amount"] is None
+    assert quote["is_non_stop"] is None
+    assert quote["provenance"]["raw_card"]
+
+
+@pytest.mark.asyncio
+async def test_yatra_live_probe_preserves_connection_failure():
+    from unittest.mock import AsyncMock, patch
+    from app.services.live_scraper import LiveScraper
+    failure = EngineResult(status="FAILED", engine="scrapy", failure_code="CONNECTION_FAILURE",
+                           failure_message="Connection failed", http_status=None)
+    with patch("app.services.scraper_governance.SourcePolicy.is_executable", return_value=True), \
+         patch("app.scraping.resolver.EngineResolver.resolve_and_execute", new=AsyncMock(return_value=failure)):
+        result = await LiveScraper().run(source_name="Yatra", source_type="ota")
+    assert result["failure_stage"] == "CONNECTION_FAILURE"
+    assert result["http_status"] is None
+    assert result["quotes_found"] == 0
+    assert result["is_fallback"] is False
+    assert result["ready_for_ingestion"] is False
+
+
+def test_yatra_policy_requires_explicit_configuration(monkeypatch):
+    from app.config import settings
+    from app.services.scraper_governance import PolicyGateService
+    monkeypatch.setattr(settings, "YATRA_PROTOTYPE_ENABLED", False)
+    monkeypatch.setattr(settings, "YATRA_REVIEW_NOTES", "")
+    policy = PolicyGateService.get_policy("Yatra")
+    assert not policy.is_executable()
+    monkeypatch.setattr(settings, "YATRA_PROTOTYPE_ENABLED", True)
+    assert not policy.is_executable()
+    monkeypatch.setattr(settings, "YATRA_REVIEW_NOTES", "Controlled test reviewed")
+    assert policy.is_executable()
+
+
 @pytest.fixture
 def search_request():
     return SearchRequest(

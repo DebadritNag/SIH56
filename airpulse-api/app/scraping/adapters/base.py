@@ -4,6 +4,7 @@ Source Adapter interface defining engine capabilities and search translations.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+import re
 from typing import Any, Dict, List, Optional
 
 from app.schemas.runs import SearchRequest
@@ -53,7 +54,7 @@ class SourceAdapter(ABC):
             'you need to enable javascript to run this app',
             'javascript is disabled in your browser',
         ])
-        return has_spa_hook
+        return has_spa_hook or bool(re.search(r"<div\s+id=['\"](?:root|app|__next)['\"]\s*>\s*</div>", lower))
 
     def is_empty_availability(self, body_text: str, http_status: int) -> bool:
         """Identifies explicit no-flight availability message in response."""

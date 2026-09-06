@@ -154,6 +154,10 @@ class LiveScraper:
             dep = today_date + timedelta(days=effective_bw)
         origin = origin.upper().strip()
         destination = destination.upper().strip()
+        if "yatra" in source_name.lower() or "ota_source_04" in source_name.lower():
+            return await self._run_yatra_probe(
+                source_name, origin, destination, dep, engine or "AUTO", max_results, is_nonstop
+            )
         stages: List[Dict[str, Any]] = []
 
         try:
@@ -325,6 +329,56 @@ class LiveScraper:
                 return res
         finally:
             rate_limiter.release()
+
+    async def _run_yatra_probe(self, source_name, origin, destination, departure, engine, max_results, is_nonstop):
+        """Use the same source adapter/resolver as the collector; never model a fare."""
+        from dataclasses import asdict
+        from app.schemas.runs import SearchRequest
+        from app.scraping.adapters.yatra import YatraAdapter
+        from app.scraping.resolver import EngineResolver
+        from app.config import settings
+
+        started = time.time()
+        limit = min(max(int(max_results or 10), 1), 15)
+        days = (departure - datetime.now(timezone.utc).date()).days
+        policy = PolicyGateService.get_policy("yatra")
+        policy_evidence = asdict(policy)
+        policy_evidence["checked_at"] = datetime.now(timezone.utc).isoformat()
+        policy_evidence["review_notes"] = settings.YATRA_REVIEW_NOTES
+        permitted = policy.is_executable()
+        stages = [_build_stage("POLICY_CHECK", "PASS" if permitted else "FAIL",
+                              "Controlled prototype review configured." if permitted else
+                              "Yatra requires YATRA_PROTOTYPE_ENABLED=true and YATRA_REVIEW_NOTES after manual review.")]
+        if not permitted:
+            result = self._finalize_result(stages, started, "POLICY_RESTRICTED", stages[0]["detail"],
+                                          origin, destination, departure, days, source_name,
+                                          engine="SCRAPY", max_results=limit)
+        else:
+            request = SearchRequest(origin=origin, destination=destination, departure_date=departure,
+                                    booking_window_days=days, max_results=limit, is_nonstop=is_nonstop)
+            limiter = SourceRateLimiter.get_limiter("yatra")
+            await limiter.acquire()
+            try:
+                resolved = await EngineResolver().resolve_and_execute(request, YatraAdapter(), preferred_engine=engine)
+            finally:
+                limiter.release()
+            stages.append(_build_stage("ENGINE_START", "PASS", f"Engine: {resolved.engine}"))
+            stages.append(_build_stage("RESULT_DETECTION", "PASS" if resolved.quotes else "FAIL",
+                                       resolved.failure_message or f"{len(resolved.quotes)} monetary fares extracted."))
+            result = self._finalize_result(stages, started, resolved.failure_code or resolved.status,
+                                          resolved.failure_message or "", origin, destination, departure, days,
+                                          source_name, http_status=resolved.http_status, engine=resolved.engine,
+                                          response_hash=resolved.raw_payload_hash, max_results=limit,
+                                          results_seen=resolved.results_seen, results_matching=resolved.results_matching,
+                                          results_collected=resolved.results_collected, stop_reason=resolved.stop_reason)
+            result["metadata"] = resolved.metadata
+            if resolved.status == "SUCCESS" and resolved.quotes:
+                result.update(status="PARTIAL", quotes=resolved.quotes, quotes_found=len(resolved.quotes),
+                              failure_stage=None, failure_reason=None,
+                              recommended_remediation="Diagnostic extraction only; durable acquisition/ingestion handoff is not yet implemented.")
+                stages.append(_build_stage("RAW_STORAGE", "SKIPPED", "Probe only: canonical ingestion was not started."))
+        result.update(policy=policy_evidence, data_origin="LIVE", ready_for_ingestion=False)
+        return result
 
     async def _run_scrapy_flow(
         self,
@@ -1931,6 +1985,7 @@ class LiveScraper:
         stop_reason: Optional[str] = None,
     ) -> Dict[str, Any]:
         duration_ms = int((time.time() - started) * 1000)
+        engine = engine.upper()
 
         # Dynamic, context-accurate remediation guidance
         remediation = "Source temporarily unavailable or blocked. Try an alternate source or use MOCK mode for demonstrations."
@@ -1941,7 +1996,7 @@ class LiveScraper:
                 "or install Google Chrome on the host/container."
             )
         elif failure_stage in (ScrapeFailureStage.BLOCKED.value, ScrapeFailureStage.CHALLENGE_DETECTED.value, ScrapeFailureStage.CAPTCHA_DETECTED.value):
-            remediation = "Source portal presented an anti-bot security challenge. AirPulse complies with ethical zero-evasion scraping. Try another route or use MOCK mode."
+            remediation = "Source returned an access challenge. Collection stopped. Imported datasets remain available separately."
         elif failure_stage == ScrapeFailureStage.RATE_LIMITED.value:
             remediation = "Upstream rate limit reached (HTTP 429). Adaptive rate limiter engaged. Retry after cooldown."
         elif failure_stage == ScrapeFailureStage.TIMEOUT.value:

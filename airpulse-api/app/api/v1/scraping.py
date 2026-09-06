@@ -47,7 +47,7 @@ class ScrapingTestRequest(BaseModel):
     mode: str = "LIVE"
     engine: Optional[str] = "AUTO"  # AUTO, SCRAPY, PLAYWRIGHT
     compare: Optional[bool] = False
-    max_results: Optional[int] = Field(15, ge=1, le=20)
+    max_results: Optional[int] = Field(10, ge=1, le=15)
     is_nonstop: Optional[bool] = None
 
 
@@ -85,7 +85,7 @@ async def execute_live_scraping_test(
     source_type = "ota" if is_ota else str(getattr(src, "source_type", "airline") if src else "airline")
 
     # If payload.compare is requested, execute both engines and return comparison
-    if payload.compare:
+    if payload.compare and "yatra" not in raw_query:
         res_scrapy = await scraper.run(
             source_name=(src.display_name if src else (payload.source_name or "AirPulse Test Source")),
             source_type=source_type,
@@ -171,4 +171,3 @@ async def get_browser_capability(
         return APIResponse(success=(test_res.get("self_test_status") == "PASSED"), data=test_res)
     cap = service.get_capability()
     return APIResponse(success=(cap.launch_status == "SUCCESS"), data=cap.to_dict())
-

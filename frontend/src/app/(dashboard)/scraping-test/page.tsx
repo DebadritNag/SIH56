@@ -41,15 +41,14 @@ const LIVE_PIPELINE_STEPS: ScrapingTestStep[] = [
 ];
 
 export default function ScrapingTestPage() {
-  const [selectedSource, setSelectedSource] = useState('OTA Source 01 (MakeMyTrip)');
+  const [selectedSource, setSelectedSource] = useState('Yatra (OTA)');
   const [route, setRoute] = useState('DEL-BOM');
-  const [departureDate, setDepartureDate] = useState('2026-09-09');
-  const [bookingWindow, setBookingWindow] = useState('T+7');
+  const [departureDate, setDepartureDate] = useState(() => { const date = new Date(); date.setUTCDate(date.getUTCDate() + 7); return date.toISOString().slice(0, 10); });
+  const [bookingWindow, setBookingWindow] = useState('T+7 (3-10 Days)');
   const [cabin, setCabin] = useState('Economy');
   const [simulateFailure, setSimulateFailure] = useState(false);
   const [selectedEngine, setSelectedEngine] = useState<'AUTO' | 'SCRAPY' | 'PLAYWRIGHT'>('AUTO');
-  const [compareEngines, setCompareEngines] = useState<boolean>(false);
-  const [resultLimit, setResultLimit] = useState<number>(15);
+  const [resultLimit, setResultLimit] = useState<number>(10);
   const [isNonstopOnly, setIsNonstopOnly] = useState<boolean>(false);
 
   const [isRunning, setIsRunning] = useState(false);
@@ -82,38 +81,6 @@ export default function ScrapingTestPage() {
     const [origin, destination] = route.split('-');
     const bwMap: Record<string, number> = { 'T+1 (1-2 Days)': 1, 'T+7 (3-10 Days)': 7, 'T+15 (11-20 Days)': 15, 'T+30 (21-35 Days)': 30, 'T+45 (36+ Days)': 45 };
 
-    // Advance Stage 0 (Policy) -> Stage 1 (Engine Init) -> Stage 2 (Navigation)
-    // AND HOLD ON STAGE 2 (Navigation) while waiting for network response!
-    let activeIndex = 0;
-    const progressTimer = setInterval(() => {
-      if (activeIndex < 2) {
-        activeIndex++;
-        setActiveStepIndex(activeIndex);
-        setSteps((prev) =>
-          prev.map((s, idx) => {
-            if (idx < activeIndex) {
-              const detail = idx === 0
-                ? 'Policy verified: ALLOWED · Ethical rate limiter engaged'
-                : `Engine active: ${selectedEngine} collector context ready`;
-              return { ...s, status: 'completed', detail };
-            } else if (idx === activeIndex) {
-              return {
-                ...s,
-                status: 'running',
-                detail: idx === 2
-                  ? `Connecting to ${selectedSource} via ${selectedEngine} engine…`
-                  : 'Initializing collector engine…',
-              };
-            }
-            return s;
-          })
-        );
-      } else {
-        // Hold strictly at stage 2 (Navigation) while waiting for network response!
-        clearInterval(progressTimer);
-      }
-    }, 350);
-
     try {
       const res = await endpoints.runScrapingTest({
         source_name: selectedSource,
@@ -123,74 +90,19 @@ export default function ScrapingTestPage() {
         booking_window_days: bwMap[bookingWindow] ?? 7,
         mode: 'LIVE',
         engine: selectedEngine,
-        compare: compareEngines,
+        compare: false,
         max_results: resultLimit,
         is_nonstop: isNonstopOnly ? true : undefined,
       });
-      clearInterval(progressTimer);
 
       const finalStages = (res.stages && res.stages.length > 0) ? res.stages : [];
-      const hasFailed = res.status === 'FAILED';
-
-      if (hasFailed) {
-        // Map backend stages directly - NEVER advance beyond the failure stage!
-        setActiveStepIndex(2);
-        if (finalStages.length > 0) {
-          setSteps(
-            finalStages.map((st: any, idx: number) => {
-              const rawStatus = (st.status || '').toLowerCase();
-              const mapped = STATUS_MAP[rawStatus] ?? (rawStatus === 'passed' ? 'completed' : rawStatus === 'failed' ? 'failed' : 'pending');
-              return {
-                step_number: idx + 1,
-                title: st.stage.replace(/_/g, ' '),
-                status: mapped,
-                detail: st.detail || '',
-              };
-            })
-          );
-        } else {
-          setSteps((prev) =>
-            prev.map((s, idx) => {
-              if (idx < 2) return { ...s, status: 'completed' };
-              if (idx === 2) return { ...s, status: 'failed', detail: res.failure_reason || 'Navigation timed out' };
-              return { ...s, status: 'pending' };
-            })
-          );
-        }
-      } else {
-        // Success: smoothly advance through remaining stages (2 to 10)
-        for (let i = 2; i < LIVE_PIPELINE_STEPS.length; i++) {
-          setActiveStepIndex(i);
-          setSteps((prev) =>
-            prev.map((s, idx) => {
-              if (idx < i) {
-                const backendDetail = finalStages[idx]?.detail || s.detail;
-                return { ...s, status: 'completed', detail: backendDetail };
-              } else if (idx === i) {
-                return { ...s, status: 'running', detail: finalStages[idx]?.detail || 'Processing live telemetry...' };
-              }
-              return s;
-            })
-          );
-          await new Promise((r) => setTimeout(r, 80));
-        }
-
-        // Final complete state
-        if (finalStages.length > 0) {
-          setSteps(
-            finalStages.map((st: any, idx: number) => {
-              const rawStatus = (st.status || '').toLowerCase();
-              const mapped = STATUS_MAP[rawStatus] ?? (rawStatus === 'passed' ? 'completed' : rawStatus === 'failed' ? 'failed' : 'pending');
-              return {
-                step_number: idx + 1,
-                title: st.stage.replace(/_/g, ' '),
-                status: mapped,
-                detail: st.detail || '',
-              };
-            })
-          );
-        }
-      }
+      setActiveStepIndex(-1);
+      setSteps(finalStages.map((st: any, idx: number) => ({
+        step_number: idx + 1,
+        title: st.stage.replace(/_/g, ' '),
+        status: STATUS_MAP[(st.status || '').toLowerCase()] ?? 'pending',
+        detail: st.detail || '',
+      })));
 
       if (res.status === 'FAILED') {
         const stage = res.failure_stage || 'FAILED';
@@ -257,8 +169,8 @@ export default function ScrapingTestPage() {
       // Real live fare & flight observations matching portal data
       const fares = (res.quotes || []).map((q: any) => {
         const depDate = q.departure_date || (q.departure_iso ? q.departure_iso.substring(0, 10) : (res.departure_date || departureDate));
-        const depTime = q.departure_time || (q.departure_iso ? q.departure_iso.substring(11, 16) : '06:00');
-        const carrierRaw = String(q.carrier ?? q.airline ?? '6E').trim();
+        const depTime = q.departure_time || (q.departure_iso ? q.departure_iso.substring(11, 16) : '—');
+        const carrierRaw = String(q.carrier ?? q.airline ?? '').trim();
         const fullAirlineName =
           carrierRaw.includes('6E') || carrierRaw.toLowerCase().includes('indigo') ? 'IndiGo' :
           carrierRaw.includes('QP') || carrierRaw.toLowerCase().includes('akasa') ? 'Akasa Air' :
@@ -266,9 +178,9 @@ export default function ScrapingTestPage() {
           carrierRaw.includes('AI') || carrierRaw.toLowerCase().includes('india') ? 'Air India' :
           carrierRaw.includes('UK') || carrierRaw.toLowerCase().includes('vistara') ? 'Vistara' :
           carrierRaw.includes('SG') || carrierRaw.toLowerCase().includes('spice') ? 'SpiceJet' :
-          String(q.airline ?? 'IndiGo');
+          String(q.airline ?? '—');
 
-        let flightNum = String(q.flight_no ?? q.flight_number ?? '6E-6047').trim();
+        let flightNum = String(q.flight_no ?? q.flight_number ?? '—').trim();
         // Normalize "6E 235" or "6E 6047" or "6E235" to "6E-235" / "6E-6047"
         if (/^([A-Z0-9]{2})\s+(\d+)$/i.test(flightNum)) {
           flightNum = flightNum.replace(/^([A-Z0-9]{2})\s+(\d+)$/i, '$1-$2');
@@ -276,9 +188,9 @@ export default function ScrapingTestPage() {
           flightNum = flightNum.replace(/^([A-Z0-9]{2})(\d{3,4})$/i, '$1-$2');
         }
 
-        const total = q.gross_total != null && Number(q.gross_total) > 0 ? Number(q.gross_total) : (q.total_fare != null ? Number(q.total_fare) : 6442);
-        const base = q.base_price != null && Number(q.base_price) > 0 ? Number(q.base_price) : Math.round(total / 1.12);
-        const taxes = Math.max(0, total - base);
+        const total = q.gross_total != null && Number(q.gross_total) > 0 ? Number(q.gross_total) : (q.total_fare != null ? Number(q.total_fare) : null);
+        const base = q.base_price != null ? Number(q.base_price) : null;
+        const taxes = q.tax_amount != null ? Number(q.tax_amount) : null;
 
         return {
           airline: fullAirlineName,
@@ -289,7 +201,7 @@ export default function ScrapingTestPage() {
           base_fare: base,
           taxes: taxes,
           total: total,
-          validation_status: res.is_fallback ? 'FALLBACK (MODEL)' : 'VALID',
+          validation_status: 'NOT INGESTED',
         };
       });
 
@@ -326,13 +238,12 @@ export default function ScrapingTestPage() {
           description: res.fallback_reason || `Live upstream throttled on hosting; dynamic corridor market model generated for travel date ${res.departure_date || departureDate}.`,
         });
       } else {
-        notify.success('Live scraping verified', {
+        notify.info('Live extraction completed', {
           id: 'scrape-probe',
-          description: `${res.quotes_validated} live flights detected on corridor · SHA-256 evidence stored.`,
+          description: `${res.quotes_found} monetary fares extracted. Canonical ingestion has not run.`,
         });
       }
     } catch (err) {
-      clearInterval(progressTimer);
       setIsRunning(false);
       const errMsg = err instanceof Error ? err.message : 'Request failed';
       const isGatewayOrCors =
@@ -464,12 +375,6 @@ export default function ScrapingTestPage() {
               disabled={isRunning}
               className="w-full bg-[#F8FAFC] border border-[#D0D5DD] rounded px-3 py-1.5 text-xs text-[#101828] font-medium"
             >
-              <option>OTA Source 01 (MakeMyTrip)</option>
-              <option>Airline Direct (IndiGo Portal)</option>
-              <option>Airline Direct (Air India Portal)</option>
-              <option>OTA Source 02 (EaseMyTrip)</option>
-              <option>OTA Source 03 (Cleartrip)</option>
-              <option>OTA Source 04 (Yatra)</option>
               <option>Yatra (OTA)</option>
             </select>
           </div>
@@ -616,18 +521,6 @@ export default function ScrapingTestPage() {
                 </label>
               </div>
 
-              <div className="pt-4">
-                <label className="flex items-center gap-1.5 text-xs text-[#344054] font-semibold cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={compareEngines}
-                    onChange={(e) => setCompareEngines(e.target.checked)}
-                    disabled={isRunning}
-                    className="rounded text-blue-600 focus:ring-0"
-                  />
-                  <span>Compare Engines</span>
-                </label>
-              </div>
             </div>
           </div>
         </div>
