@@ -41,8 +41,15 @@ def source_enabled(source):
 
 @router.get('/config')
 async def configuration(source: Literal['yatra', 'happyfares'] = 'yatra', user: UserContext = Depends(require_viewer)):
+    from app.services.memory_budget import require_browser_memory
+    browser_available, browser_message = True, None
+    try:
+        require_browser_memory()
+    except MemoryError as exc:
+        browser_available, browser_message = False, str(exc)
     return {'success': True, 'data': {
         'source': source, 'enabled': source_enabled(source),
+        'browser_available': browser_available, 'browser_message': browser_message,
         'worker_enabled': settings.LIVE_WORKER_ENABLED, 'max_results': 15,
         'policy_status': 'MANUAL_REVIEW_REQUIRED',
         'message': 'Bounded public-page prototype. Access challenges stop collection without bypass.'}}

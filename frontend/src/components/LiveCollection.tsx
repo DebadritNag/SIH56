@@ -15,7 +15,7 @@ export default function LiveCollection() {
   const [destination, setDestination] = useState("BOM");
   const [departure, setDeparture] = useState(() => new Date(Date.now() + 7 * 86400000).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }));
   const [limit, setLimit] = useState(10);
-  const config = useQuery({ queryKey: ["live-config", source], queryFn: () => getData<{ enabled: boolean; worker_enabled: boolean; message: string }>("/live/config", { source }) });
+  const config = useQuery({ queryKey: ["live-config", source], queryFn: () => getData<{ enabled: boolean; worker_enabled: boolean; browser_available?: boolean; browser_message?: string; message: string }>("/live/config", { source }), refetchInterval: 30000 });
   const recent = useQuery({ queryKey: ["live-runs"], queryFn: () => getData<Run[]>("/live/runs"), refetchInterval: 5000 });
   const runId = selected ?? recent.data?.[0]?.id;
   const detail = useQuery({ queryKey: ["live-run", runId], queryFn: () => getData<Run>(`/live/runs/${runId}`), enabled: !!runId, refetchInterval: q => q.state.data?.pipelines?.some(p => ["QUEUED", "RUNNING"].includes(p.status)) ? 2000 : 5000 });
@@ -38,14 +38,15 @@ export default function LiveCollection() {
     <label className="flex items-center gap-3">Source<select className={inputClass} value={source} onChange={e => setSource(e.target.value)}><option value="yatra">Yatra</option><option value="happyfares">HappyFares (prototype)</option></select></label>
     {config.data && !config.data.enabled && <p role="alert" className="rounded border border-amber-400 p-4">{source} is disabled. Configure {source.toUpperCase()}_PROTOTYPE_ENABLED and {source.toUpperCase()}_REVIEW_NOTES after manual review.</p>}
     {config.data && !config.data.worker_enabled && <p role="alert">The backend live worker is disabled.</p>}
+    {config.data?.browser_available === false && <p role="alert" className="rounded border border-amber-400 p-4">{config.data.browser_message}</p>}
     <form className="flex flex-wrap items-end gap-4 rounded border p-4" onSubmit={e => { e.preventDefault(); collect.mutate(); }}>
       <label className="grid gap-1 text-sm">Origin<input className={inputClass} value={origin} maxLength={3} pattern="[A-Z]{3}" required onChange={e => setOrigin(e.target.value.toUpperCase())} /></label>
       <label className="grid gap-1 text-sm">Destination<input className={inputClass} value={destination} maxLength={3} pattern="[A-Z]{3}" required onChange={e => setDestination(e.target.value.toUpperCase())} /></label>
       <label className="grid gap-1 text-sm">Departure<input className={inputClass} type="date" required value={departure} onChange={e => setDeparture(e.target.value)} /></label>
       <label className="grid gap-1 text-sm">Maximum fares<input className={inputClass} type="number" min={1} max={15} required value={limit} onChange={e => setLimit(Number(e.target.value))} /></label>
-      <button className="rounded bg-blue-700 px-4 py-2 text-white disabled:opacity-40" disabled={!!busy || !config.data?.enabled || !config.data.worker_enabled}>Collect live fares</button>
+      <button className="rounded bg-blue-700 px-4 py-2 text-white disabled:opacity-40" disabled={!!busy || !config.data?.enabled || !config.data.worker_enabled || config.data.browser_available === false}>Collect live fares</button>
     </form>
-    <p className="text-sm text-slate-500">Engine: automatic · Scrapy first · browser rendering only for accessible JavaScript pages. Challenges stop the run. Imported datasets remain available in Data Ingestion.</p>
+    <p className="text-sm text-slate-500">Engine: Playwright with installed Chrome. Challenges stop the run. Imported datasets remain available in Data Ingestion.</p>
     {error && <p role="alert" className="rounded border border-red-400 p-4">{error instanceof Error ? error.message : "Unable to load live collection"}</p>}
     <label className="flex items-center gap-3">Recent runs<select className={inputClass} value={runId ?? ""} onChange={e => setSelected(e.target.value)}><option value="" disabled>No runs yet</option>{recent.data?.map(r => <option key={r.id} value={r.id}>{new Date(r.created_at).toLocaleString()} · {r.status} · {r.quotes_received} fares</option>)}</select></label>
     {run && <section className="space-y-4 rounded border p-4">

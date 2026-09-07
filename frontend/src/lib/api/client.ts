@@ -101,7 +101,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   } catch (err) {
     // Network-level failure (backend down, CORS, DNS). Surface as ApiError(0).
     throw new ApiError(
-      err instanceof Error ? err.message : "Network request failed",
+      "Cannot reach the AirPulse API. Check your connection and whether the frontend and backend deployments are running. No HTTP response was received; collection status is unknown. Check Recent runs before trying again.",
       0,
       "NETWORK_ERROR",
     );

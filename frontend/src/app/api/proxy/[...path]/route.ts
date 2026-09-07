@@ -39,6 +39,8 @@ async function handler(req: NextRequest, { params }: { params: Promise<{ path: s
   req.headers.forEach((val, key) => {
     if (key.toLowerCase() !== "host") headers[key] = val;
   });
+  // Prefer an uncompressed upstream response; Vercel handles browser compression.
+  headers["accept-encoding"] = "identity";
 
   const body = ["GET", "HEAD"].includes(req.method) ? undefined : await req.arrayBuffer();
 
@@ -74,10 +76,12 @@ async function handler(req: NextRequest, { params }: { params: Promise<{ path: s
     );
   }
 
-  // Forward response headers (except ones Next.js manages).
+  // Node fetch decodes gzip/br/deflate bodies but retains upstream headers.
+  // Forwarding their encoding or compressed length makes browsers decode the
+  // already-decoded stream again (ERR_CONTENT_DECODING_FAILED, even on HTTP 200).
   const resHeaders = new Headers();
   res.headers.forEach((val, key) => {
-    if (!["transfer-encoding", "connection", "keep-alive"].includes(key.toLowerCase())) {
+    if (!["content-encoding", "content-length", "transfer-encoding", "connection", "keep-alive"].includes(key.toLowerCase())) {
       resHeaders.set(key, val);
     }
   });
