@@ -19,6 +19,9 @@ import { OriginBadge } from '@/components/ui/Badge';
 import { formatINR } from '@/lib/formatters';
 import { formatTimestamp } from '@/lib/utils/timestamps';
 import { useFareProvenance } from '@/lib/hooks/useResources';
+import { useQuery } from '@tanstack/react-query';
+import { getPaginated } from '@/lib/api/client';
+import { useDataMode } from '@/lib/providers/DataModeProvider';
 
 interface FareProvenanceDrawerProps {
   fare: FareObservation | null;
@@ -27,6 +30,14 @@ interface FareProvenanceDrawerProps {
 
 export const FareProvenanceDrawer: React.FC<FareProvenanceDrawerProps> = ({ fare, onClose }) => {
   const { data: rawProv, isLoading } = useFareProvenance(fare?.id);
+  const { mode } = useDataMode();
+  const imported = ((rawProv as Record<string, unknown> | undefined)?.data_origin ?? fare?.origin_type) === 'IMPORTED';
+  const ingestionRuns = useQuery({
+    queryKey: ['fare-audit-ingestion-runs', mode],
+    queryFn: () => getPaginated<{ id: string; status: string; started_at?: string; run_metadata?: { published_dashboard?: boolean; original_filename?: string } }>('/ingestion/runs', { page_size: 100 }),
+    enabled: !!fare && imported && mode === 'real',
+    refetchInterval: 5000,
+  });
 
   if (!fare) return null;
 
@@ -35,7 +46,16 @@ export const FareProvenanceDrawer: React.FC<FareProvenanceDrawerProps> = ({ fare
 
   const isImported = (prov?.data_origin ?? fare.origin_type) === 'IMPORTED';
   const sourceName = prov?.source_provider || fare.source || 'Goibibo (OTA)';
-  const runId = prov?.collection_run_id || fare.provenance?.collection_run_id || '—';
+  const originalRunId = prov?.collection_run_id || fare.provenance?.collection_run_id || '—';
+  // A published Run Collection processes the available observation pool. Keep
+  // raw acquisition lineage separate and exclude failed or unfinished attempts.
+  const latestIngestion = mode === 'real' && isImported ? ingestionRuns.data?.items.find(r =>
+    ['COMPLETED', 'PARTIAL'].includes(r.status.toUpperCase()) &&
+    r.run_metadata?.published_dashboard === true &&
+    r.run_metadata?.original_filename === 'existing-observations' &&
+    (!prov?.timestamps?.ingested_at || (r.started_at && new Date(prov.timestamps.ingested_at) <= new Date(r.started_at)))
+  ) : undefined;
+  const runId = latestIngestion?.id ?? originalRunId;
   const displayFare = prov?.normalized_fare ? Number(prov.normalized_fare) : fare.total_fare;
   const routeDisplay = prov?.route ? prov.route.replace('-', ' → ') : fare.route;
   const bookingWindow = prov?.booking_window_bucket || fare.booking_window;
@@ -182,6 +202,11 @@ export const FareProvenanceDrawer: React.FC<FareProvenanceDrawerProps> = ({ fare
               <span className="text-[#667085]">Collection Run:</span>
               <span className="font-mono font-bold text-blue-700">#{runId}</span>
             </div>
+            {latestIngestion && <div className="flex justify-between items-center">
+              <span className="text-[#667085]">Original Import Run:</span>
+              <span className="font-mono text-[#475467]">#{originalRunId}</span>
+            </div>}
+            {mode === 'real' && isImported && ingestionRuns.isError && <p className="text-amber-700">Latest ingestion run could not be loaded; showing original import run.</p>}
             <div className="flex justify-between items-center">
               <span className="text-[#667085]">Source Provider:</span>
               <span className="font-semibold text-[#101828]">{sourceName}</span>
