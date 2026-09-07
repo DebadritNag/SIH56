@@ -9,15 +9,19 @@ type Run = { id: string; status: string; started_at?: string; created_at?: strin
 type Pipeline = { id: string; pipeline_type: string; status: string; error_summary?: string; steps: { id: string; step_name: string; status: string; records_output: number; message?: string }[] };
 const tone = (status: string) => /FAILED/i.test(status) ? 'bg-red-50 text-red-700' : /RUNNING|QUEUED/i.test(status) ? 'bg-blue-50 text-blue-700' : /COMPLETED/i.test(status) ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-800';
 
-export default function LivePipelineMonitor() {
+const demoRuns: Run[] = [{ id: 'demo-completed', status: 'COMPLETED', started_at: '2026-09-02T09:30:00Z' }, { id: 'demo-failed', status: 'FAILED', started_at: '2026-09-02T08:00:00Z' }];
+const demoDetail = (id: string): { pipeline_runs: Pipeline[] } => ({ pipeline_runs: [{ id, pipeline_type: 'demo_ingestion', status: id === 'demo-failed' ? 'FAILED' : 'COMPLETED', steps: ['INGEST', 'NORMALIZE', 'VALIDATE', 'DEDUP', 'FEATURES', 'FAREGUARD', 'PRICEGUARD', 'APIX'].map((name, index) => ({ id: `${id}-${name}`, step_name: name, status: id === 'demo-failed' ? index === 2 ? 'FAILED' : index > 2 ? 'SKIPPED' : 'COMPLETED' : 'COMPLETED', records_output: id === 'demo-failed' && index >= 2 ? 0 : 26, message: id === 'demo-failed' && index === 2 ? 'Demo validation failure: invalid quote format.' : 'Illustrative demo telemetry.' })) }] });
+
+export default function LivePipelineMonitor({ demo = false }: { demo?: boolean }) {
   const [selected, setSelected] = useState<string>();
-  const runs = useQuery({ queryKey: ['pipeline-monitor-runs'], queryFn: () => getPaginated<Run>('/ingestion/runs', { page_size: 30 }), refetchInterval: 5000 });
+  const runs = useQuery({ queryKey: ['pipeline-monitor-runs', demo], queryFn: () => demo ? Promise.resolve({ items: demoRuns }) : getPaginated<Run>('/ingestion/runs', { page_size: 30 }), refetchInterval: demo ? false : 5000 });
   const runId = selected ?? runs.data?.items[0]?.id;
-  const detail = useQuery({ queryKey: ['pipeline-monitor-detail', runId], queryFn: () => getData<{ pipeline_runs: Pipeline[] }>(`/ingestion/runs/${runId}`), enabled: !!runId, refetchInterval: 3000 });
+  const detail = useQuery({ queryKey: ['pipeline-monitor-detail', demo, runId], queryFn: () => demo ? Promise.resolve(demoDetail(runId!)) : getData<{ pipeline_runs: Pipeline[] }>(`/ingestion/runs/${runId}`), enabled: !!runId, refetchInterval: demo ? false : 3000 });
   const items = runs.data?.items ?? [];
   const error = runs.error || detail.error;
   return <div className="space-y-6">
-    <header className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-2xl font-bold text-slate-900">Pipeline Monitor</h1><p className="mt-1 text-sm text-slate-500">Recorded collection and processing runs · refreshed every 5 seconds</p></div><Link className="rounded-lg border bg-white px-4 py-2 text-sm text-blue-700" href="/ingestion">Open Data Ingestion</Link></header>
+    {demo && <p className="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Demo Mode · Illustrative runs and stage results</p>}
+    <header className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-2xl font-bold text-slate-900">Pipeline Monitor</h1><p className="mt-1 text-sm text-slate-500">{demo ? 'Illustrative collection and processing runs' : 'Recorded collection and processing runs · refreshed every 5 seconds'}</p></div><Link className="rounded-lg border bg-white px-4 py-2 text-sm text-blue-700" href="/ingestion">Open Data Ingestion</Link></header>
     <div className="grid grid-cols-2 gap-3 md:grid-cols-4">{[['Recent runs', items.length], ['Queued / running', items.filter(r => /^(QUEUED|RUNNING)$/i.test(r.status)).length], ['Failed', items.filter(r => /^FAILED$/i.test(r.status)).length], ['Completed / partial', items.filter(r => /^(COMPLETED|PARTIAL)$/i.test(r.status)).length]].map(([label, value]) => <div key={label} className="rounded-xl border bg-white p-4"><p className="text-xs text-slate-500">{label}</p><p className="mt-2 text-2xl font-semibold">{runs.isPending || runs.isError ? '—' : value}</p></div>)}</div>
     {error && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">{error.message}<button className="ml-3 underline" onClick={() => { void runs.refetch(); if (runId) void detail.refetch(); }}>Retry</button></div>}
     {runs.isPending && <p role="status">Loading recorded pipeline runs…</p>}
