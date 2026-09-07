@@ -20,7 +20,6 @@ import {
   Cpu,
   Server,
   Activity,
-  Download,
   ChevronLeft,
   ChevronRight,
   Shield,
@@ -72,7 +71,6 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'Fare Explorer', href: '/fares', icon: Database },
       { label: 'Data Ingestion', href: '/ingestion', icon: DownloadCloud },
       { label: 'Data Sources', href: '/sources', icon: Globe },
-      { label: 'Downloads & Exports', href: '/downloads', icon: Download },
     ],
   },
   {

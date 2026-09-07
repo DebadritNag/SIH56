@@ -21,7 +21,7 @@ export function LiveDataGate({ children }: { children: ReactNode }) {
     if (q.data?.ready && previous.current === false) void client.invalidateQueries();
     previous.current = q.data?.ready;
   }, [q.data?.ready, client]);
-  const management = ['/ingestion', '/scraping-test', '/sources', '/settings'];
+  const management = ['/ingestion', '/pipeline', '/scraping-test', '/sources', '/settings'];
   if (mode === 'mock' || management.some(p => path === p || path.startsWith(p + '/'))) return children;
   if (q.isPending) return <p className="p-8 text-slate-500">Checking processed observations…</p>;
   if (q.isError) return <div className="p-8">Unable to check ingestion status. <button onClick={() => void q.refetch()}>Retry</button></div>;

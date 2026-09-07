@@ -15,6 +15,7 @@ export interface ConfirmActionDialogProps {
   entityName?: string;
   details?: React.ReactNode;
   isLoading?: boolean;
+  loadingContent?: React.ReactNode;
   onConfirm: () => void | Promise<void>;
   onCancel: () => void;
 }
@@ -29,6 +30,7 @@ export const ConfirmActionDialog: React.FC<ConfirmActionDialogProps> = ({
   entityName,
   details,
   isLoading = false,
+  loadingContent,
   onConfirm,
   onCancel,
 }) => {
@@ -78,7 +80,7 @@ export const ConfirmActionDialog: React.FC<ConfirmActionDialogProps> = ({
           </button>
         </div>
 
-        {isLoading ? (
+        {isLoading ? loadingContent ?? (
           <div className="py-2 border-y border-[#F1F5F9] bg-slate-50/50 rounded p-2">
             <AirPulseFlightLoader
               size="sm"

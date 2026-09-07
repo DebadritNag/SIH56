@@ -13,6 +13,7 @@ import { endpoints } from '@/lib/api/endpoints';
 import { getData } from '@/lib/api/client';
 import { notify } from '@/lib/notify';
 import { ConfirmActionDialog } from '@/components/notifications/ConfirmActionDialog';
+import { CollectionProgress } from '@/components/ui/CollectionProgress';
 
 import { DataFreshness } from '@/components/ui/DataFreshness';
 
@@ -114,6 +115,10 @@ export default function IngestionPage() {
 
   // Live: only real run history. Mock: demo runs.
   const realRuns: RunRow[] = ((runsPage as { items?: Record<string, unknown>[] } | undefined)?.items ?? []).map(mapRun);
+  const timings = ((runsPage as { items?: Record<string, unknown>[] } | undefined)?.items ?? [])
+    .filter(r => ['COMPLETED', 'PARTIAL'].includes(String(r.status).toUpperCase()) && Number(r.duration_ms) > 0 && String(r.run_type) !== 'LIVE_ACQUISITION')
+    .map(r => Number(r.duration_ms) / 1000).sort((a, b) => a - b);
+  const expectedSeconds = timings.length ? timings[Math.floor(timings.length / 2)] : undefined;
   const runs: RunRow[] = isMock ? (RECENT_RUNS as RunRow[]) : (published ? realRuns : []);
 
   const selectedRun = (selectedRunId ? runs.find((r) => r.id === selectedRunId) : runs[0]) ?? runs[0];
@@ -487,6 +492,7 @@ export default function IngestionPage() {
         variant="default"
         entityName="BATCH-INGESTION"
         isLoading={isTriggering}
+        loadingContent={!isMock ? <CollectionProgress expectedSeconds={expectedSeconds} /> : undefined}
         onConfirm={handleTriggerCollection}
         onCancel={() => setShowRunConfirm(false)}
       />
