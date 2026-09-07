@@ -19,13 +19,13 @@ const CONFIGURED_BACKEND =
 
 const IS_DEV = process.env.NODE_ENV === "development";
 
-/** Try a fetch; return null on any network error (ECONNREFUSED, timeout, etc.). */
-async function tryFetch(url: string, init: RequestInit): Promise<Response | null> {
+/** Keep the upstream deadline below the route's execution budget. */
+async function tryFetch(url: string, init: RequestInit, timeoutMs = 50000): Promise<{ response: Response | null; timedOut: boolean }> {
   try {
-    const res = await fetch(url, { ...init, signal: AbortSignal.timeout(4000) });
-    return res;
-  } catch {
-    return null;
+    const res = await fetch(url, { ...init, cache: "no-store", signal: AbortSignal.timeout(timeoutMs) });
+    return { response: res, timedOut: false };
+  } catch (error) {
+    return { response: null, timedOut: error instanceof Error && error.name === "TimeoutError" };
   }
 }
 
@@ -54,25 +54,33 @@ async function handler(req: NextRequest, { params }: { params: Promise<{ path: s
 
   let res: Response | null = null;
   let usedBackend = CONFIGURED_BACKEND;
+  let timedOut = false;
 
   if (IS_DEV && CONFIGURED_BACKEND !== LOCAL_BACKEND) {
     // In dev: try localhost first so your local FastAPI is used when running;
     // fall back to the configured backend (Render) when it is not.
-    res = await tryFetch(`${LOCAL_BACKEND}/api/v1/${pathStr}${search}`, init);
+    res = (await tryFetch(`${LOCAL_BACKEND}/api/v1/${pathStr}${search}`, init, 2000)).response;
     if (res) {
       usedBackend = LOCAL_BACKEND;
     }
   }
 
   if (!res) {
-    res = await tryFetch(`${CONFIGURED_BACKEND}/api/v1/${pathStr}${search}`, init);
+    const attempt = await tryFetch(`${CONFIGURED_BACKEND}/api/v1/${pathStr}${search}`, init);
+    res = attempt.response;
+    timedOut = attempt.timedOut;
     usedBackend = CONFIGURED_BACKEND;
   }
 
   if (!res) {
     return NextResponse.json(
-      { success: false, error: { message: "Backend unreachable — both local and deployed backends failed to respond.", code: "BACKEND_UNAVAILABLE" } },
-      { status: 503 }
+      { success: false, error: {
+        message: timedOut
+          ? "The backend did not respond within 50 seconds. Check Render startup and health logs. For collection or ingestion, check run history before submitting again; the request may have reached the backend."
+          : "The proxy could not connect to the configured backend. Check the backend URL and Render service health.",
+        code: timedOut ? "BACKEND_TIMEOUT" : "BACKEND_UNAVAILABLE",
+      } },
+      { status: timedOut ? 504 : 503, headers: { "cache-control": "no-store", "x-airpulse-error-source": "proxy" } }
     );
   }
 
@@ -100,3 +108,4 @@ export const OPTIONS = handler;
 // Use Node.js runtime for TCP socket access (fetch to localhost).
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;

@@ -12,16 +12,21 @@ async function main() {
   const payload = JSON.stringify({ success: true, data: { message: 'Observed fares ₹4968' } });
   const encoders = { gzip: zlib.gzipSync, br: zlib.brotliCompressSync, deflate: zlib.deflateSync, identity: Buffer.from };
   const server = http.createServer((req, res) => {
-    const encoding = req.url.split('/').pop();
+    const mode = req.url.split('/').pop();
+    const encoding = mode === 'slow' ? 'gzip' : mode;
     assert.equal(req.headers['accept-encoding'], 'identity');
     // Intentionally compress anyway to verify safety even if an upstream ignores identity.
     const bytes = encoders[encoding](Buffer.from(payload));
+    const send = () => {
     res.writeHead(encoding === 'br' ? 503 : 200, {
       'content-type': 'application/json',
       ...(encoding === 'identity' ? {} : { 'content-encoding': encoding }),
       'content-length': bytes.length,
     });
     res.end(bytes);
+    };
+    if (mode === 'slow') setTimeout(send, 4500);
+    else send();
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   try {
@@ -35,7 +40,7 @@ async function main() {
     route.filename = filename;
     route.paths = Module._nodeModulePaths(path.dirname(filename));
     route._compile(compiled, filename);
-    for (const encoding of Object.keys(encoders)) {
+    for (const encoding of [...Object.keys(encoders), 'slow']) {
       const response = await route.exports.GET(
         new NextRequest(`http://localhost/api/proxy/${encoding}`, { headers: { 'accept-encoding': 'gzip, br' } }),
         { params: Promise.resolve({ path: [encoding] }) },
