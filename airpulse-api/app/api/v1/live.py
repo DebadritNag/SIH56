@@ -49,6 +49,11 @@ async def collect(payload: LiveRequest, db: AsyncSession = Depends(get_db), user
         raise HTTPException(503, 'Live worker is disabled')
     if not settings.YATRA_PROTOTYPE_ENABLED or not settings.YATRA_REVIEW_NOTES.strip():
         raise HTTPException(409, 'Set YATRA_PROTOTYPE_ENABLED=true and YATRA_REVIEW_NOTES on the backend')
+    from app.services.memory_budget import require_browser_memory
+    try:
+        require_browser_memory()
+    except MemoryError as exc:
+        raise HTTPException(503, str(exc)) from exc
     request = payload.model_dump(mode='json')
     request['booking_window_days'] = (payload.departure_date - datetime.now(ZoneInfo('Asia/Kolkata')).date()).days
     try:

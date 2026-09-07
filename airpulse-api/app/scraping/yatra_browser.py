@@ -180,6 +180,9 @@ class YatraBrowserCollector:
         try:
             async with async_playwright() as pw:
                 try:
+                    from app.services.memory_budget import require_browser_memory
+                    memory = require_browser_memory()
+                    logging.getLogger(__name__).info('Chrome container memory preflight: %s', memory)
                     launch_options = dict(channel='chrome', headless=settings.YATRA_BROWSER_HEADLESS)
                     if settings.YATRA_DISABLE_HTTP2:
                         launch_options['args'] = ['--disable-http2']
@@ -275,6 +278,8 @@ class YatraBrowserCollector:
                         except Exception:
                             pass
                     code = 'BLOCKED' if isinstance(exc,PermissionError) else 'TIMEOUT' if isinstance(exc,PlaywrightTimeout) else 'BROWSER_UNAVAILABLE' if self.stage=='BROWSER_LAUNCH' else 'CONTROL_ERROR'
+                    if isinstance(exc, MemoryError):
+                        code = 'INSUFFICIENT_MEMORY'
                     if code == 'CONTROL_ERROR' and 'net::ERR_' in str(exc):
                         code = 'NETWORK_ERROR'
                     if isinstance(exc, ConnectionError):

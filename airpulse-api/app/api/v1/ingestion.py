@@ -26,7 +26,6 @@ from app.schemas.runs import (
     PipelineRunDetail,
     PipelineStepResponse,
 )
-from app.services.collection_orchestrator import CollectionOrchestrator
 from app.services.audit_service import AuditService
 from app.services.live_scraper import get_live_scraper
 from pydantic import BaseModel, Field
@@ -322,6 +321,7 @@ async def trigger_source_collection(
     current_user: UserContext = Depends(require_analyst),
 ):
     from app.services.ingestion_service import IngestionService
+    from app.services.collection_orchestrator import CollectionOrchestrator
     orchestrator = CollectionOrchestrator(db)
     col_run = await orchestrator.execute_batch_collection(
         source_id=source_id,

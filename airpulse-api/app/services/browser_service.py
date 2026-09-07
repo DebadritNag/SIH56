@@ -676,29 +676,17 @@ class SharedBrowserService:
         """
         start = time.time()
         service = cls.get_instance()
-        from app.core.utils import is_memory_constrained
-        if is_memory_constrained():
-            logger.info("Memory-constrained cloud container detected (Render 512MB); skipping heavy browser self-test to avoid OOM.")
-            cap = BrowserCapability(
-                engine="playwright-chromium",
-                version="124.0.0.0",
-                executable_path="playwright-managed",
-                launch_status="MEMORY_PROTECTED",
-            )
-            service._current_capability = cap
+        from app.services.memory_budget import require_browser_memory
+        try:
+            require_browser_memory()
+        except MemoryError as exc:
+            logger.warning("Browser startup probe skipped: %s", exc)
             return {
-                "status": "PASSED",
-                "self_test_status": "PASSED",
-                "capability": cap.to_dict(),
-                "browser_engine": cap.engine,
-                "browser_version": cap.version,
-                "browser_executable": cap.executable_path,
-                "browser_launch_status": "MEMORY_PROTECTED",
-                "test_page_loaded": True,
-                "js_execution_verified": True,
-                "clean_exit": True,
-                "error": None,
-                "duration_ms": 1,
+                "status": "SKIPPED", "self_test_status": "SKIPPED",
+                "browser_launch_status": "INSUFFICIENT_MEMORY",
+                "test_page_loaded": False, "js_execution_verified": False,
+                "clean_exit": True, "error": str(exc),
+                "duration_ms": int((time.time()-start)*1000),
             }
         try:
             from playwright.async_api import async_playwright
