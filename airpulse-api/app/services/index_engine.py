@@ -49,9 +49,9 @@ class IndexEngine:
                 id=uuid4(),
                 name="Default Indian Domestic Airfare Basket",
                 version=basket_version,
-                base_period="2026-08",
-                effective_from=date(2026, 1, 1),
-                weighting_method="passenger_traffic",
+                base_period_start=date(2026, 1, 1),
+                base_period_end=date(2026, 8, 31),
+                active=True,
             )
             self.session.add(basket)
             await self.session.flush()
@@ -195,20 +195,26 @@ class IndexEngine:
         index_record = AirfareIndex(
             id=index_id,
             index_date=index_date,
-            frequency="daily",
-            scope="national",
-            scope_id=None,
+            index_type="national",
+            route_id=None,
+            booking_window_days=None,
             index_value=final_index_value,
-            base_period=basket.base_period,
-            base_value=100.0,
-            weighted_average_fare=final_weighted_fare,
-            sample_count=sample_count_total,
-            route_count=matched_routes_count,
-            source_count=len(observed_sources),
+            daily_change_pct=None,
+            weekly_change_pct=None,
+            monthly_change_pct=None,
             coverage_quality_score=coverage_quality_score,
+            route_coverage_pct=matched_routes_count / max(len(basket_routes), 1) * 100.0,
+            source_coverage_pct=len(observed_sources) / max(sample_count_total, 1) * 100.0,
+            freshness_score=1.0,
             methodology_version=methodology_version,
             basket_version=basket_version,
-            created_at=utc_now(),
+            index_metadata={
+                "weighted_average_fare": final_weighted_fare,
+                "sample_count": sample_count_total,
+                "route_count": matched_routes_count,
+                "source_count": len(observed_sources),
+                "base_period": "2026-08",
+            },
         )
 
         self.session.add(index_record)

@@ -2,7 +2,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 from uuid import UUID
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.core.enums import CabinClass, CollectionRunStatus, PipelineStatus, StepStatus, TriggerType
 
@@ -36,6 +36,13 @@ class CollectionRunCreate(BaseModel):
 class PipelineStepResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
+    @model_validator(mode='before')
+    @classmethod
+    def restore_outcome(cls, value):
+        if not isinstance(value, dict) and (getattr(value, 'metadata_json', None) or {}).get('outcome') == 'SKIPPED':
+            return {**{name: getattr(value, name, None) for name in cls.model_fields}, 'status': 'skipped'}
+        return value
+
     id: UUID
     step_name: str
     status: StepStatus
@@ -53,7 +60,7 @@ class PipelineRunDetail(BaseModel):
 
     id: UUID
     pipeline_type: str
-    started_at: datetime
+    started_at: Optional[datetime]
     finished_at: Optional[datetime]
     status: PipelineStatus
     records_input: int
@@ -101,7 +108,7 @@ class IngestionStatusResponse(BaseModel):
     booking_windows: List[str]
     quotes_today: int
     latest_pipeline_status: str
-    latest_apix: float
+    latest_apix: Optional[float]
 
 
 class DatasetItemResponse(BaseModel):

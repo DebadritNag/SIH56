@@ -44,7 +44,7 @@ export const NationalIndexChart: React.FC<NationalIndexChartProps> = ({
       ...apixValues,
       ...(showBenchmark ? benchmarkValues : []),
       ...(hasCompare ? compareSeriesData : []),
-    ].filter((v) => typeof v === 'number' && !isNaN(v));
+    ].filter((v): v is number => typeof v === 'number' && !isNaN(v));
 
     const rawMin = allValues.length > 0 ? Math.min(...allValues) : 98;
     const rawMax = allValues.length > 0 ? Math.max(...allValues) : 110;

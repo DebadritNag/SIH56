@@ -1,5 +1,7 @@
 'use client';
 
+import { useDataMode } from '@/lib/providers/DataModeProvider';
+import { ObservedRoute } from '@/components/data/ObservedRoute';
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -32,6 +34,10 @@ const AVAILABLE_ROUTES = [
 ];
 
 export default function RoutesPage() {
+  const { mode } = useDataMode();
+  return mode === 'real' ? <ObservedRoute /> : <DemoRoutesPage />;
+}
+function DemoRoutesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const urlRoute = searchParams.get('route');
@@ -52,7 +58,8 @@ export default function RoutesPage() {
   };
 
   const { data: routeData, isFetching } = useRouteInsights(selectedRouteCode);
-  const route = routeData || getMockRouteDetail(selectedRouteCode);
+  if (!routeData) return <div className="p-8">{isFetching ? 'Loading route observations...' : 'No processed observations for this route.'}</div>;
+  const route = routeData;
 
   return (
     <div className="space-y-5">

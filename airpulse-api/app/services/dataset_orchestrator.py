@@ -195,7 +195,7 @@ class DatasetIngestionOrchestrator:
                 collector_version=IMPORTER_VERSION,
                 parser_version=IMPORTER_VERSION,
                 trigger_type=trigger_type,
-                triggered_by=f"{acquisition_mode} Pipeline Trigger ({trigger_type})",
+                triggered_by=None,  # profile UUID; set by caller if authenticated
                 run_metadata={
                     "dataset": dataset_name,
                     "source": "Goibibo (OTA)",
@@ -267,7 +267,7 @@ class DatasetIngestionOrchestrator:
                 pipeline_run_id=pipe_id,
                 step_name=name,
                 step_order=order,
-                status=status,
+                status="PARTIAL" if status == "SKIPPED" else status,
                 started_at=start_t,
                 finished_at=finish_t,
                 records_input=input_cnt,
@@ -275,7 +275,7 @@ class DatasetIngestionOrchestrator:
                 records_failed=failed_cnt,
                 duration_ms=dur,
                 message=message,
-                metadata_json=meta or {},
+                metadata_json={**(meta or {}), "outcome": status},
             )
             self.session.add(step)
             await self.session.commit()
@@ -324,7 +324,7 @@ class DatasetIngestionOrchestrator:
         else:
             # Reprocess from existing validated/raw fares
             res = await self.session.execute(
-                select(ValidatedFare).where(ValidatedFare.data_origin == "IMPORTED")
+                select(ValidatedFare).where(ValidatedFare.data_origin.in_(["IMPORTED", "LIVE"]))
             )
             existing_fares = list(res.scalars().all())
             raw_count = len(existing_fares)
@@ -385,7 +385,7 @@ class DatasetIngestionOrchestrator:
                 })
         else:
             # Normalize from existing validated fares
-            res = await self.session.execute(select(ValidatedFare).where(ValidatedFare.data_origin == "IMPORTED"))
+            res = await self.session.execute(select(ValidatedFare).where(ValidatedFare.data_origin.in_(["IMPORTED", "LIVE"])))
             for vf in res.scalars().all():
                 obs_date = vf.collected_at.date() if vf.collected_at else date(2026, 9, 5)
                 lead_days, bw_bucket = calculate_booking_window(vf.departure_at.date(), obs_date)
@@ -460,11 +460,8 @@ class DatasetIngestionOrchestrator:
 
             if "existing_fare" in vr:
                 vf = vr["existing_fare"]
-                vf.collection_run_id = col_run.id
-                vf.source_id = source_id
+                # Reprocessing must preserve the observation's acquisition lineage.
                 vf.booking_window_days = vr["actual_lead_days"]
-                vf.quote_hash = q_hash
-                vf.data_origin = effective_data_origin
                 validated_entities.append(vf)
             else:
                 route_code = f"{vr['origin']}-{vr['destination']}"
@@ -562,20 +559,23 @@ class DatasetIngestionOrchestrator:
             ff_entity = FareFeature(
                 id=uuid4(),
                 fare_id=vf.id,
+                route_id=vf.route_id,
                 distance_km=dist,
                 booking_window_days=vf.booking_window_days or 1,
                 day_of_week=f_dict["day_of_week"],
                 is_weekend=bool(f_dict["is_weekend"]),
-                month=f_dict["month"],
-                season=f_dict["season"],
                 is_festival=bool(f_dict["is_festival"]),
-                fuel_price=f_dict["fuel_price"],
-                synthetic_route_demand_score=f_dict["synthetic_route_demand_score"],
+                season=f_dict["season"],
+                fuel_price=f_dict.get("fuel_price"),
                 route_recent_median=med,
+                route_recent_mean=med,
                 route_recent_std=std,
-                route_recent_volatility=f_dict["route_recent_volatility"],
-                source_reliability_score=1.0,
-                generated_at=utc_now(),
+                route_volatility=f_dict.get("route_recent_volatility"),
+                demand_proxy=f_dict.get("synthetic_route_demand_score"),
+                feature_version="v1.0",
+                # Full feature vector preserved in JSONB for FareGuard / audit.
+                features={k: v for k, v in f_dict.items()
+                          if k not in ("actual_fare",)},
             )
             self.session.add(ff_entity)
 
@@ -600,7 +600,13 @@ class DatasetIngestionOrchestrator:
         predictions_map: Dict[UUID, FarePrediction] = {}
         fg_scored_count = 0
 
-        # Clear prior predictions for idempotency
+        # Clear prior predictions for idempotency.
+        # Must null the FK in anomalies first to avoid the constraint violation.
+        await self.session.execute(
+            text("UPDATE anomalies SET prediction_id = NULL WHERE prediction_id IN "
+                 "(SELECT id FROM fare_predictions WHERE fare_id = ANY(:fids))"),
+            {"fids": fare_ids},
+        )
         await self.session.execute(
             text("DELETE FROM fare_predictions WHERE fare_id = ANY(:fids)"),
             {"fids": fare_ids},
@@ -624,10 +630,8 @@ class DatasetIngestionOrchestrator:
                             fare_id=vf.id,
                             model_version=fareguard.version,
                             predicted_fare=pred_val,
-                            actual_fare=actual_val,
                             residual=res_val,
                             residual_pct=res_pct,
-                            created_at=utc_now(),
                         )
                         self.session.add(fp)
                         predictions_map[vf.id] = fp
@@ -683,10 +687,10 @@ class DatasetIngestionOrchestrator:
                 pg_msg = f"PriceGuard Isolation Forest & MAD scored {fg_scored_count} observations; flagged {anomalies_detected} anomalies"
             except Exception as pg_err:
                 logger.error(f"PriceGuard scoring error: {pg_err}")
-                pg_status = "COMPLETED"
+                pg_status = "FAILED"
                 pg_msg = f"PriceGuard finished with advisory: {pg_err}"
         else:
-            pg_status = "COMPLETED"
+            pg_status = "SKIPPED"
             pg_msg = "PriceGuard status: NOT_SCORED (Requires valid FareGuard prediction)"
 
         await record_stage(
@@ -706,18 +710,8 @@ class DatasetIngestionOrchestrator:
         # ==================================================================
         s8_start = utc_now()
         shap_count = 0
-        try:
-            # Query anomalies with predictions for gated explanation
-            anoms_res = await self.session.execute(
-                select(Anomaly).where(Anomaly.fare_id == ANY([vf.id for vf in validated_entities]))
-            )
-            # For demonstration, record SHAP completion
-            shap_count = min(3, len(validated_entities))
-            shap_status = "COMPLETED"
-            shap_msg = f"Gated SHAP TreeExplainer generated local attribution factors for {shap_count} anomalous observations"
-        except Exception:
-            shap_status = "COMPLETED"
-            shap_msg = "SHAP analysis completed with baseline attribution weights"
+        shap_status = "SKIPPED"
+        shap_msg = "No SHAP explanations were generated by this import pipeline"
 
         await record_stage(
             order=8,
@@ -751,20 +745,16 @@ class DatasetIngestionOrchestrator:
             self.session.add(elig)
         await self.session.commit()
 
-        idx_engine = IndexEngine(self.session)
-        latest_index = await idx_engine.calculate_daily_index(date.today())
-        index_val = float(latest_index.index_value) if latest_index else 108.43
-
+        from app.services.live_processing import calculate_live_index
+        index_result = await calculate_live_index(self.session, pipe_id)
+        index_val = index_result.get("index_value")
         await record_stage(
-            order=9,
-            name="APIX",
-            start_t=s9_start,
-            status="COMPLETED",
-            input_cnt=len(validated_entities),
-            output_cnt=1,
-            failed_cnt=0,
-            message=f"Official APIx Laspeyres airfare price index recomputed: {index_val:.2f} (Quality: {latest_index.coverage_quality_score if latest_index else 0.95})",
-            meta={"index_value": index_val, "basket_version": "domestic-basket-2026Q3"},
+            order=9, name="APIX", start_t=s9_start,
+            status="COMPLETED" if index_val is not None else "SKIPPED",
+            input_cnt=len(validated_entities), output_cnt=int(index_val is not None), failed_cnt=0,
+            message=(f"Observed-fare APIx computed: {index_val:.2f}" if index_val is not None
+                     else index_result.get("reason", "Insufficient observed data")),
+            meta=index_result,
         )
 
         # ==================================================================
@@ -789,6 +779,7 @@ class DatasetIngestionOrchestrator:
         # FINALIZE RUNS & COUNTERS
         # ==================================================================
         pipeline_finish = utc_now()
+        final_status = "PARTIAL" if any(s['status'] != 'COMPLETED' for s in stages_telemetry) else "COMPLETED"
         total_duration_ms = max(500, int((pipeline_finish - pipeline_start).total_seconds() * 1000))
 
         col_run.quotes_received = len(normalized_records)
@@ -796,10 +787,10 @@ class DatasetIngestionOrchestrator:
         col_run.quotes_rejected = len(rejected_records)
         col_run.duplicates_detected = dupes_count
         col_run.duration_ms = total_duration_ms
-        col_run.status = "COMPLETED"
+        col_run.status = final_status
         col_run.finished_at = pipeline_finish
 
-        pipe_run.status = "COMPLETED"
+        pipe_run.status = final_status
         pipe_run.records_input = len(normalized_records)
         pipe_run.records_processed = len(validated_entities)
         pipe_run.records_failed = len(rejected_records)
@@ -809,10 +800,9 @@ class DatasetIngestionOrchestrator:
         audit_event = AuditEvent(
             id=uuid4(),
             entity_type="collection_run",
-            entity_id=col_run.id,
+            entity_id=str(col_run.id),
             action="PIPELINE_ORCHESTRATED",
-            performed_by=col_run.triggered_by or "system",
-            changes={
+            event_metadata={
                 "pipeline_mode": pipeline_mode,
                 "acquisition_mode": acquisition_mode,
                 "data_origin": effective_data_origin,
@@ -826,7 +816,7 @@ class DatasetIngestionOrchestrator:
         await self.session.commit()
 
         return {
-            "status": "COMPLETED",
+            "status": final_status,
             "collection_run_id": str(col_run.id),
             "pipeline_run_id": str(pipe_run.id),
             "acquisition_mode": acquisition_mode,

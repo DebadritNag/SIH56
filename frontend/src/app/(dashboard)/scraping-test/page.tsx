@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
+import LiveCollection from '@/components/LiveCollection';
+import { useDataMode } from '@/lib/providers/DataModeProvider';
 import {
   Terminal,
   Play,
@@ -41,6 +43,11 @@ const LIVE_PIPELINE_STEPS: ScrapingTestStep[] = [
 ];
 
 export default function ScrapingTestPage() {
+  const { mode } = useDataMode();
+  return mode === 'real' ? <LiveCollection /> : <DemoScrapingTestPage />;
+}
+
+function DemoScrapingTestPage() {
   const [selectedSource, setSelectedSource] = useState('OTA Source 01 (MakeMyTrip)');
   const [route, setRoute] = useState('DEL-BOM');
   const [departureDate, setDepartureDate] = useState('2026-09-09');
@@ -1073,4 +1080,3 @@ export default function ScrapingTestPage() {
     </div>
   );
 }
-

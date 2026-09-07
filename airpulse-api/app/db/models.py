@@ -39,6 +39,18 @@ _AlertStatusType = PGEnum(
     "OPEN", "ACKNOWLEDGED", "RESOLVED",
     name="alert_status", create_type=False,
 )
+_CollectionRunStatusType = PGEnum(
+    "QUEUED", "RUNNING", "COMPLETED", "PARTIAL", "FAILED", "CANCELLED",
+    name="collection_run_status", create_type=False,
+)
+_CollectionTriggerType = PGEnum(
+    "SCHEDULED", "MANUAL", "REPLAY", "SYNTHETIC", "REFERENCE_SYNC", "SCRAPING_TEST",
+    name="collection_trigger_type", create_type=False,
+)
+_PipelineStatusType = PGEnum(
+    "QUEUED", "RUNNING", "COMPLETED", "PARTIAL", "FAILED",
+    name="pipeline_status", create_type=False,
+)
 from sqlalchemy.orm import declarative_base, relationship
 
 from app.core.utils import utc_now
@@ -119,7 +131,7 @@ class CollectionRun(Base):
     data_origin = Column(_DataOriginType, nullable=True)
     started_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
     finished_at = Column(DateTime(timezone=True), nullable=True)
-    status = Column(String(20), nullable=False, default="running")  # queued, running, completed, partial, failed
+    status = Column(_CollectionRunStatusType, nullable=False, default="RUNNING")
     routes_requested = Column(Integer, default=0, nullable=False)
     searches_requested = Column(Integer, default=0, nullable=False)
     requests_successful = Column(Integer, default=0, nullable=False)
@@ -129,11 +141,11 @@ class CollectionRun(Base):
     quotes_rejected = Column(Integer, default=0, nullable=False)
     duplicates_detected = Column(Integer, default=0, nullable=False)
     duration_ms = Column(Integer, nullable=True)
-    collector_version = Column(String(50), nullable=False, default="1.0.0")
-    parser_version = Column(String(50), nullable=False, default="1.0.0")
-    trigger_type = Column(String(30), default="scheduled", nullable=False)  # scheduled, manual, replay, synthetic
-    triggered_by = Column(String(100), nullable=True)
-    run_metadata = Column(JSONB, nullable=True)
+    collector_version = Column(String(50), nullable=True, default="1.0.0")
+    parser_version = Column(String(50), nullable=True, default="1.0.0")
+    trigger_type = Column(_CollectionTriggerType, default="SCHEDULED", nullable=True)
+    triggered_by = Column(UUID(as_uuid=True), nullable=True)
+    run_metadata = Column("metadata", JSONB, nullable=True)
     created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
 
 
@@ -143,9 +155,9 @@ class PipelineRun(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     collection_run_id = Column(UUID(as_uuid=True), ForeignKey("collection_runs.id"), nullable=True, index=True)
     pipeline_type = Column(String(50), nullable=False, index=True)
-    started_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
+    started_at = Column(DateTime(timezone=True), default=utc_now, nullable=True)
     finished_at = Column(DateTime(timezone=True), nullable=True)
-    status = Column(String(20), nullable=False, default="running")  # queued, running, completed, partial, failed
+    status = Column(_PipelineStatusType, nullable=False, default="RUNNING")
     records_input = Column(Integer, default=0, nullable=False)
     records_processed = Column(Integer, default=0, nullable=False)
     records_failed = Column(Integer, default=0, nullable=False)
@@ -163,7 +175,7 @@ class PipelineStep(Base):
     pipeline_run_id = Column(UUID(as_uuid=True), ForeignKey("pipeline_runs.id"), nullable=False, index=True)
     step_name = Column(String(50), nullable=False, index=True)
     step_order = Column(Integer, nullable=True)
-    status = Column(String(20), nullable=False, default="pending")  # pending, running, completed, failed, skipped
+    status = Column(_PipelineStatusType, nullable=False, default="QUEUED")
     started_at = Column(DateTime(timezone=True), nullable=True)
     finished_at = Column(DateTime(timezone=True), nullable=True)
     records_input = Column(Integer, default=0, nullable=False)
@@ -489,10 +501,11 @@ class IndexBasket(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(100), nullable=False)
     version = Column(String(50), unique=True, nullable=False, index=True)
-    base_period = Column(String(20), nullable=False)
-    effective_from = Column(Date, nullable=False)
-    effective_to = Column(Date, nullable=True)
-    weighting_method = Column(String(50), default="passenger_traffic", nullable=False)
+    description = Column(Text, nullable=True)
+    base_period_start = Column(Date, nullable=True)
+    base_period_end = Column(Date, nullable=True)
+    active = Column(Boolean, default=True, nullable=True)
+    created_by = Column(UUID(as_uuid=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
 
 
@@ -512,20 +525,21 @@ class AirfareIndex(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     index_date = Column(Date, nullable=False, index=True)
-    frequency = Column(String(20), nullable=False, index=True)
-    scope = Column(String(20), nullable=False, index=True)
-    scope_id = Column(String(50), nullable=True, index=True)
+    index_type = Column(Text, nullable=True, index=True)          # national, route, airline
+    route_id = Column(UUID(as_uuid=True), ForeignKey("routes.id"), nullable=True, index=True)
+    booking_window_days = Column(Integer, nullable=True)
     index_value = Column(Float, nullable=False)
-    base_period = Column(String(20), nullable=False)
-    base_value = Column(Float, default=100.0, nullable=False)
-    weighted_average_fare = Column(Float, nullable=False)
-    sample_count = Column(Integer, nullable=False)
-    route_count = Column(Integer, nullable=False)
-    source_count = Column(Integer, nullable=False)
+    daily_change_pct = Column(Float, nullable=True)
+    weekly_change_pct = Column(Float, nullable=True)
+    monthly_change_pct = Column(Float, nullable=True)
     coverage_quality_score = Column(Float, nullable=True)
-    methodology_version = Column(String(50), nullable=False)
-    basket_version = Column(String(50), nullable=False)
-    created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
+    route_coverage_pct = Column(Float, nullable=True)
+    source_coverage_pct = Column(Float, nullable=True)
+    freshness_score = Column(Float, nullable=True)
+    methodology_version = Column(Text, nullable=False)
+    basket_version = Column(Text, nullable=False)
+    calculated_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
+    index_metadata = Column("metadata", JSONB, nullable=True)
 
 
 class IndexComponent(Base):

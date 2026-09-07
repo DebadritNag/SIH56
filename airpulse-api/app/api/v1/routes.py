@@ -87,7 +87,7 @@ async def get_route_insights(
                 func.percentile_cont(0.5).within_group(ValidatedFare.normalized_total_fare),
                 func.count(func.distinct(ValidatedFare.source_id)),
                 func.count(ValidatedFare.id),
-            ).where(and_(ValidatedFare.origin == origin, ValidatedFare.destination == dest))
+            ).where(and_(ValidatedFare.origin == origin, ValidatedFare.destination == dest, ValidatedFare.data_origin.in_(['IMPORTED','LIVE'])))
         )).one()
         med = float(row[0]) if row[0] is not None else None
         sources = int(row[1] or 0)
@@ -96,7 +96,7 @@ async def get_route_insights(
         bw_rows = (await db.execute(
             select(ValidatedFare.booking_window_days,
                    func.avg(ValidatedFare.normalized_total_fare))
-            .where(and_(ValidatedFare.origin == origin, ValidatedFare.destination == dest))
+            .where(and_(ValidatedFare.origin == origin, ValidatedFare.destination == dest, ValidatedFare.data_origin.in_(['IMPORTED','LIVE'])))
             .group_by(ValidatedFare.booking_window_days)
         )).all()
         for bw, avg in bw_rows:
@@ -105,113 +105,12 @@ async def get_route_insights(
     except Exception:
         await db.rollback()
 
-    dist = (route.distance_km or 0.0) if route else 0.0
-    if dist <= 0:
-        # Standard known corridor distances
-        known_dist = {
-            "DEL-BOM": 1148.0, "DEL-BLR": 1740.0, "BOM-BLR": 842.0, "DEL-CCU": 1305.0,
-            "HYD-DEL": 1253.0, "BOM-GOI": 435.0, "BLR-PNQ": 718.0, "CCU-GAU": 500.0,
-        }
-        dist = known_dist.get(code, 1000.0)
-
-    if med is None or med <= 0:
-        # Distance-calibrated baseline fare if no live imports exist for this specific pair
-        med = round(3200.0 + (dist * 2.85), 0)
-        sources = 4
-        obs_count = 240
-
-    # Build authentic advance purchase curve for this corridor
-    # Windows: T+45 (0.63x), T+30 (0.71x), T+15 (0.85x), T+7 (1.00x), T+1 (1.62x)
-    curve = [
-        AdvancePurchasePoint(
-            days_prior=45,
-            window_label="T+45",
-            today_fare=float(bw_breakdown.get("T45") or round(med * 0.63, 0)),
-            median_30d_fare=round(med * 0.61, 0),
-        ),
-        AdvancePurchasePoint(
-            days_prior=30,
-            window_label="T+30",
-            today_fare=float(bw_breakdown.get("T30") or round(med * 0.71, 0)),
-            median_30d_fare=round(med * 0.68, 0),
-        ),
-        AdvancePurchasePoint(
-            days_prior=15,
-            window_label="T+15",
-            today_fare=float(bw_breakdown.get("T15") or round(med * 0.85, 0)),
-            median_30d_fare=round(med * 0.79, 0),
-        ),
-        AdvancePurchasePoint(
-            days_prior=7,
-            window_label="T+7",
-            today_fare=float(bw_breakdown.get("T7") or round(med * 1.00, 0)),
-            median_30d_fare=round(med * 0.88, 0),
-        ),
-        AdvancePurchasePoint(
-            days_prior=1,
-            window_label="T+1",
-            today_fare=float(bw_breakdown.get("T1") or round(med * 1.62, 0)),
-            median_30d_fare=round(med * 1.34, 0),
-        ),
-    ]
-
-    sources_comp = [
-        SourceComparisonItem(
-            source_name="Airline Direct (IndiGo & Air India)",
-            source_type="Airline Direct",
-            median_fare=round(med * 0.995, 0),
-            min_fare=round(med * 0.915, 0),
-            observations=max(int(obs_count * 0.35), 45),
-            freshness="1m ago",
-            agreement_status="Agreement",
-            reliability_score=0.99,
-        ),
-        SourceComparisonItem(
-            source_name="OTA Source 01 (MakeMyTrip)",
-            source_type="OTA",
-            median_fare=round(med * 1.006, 0),
-            min_fare=round(med * 0.923, 0),
-            observations=max(int(obs_count * 0.28), 35),
-            freshness="2m ago",
-            agreement_status="Agreement",
-            reliability_score=0.97,
-        ),
-        SourceComparisonItem(
-            source_name="OTA Source 02 (EaseMyTrip)",
-            source_type="OTA",
-            median_fare=round(med * 0.998, 0),
-            min_fare=round(med * 0.918, 0),
-            observations=max(int(obs_count * 0.22), 28),
-            freshness="4m ago",
-            agreement_status="Agreement",
-            reliability_score=0.95,
-        ),
-        SourceComparisonItem(
-            source_name="OTA Source 03 (Cleartrip)",
-            source_type="OTA",
-            median_fare=round(med * 1.012, 0),
-            min_fare=round(med * 0.931, 0),
-            observations=max(int(obs_count * 0.15), 18),
-            freshness="6m ago",
-            agreement_status="Agreement",
-            reliability_score=0.93,
-        ),
-    ]
-
-    insights = RouteInsights(
-        route_code=code,
-        origin_code=origin,
-        destination_code=dest,
-        distance_km=dist,
-        current_median_fare=round(med, 0),
-        previous_day_change_pct=1.4,
-        previous_week_change_pct=8.6,
-        trend_30d="upward",
-        booking_window_breakdown=bw_breakdown or {"T7": round(med, 0)},
-        source_coverage_count=max(sources, 4),
-        open_anomalies_count=0,
-        route_apix_latest=round((med / 5000.0) * 100.0, 1),
-        advance_purchase_curve=curve,
-        sources_comparison=sources_comp,
-    )
-    return APIResponse(success=True, data=insights)
+    return APIResponse(success=True, data={
+        'route_code': code, 'origin_code': origin, 'destination_code': dest,
+        'distance_km': float(route.distance_km) if route and route.distance_km else None,
+        'current_median_fare': med, 'previous_day_change_pct': None,
+        'previous_week_change_pct': None, 'trend_30d': None,
+        'booking_window_breakdown': bw_breakdown, 'source_coverage_count': sources,
+        'observation_count': obs_count, 'open_anomalies_count': None,
+        'route_apix_latest': None, 'advance_purchase_curve': [], 'sources_comparison': [],
+    })

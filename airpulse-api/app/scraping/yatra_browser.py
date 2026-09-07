@@ -201,22 +201,22 @@ class YatraBrowserCollector:
                             if response.status in (403,429) and response.request.resource_type in ('document','xhr','fetch'):
                                 self.blocked = response.status
                     page.on('response',response_received)
-                    self.stage,self.control = 'HOMEPAGE','https://www.yatra.com/'
-                    try:
-                        response = await page.goto('https://www.yatra.com/',wait_until='domcontentloaded',
-                                                   timeout=settings.YATRA_HOMEPAGE_TIMEOUT_MS)
-                        self.http_status = response.status if response else None
-                    except PlaywrightTimeout:
-                        # A slow load event need not prevent using an already-rendered form.
-                        # Never retry navigation after failure; proceed to the bounded form wait.
-                        await self.guard(page)
-                        self.events.append(dict(stage='HOMEPAGE',status='LOAD_TIMEOUT_PROCEEDING',
-                                                control='One Way'))
+                    self.stage,self.control = 'HOMEPAGE','HTTP response from https://www.yatra.com/'
+                    # Separate network readiness from React readiness. A navigation
+                    # timeout must not be swallowed and relabelled as a missing control.
+                    response = await page.goto('https://www.yatra.com/',wait_until='commit',
+                                               timeout=settings.YATRA_HOMEPAGE_TIMEOUT_MS)
+                    self.http_status = response.status if response else None
                     await self.guard(page)
+                    if self.http_status is not None and self.http_status >= 400:
+                        raise ConnectionError(f'Yatra homepage returned HTTP {self.http_status}')
+                    self.events.append(dict(stage='HOMEPAGE',status='RESPONSE_RECEIVED',
+                                            http_status=self.http_status))
                     # Tolerant trip-type locator: the tab may render as "One Way" / "ONE WAY" /
                     # "Oneway" and hydrate after DOM load. Wait (bounded) so we never hang on the
                     # default 15s timeout with an exact-text match.
                     one_way = page.get_by_text(re.compile(r'^\s*one\s*way\s*$', re.I)).first
+                    self.stage,self.control = 'HOMEPAGE_FORM','visible One Way search control'
                     await one_way.wait_for(state='visible', timeout=settings.YATRA_FORM_TIMEOUT_MS)
                     self.events.append(dict(stage='HOMEPAGE',status='FORM_VISIBLE',control='One Way'))
                     await self.guard(page)
@@ -225,7 +225,7 @@ class YatraBrowserCollector:
                     await self.action(page,'DESTINATION','Arrival At / IATA suggestion',lambda:self.airport(page,'Arrival At',request.destination))
                     await self.action(page,'DATE',date_label(request.departure_date),lambda:self.calendar(page,request.departure_date))
                     await self.action(page,'TRAVELLERS','Adults / cabin / Done',lambda:self.travellers(page,request))
-                    await self.action(page,'SEARCH','Search',lambda:page.get_by_text('Search',exact=True).click())
+                    await self.action(page,'SEARCH','Search button',lambda:page.get_by_role('button',name='Search',exact=True).click())
                     self.stage,self.control = 'VERIFY_SEARCH','flight.yatra.com/air-search query parameters'
                     await page.wait_for_url(re.compile(r'https://flight\.yatra\.com/air-search'),wait_until='domcontentloaded',timeout=30000)
                     await self.guard(page)
@@ -277,6 +277,8 @@ class YatraBrowserCollector:
                     code = 'BLOCKED' if isinstance(exc,PermissionError) else 'TIMEOUT' if isinstance(exc,PlaywrightTimeout) else 'BROWSER_UNAVAILABLE' if self.stage=='BROWSER_LAUNCH' else 'CONTROL_ERROR'
                     if code == 'CONTROL_ERROR' and 'net::ERR_' in str(exc):
                         code = 'NETWORK_ERROR'
+                    if isinstance(exc, ConnectionError):
+                        code = 'NETWORK_ERROR'
                     result.status = result.failure_code = code
                     result.stop_reason = 'BLOCKED' if code=='BLOCKED' else 'TIMEOUT' if code=='TIMEOUT' else 'ERROR'
                     result.failure_message = f'{self.stage} [{self.control}]: {exc}'
@@ -286,6 +288,8 @@ class YatraBrowserCollector:
                         target.parent.mkdir(exist_ok=True)
                         with suppress(Exception):
                             target.write_text(await page.content(),encoding='utf-8')
+                        with suppress(Exception):
+                            await page.screenshot(path=str(target.with_suffix('.png')),timeout=3000)
                 finally:
                     if page:
                         self.final_url = page.url

@@ -26,7 +26,7 @@ export default function LiveCollection() {
   const ingestionLabel = state === "FAILED" && !ingestionFailed ? "NOT STARTED" : state ?? "PENDING";
   useEffect(() => {
     if (["COMPLETED", "PARTIAL"].includes(state ?? "")) {
-      for (const key of ["dashboard-summary", "apix-latest", "apix-trend", "fares", "anomalies", "alerts", "runs", "ingestion-status"]) cache.invalidateQueries({ queryKey: [key] });
+      void cache.invalidateQueries();
     }
   }, [state, runId, cache]);
   const error = collect.error || ingest.error || detail.error || recent.error || config.error;

@@ -1,6 +1,7 @@
 import React from 'react';
 import { AppShell } from '@/components/layout/AppShell';
 import { RequireAuth } from '@/components/auth/RequireAuth';
+import { LiveDataGate } from '@/components/data/LiveDataGate';
 
 export default function DashboardLayout({
   children,
@@ -9,7 +10,7 @@ export default function DashboardLayout({
 }) {
   return (
     <RequireAuth>
-      <AppShell>{children}</AppShell>
+      <AppShell><LiveDataGate>{children}</LiveDataGate></AppShell>
     </RequireAuth>
   );
 }

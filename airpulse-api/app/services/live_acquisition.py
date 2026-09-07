@@ -174,7 +174,8 @@ async def consume_one(session_factory=AsyncSessionLocal):
                 await db.execute(text("""UPDATE collection_runs SET quotes_validated=:count,quotes_rejected=:failed,
                     duplicates_detected=:dupes,metadata=metadata || CAST(:meta AS jsonb) WHERE id=:id"""),
                     {'id':job['collection_run_id'],'count':result['records_processed'],'failed':result['records_failed'],
-                     'dupes':result['duplicates'],'meta':json.dumps({'ingestion_state':result['status'],'processing':result},default=str)})
+                     'dupes':result['duplicates'],'meta':json.dumps({'ingestion_state':result['status'],'processing':result,
+                         'published_dashboard':result['records_processed']>0},default=str)})
             await db.execute(text("""UPDATE pipeline_runs SET status=CAST(:status AS pipeline_status),finished_at=now(),
                 records_processed=:count,records_failed=:failed,metadata=metadata || CAST(:meta AS jsonb) WHERE id=:id"""),
                 {'id':job['id'],'status':result['status'],'count':result['records_processed'],

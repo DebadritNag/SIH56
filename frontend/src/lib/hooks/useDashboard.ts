@@ -33,7 +33,7 @@ import {
   getFilteredMockRouteContributors,
 } from "@/lib/mock-data/dashboard";
 import { useDataMode } from "@/lib/providers/DataModeProvider";
-import { DashboardFilters } from "@/types";
+import { DashboardFilters, DashboardSummary } from "@/types";
 
 export interface DataMeta {
   isMock: boolean;
@@ -41,6 +41,8 @@ export interface DataMeta {
   lastUpdated: string | null;
 }
 
+const EMPTY_SUMMARY: DashboardSummary = { latest_index: null, daily_change_pct: null, weekly_change_pct: null, monthly_change_pct: null, active_routes: 0, quotes_24h: 0, open_anomalies: 0, critical_anomalies: 0, active_alerts: 0, healthy_sources: 0, total_sources: 0, coverage_quality_score: 0, market_pressure: 'UNKNOWN', rapid_routes_count: 0, data_confidence_pct: 0 };
+const EMPTY_TRUST = { source_coverage_pct: 0, route_coverage_pct: 0, booking_window_coverage_pct: 0, freshness_pct: 0, validation_success_pct: 0 };
 const REAL_SOURCE = "AirPulse backend (live)";
 const MOCK_SOURCE = "Demo dataset (offline)";
 
@@ -98,17 +100,17 @@ export function useDashboardSummary(filters?: DashboardFilters) {
       try {
         const raw = await endpoints.dashboardSummary(queryParams, signal);
         return { data: mapDashboardSummary(raw), isMock: false };
-      } catch {
-        return { data: fallback, isMock: true };
+      } catch (error) {
+        throw error;
       }
     },
-    placeholderData: (prev) => prev ?? { data: fallback, isMock: true },
+    placeholderData: mode === "mock" ? { data: fallback, isMock: true } : undefined,
   });
 
-  const isMock = q.data?.isMock ?? true;
+  const isMock = q.data?.isMock ?? (mode === "mock");
   return {
     ...q,
-    summary: q.data?.data ?? fallback,
+    summary: q.data?.data ?? (mode === "mock" ? fallback : EMPTY_SUMMARY),
     meta: {
       isMock,
       source: isMock ? MOCK_SOURCE : REAL_SOURCE,
@@ -134,17 +136,17 @@ export function useNationalTrend(filters?: DashboardFilters) {
       try {
         const raw = await endpoints.indexTrend(queryParams, signal);
         return { data: mapNationalTrend(raw), isMock: false };
-      } catch {
-        return { data: fallback, isMock: true };
+      } catch (error) {
+        throw error;
       }
     },
-    placeholderData: (prev) => prev ?? { data: fallback, isMock: true },
+    placeholderData: mode === "mock" ? { data: fallback, isMock: true } : undefined,
   });
 
-  const isMock = q.data?.isMock ?? true;
+  const isMock = q.data?.isMock ?? (mode === "mock");
   return {
     ...q,
-    trend: q.data?.data ?? fallback,
+    trend: q.data?.data ?? (mode === "mock" ? fallback : []),
     meta: {
       isMock,
       source: isMock ? MOCK_SOURCE : REAL_SOURCE,
@@ -170,17 +172,17 @@ export function useRouteContributors(filters?: DashboardFilters) {
       try {
         const raw = await endpoints.topRouteMovements(queryParams, signal);
         return { data: mapRouteContributors(raw), isMock: false };
-      } catch {
-        return { data: fallback, isMock: true };
+      } catch (error) {
+        throw error;
       }
     },
-    placeholderData: (prev) => prev ?? { data: fallback, isMock: true },
+    placeholderData: mode === "mock" ? { data: fallback, isMock: true } : undefined,
   });
 
-  const isMock = q.data?.isMock ?? true;
+  const isMock = q.data?.isMock ?? (mode === "mock");
   return {
     ...q,
-    contributors: q.data?.data ?? fallback,
+    contributors: q.data?.data ?? (mode === "mock" ? fallback : { up: [], down: [] }),
     meta: {
       isMock,
       source: isMock ? MOCK_SOURCE : REAL_SOURCE,
@@ -222,16 +224,16 @@ export function useSystemTrust() {
       if (mode === "mock") return { data: mockSystemTrustMetrics, isMock: true };
       try {
         return { data: mapSystemTrust(await endpoints.systemDiagnostics(signal)), isMock: false };
-      } catch {
-        return { data: mockSystemTrustMetrics, isMock: true };
+      } catch (error) {
+        throw error;
       }
     },
-    placeholderData: { data: mockSystemTrustMetrics, isMock: true },
+    placeholderData: mode === "mock" ? { data: mockSystemTrustMetrics, isMock: true } : undefined,
   });
-  const isMock = q.data?.isMock ?? true;
+  const isMock = q.data?.isMock ?? (mode === "mock");
   return {
     ...q,
-    trust: q.data?.data ?? mockSystemTrustMetrics,
+    trust: q.data?.data ?? (mode === "mock" ? mockSystemTrustMetrics : EMPTY_TRUST),
     meta: {
       isMock,
       source: isMock ? MOCK_SOURCE : REAL_SOURCE,

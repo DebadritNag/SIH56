@@ -34,7 +34,7 @@ function derivePressure(monthlyChange: number | null): DashboardSummary["market_
 }
 
 export function mapDashboardSummary(b: BackendDashboardSummary): DashboardSummary {
-  const coverage = b.coverage_quality_score ?? mockDashboardSummary.coverage_quality_score;
+  const coverage = b.coverage_quality_score ?? 0;
   return {
     latest_index: b.latest_index,
     daily_change_pct: b.daily_change_pct,
@@ -50,7 +50,7 @@ export function mapDashboardSummary(b: BackendDashboardSummary): DashboardSummar
     coverage_quality_score: coverage,
     // Fields not yet emitted by the backend summary — derive or fall back to mock.
     market_pressure: derivePressure(b.monthly_change_pct),
-    rapid_routes_count: mockDashboardSummary.rapid_routes_count,
+    rapid_routes_count: 0,
     data_confidence_pct: coverage * 100,
   };
 }
@@ -64,11 +64,11 @@ export function mapNationalTrend(points: BackendIndexTrendPoint[]): NationalTren
       date: p.date,
       apix: p.index_value,
       // Backend index-trend does not yet include a CPI benchmark; approximate for display.
-      benchmark_cpi: Number((100 + (p.index_value - 100) * 0.55).toFixed(2)),
+      benchmark_cpi: null,
       daily_pct: Number(daily.toFixed(2)),
       weekly_pct: 0,
       monthly_pct: Number((p.index_value - 100).toFixed(2)),
-      coverage_pct: 95,
+      coverage_pct: 0,
     };
   });
 }
@@ -289,7 +289,7 @@ export function mapSystemTrust(d: BackendSystemDiagnostics): SystemTrustMetrics 
   // The diagnostics endpoint focuses on infra health; coverage sub-scores are not all
   // computed yet, so fall back to mock for the ones the backend does not provide.
   return {
-    ...mockSystemTrustMetrics,
-    freshness_pct: d.database === "connected" ? mockSystemTrustMetrics.freshness_pct : 0,
+    source_coverage_pct: 0, route_coverage_pct: 0, booking_window_coverage_pct: 0, validation_success_pct: 0,
+    freshness_pct: 0,
   };
 }

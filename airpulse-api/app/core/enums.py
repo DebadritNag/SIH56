@@ -146,6 +146,7 @@ class PipelineStatus(CIEnum):
 
 
 class StepStatus(CIEnum):
+    PARTIAL = "partial"
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"

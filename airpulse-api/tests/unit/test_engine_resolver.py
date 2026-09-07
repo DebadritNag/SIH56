@@ -77,8 +77,7 @@ def test_yatra_observed_card_rejects_nearby_airports_dates_and_bad_fields():
 @pytest.mark.asyncio
 @pytest.mark.parametrize('disable_http2', [False, True])
 @pytest.mark.parametrize('result_limit', [5, 10, 15])
-@pytest.mark.parametrize('load_timeout', [False, True])
-async def test_yatra_homepage_success_dedups_and_closes_chrome(monkeypatch, disable_http2, result_limit, load_timeout):
+async def test_yatra_homepage_success_dedups_and_closes_chrome(monkeypatch, disable_http2, result_limit):
     from unittest.mock import AsyncMock, MagicMock
     from types import SimpleNamespace
     from playwright.async_api import TimeoutError
@@ -90,9 +89,9 @@ async def test_yatra_homepage_success_dedups_and_closes_chrome(monkeypatch, disa
     page = MagicMock()
     page.url = 'https://flight.yatra.com/air-search?type=O&origin=DEL&destination=BOM&flight_depart_date=20%2F09%2F2026&ADT=1&class=Economy'
     page.goto = AsyncMock(return_value=SimpleNamespace(status=200))
-    if load_timeout:
-        page.goto.side_effect = TimeoutError('DOMContentLoaded delayed')
-    page.get_by_text.return_value.is_visible = AsyncMock(return_value=True)
+    page.get_by_text.return_value.first.wait_for = AsyncMock()
+    page.get_by_text.return_value.first.click = AsyncMock()
+    page.get_by_role.return_value.click = AsyncMock()
     page.wait_for_url = AsyncMock()
     page.wait_for_function = AsyncMock(side_effect=TimeoutError('no growth'))
     page.get_by_text.return_value.click = AsyncMock()
@@ -120,6 +119,7 @@ async def test_yatra_homepage_success_dedups_and_closes_chrome(monkeypatch, disa
     assert result.stop_reason == 'RESULT_LIMIT_REACHED'
     cards.last.scroll_into_view_if_needed.assert_not_awaited()
     page.goto.assert_awaited_once()
+    assert page.goto.call_args.kwargs['wait_until'] == 'commit'
     options = dict(channel='chrome',headless=False)
     if disable_http2:
         options['args'] = ['--disable-http2']

@@ -1,6 +1,8 @@
 'use client';
 
 import React from 'react';
+import { useDataMode } from '@/lib/providers/DataModeProvider';
+import IngestionPage from '../ingestion/page';
 import { GitCommit, ArrowRight, CheckCircle2, RotateCw } from 'lucide-react';
 import { GenerateReportButton } from '@/components/data/GenerateReportButton';
 
@@ -14,6 +16,8 @@ const NODES = [
 ];
 
 export default function PipelineMonitorPage() {
+  const { mode } = useDataMode();
+  if (mode === 'real') return <IngestionPage />;
   return (
     <div className="space-y-5">
       {/* Header */}

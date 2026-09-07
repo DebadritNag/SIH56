@@ -34,7 +34,7 @@ export interface DashboardSummary {
 export interface NationalTrendPoint {
   date: string;
   apix: number;
-  benchmark_cpi: number;
+  benchmark_cpi: number | null;
   daily_pct: number;
   weekly_pct: number;
   monthly_pct: number;

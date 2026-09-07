@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { DownloadCloud, Play, CheckCircle2, RotateCw, Server, ArrowRight, Layers, Activity, ChevronRight, FileSpreadsheet, Info } from 'lucide-react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatINR } from '@/lib/formatters';
 import { useDashboardSummary } from '@/lib/hooks/useDashboard';
 import { useRuns } from '@/lib/hooks/useResources';
@@ -10,6 +10,7 @@ import { GenerateReportButton } from '@/components/data/GenerateReportButton';
 import { useDataMode } from '@/lib/providers/DataModeProvider';
 import { DataSourceMeta } from '@/components/data/DataBadge';
 import { endpoints } from '@/lib/api/endpoints';
+import { getData } from '@/lib/api/client';
 import { notify } from '@/lib/notify';
 import { ConfirmActionDialog } from '@/components/notifications/ConfirmActionDialog';
 
@@ -81,15 +82,15 @@ function mapRun(r: Record<string, unknown>): RunRow {
     trigger: String(r.trigger_type ?? r.run_type ?? 'MANUAL'),
     started: formattedDate,
     duration: durationMs ? `${(durationMs / 1000).toFixed(0)}s` : '—',
-    raw: (r.quotes_received as number) ?? 26,
-    valid: (r.quotes_validated as number) ?? 26,
+    raw: (r.quotes_received as number) ?? 0,
+    valid: (r.quotes_validated as number) ?? 0,
     rejected: (r.quotes_rejected as number) ?? 0,
     dup: (r.duplicates_detected as number) ?? 0,
     status: String(r.status ?? 'COMPLETED'),
-    source: (meta.source as string) || 'Goibibo Domestic OTA Flights',
-    dataset: (meta.dataset as string) || 'Goibibo Domestic Dataset',
-    corridors: corridors && corridors.length > 0 ? corridors : ['BOM-BLR', 'DEL-CCU', 'DEL-BOM'],
-    notes: (meta.description as string) || (meta.notes as string) || '26 verified flight quotes ingested from Goibibo domestic dataset across 3 primary trunk corridors.',
+    source: (meta.source as string) || 'Recorded source',
+    dataset: (meta.dataset as string) || 'Available observations',
+    corridors: corridors ?? [],
+    notes: (meta.description as string) || (meta.notes as string) || '',
   };
 }
 
@@ -103,46 +104,38 @@ export default function IngestionPage() {
   const { mode } = useDataMode();
   const isMock = mode === 'mock';
   const { summary } = useDashboardSummary();
+  const readiness = useQuery({
+    queryKey: ['ingestion-readiness', mode],
+    queryFn: () => getData<{ ready: boolean; observations: number }>('/ingestion/readiness'),
+    enabled: !isMock, refetchInterval: 3000,
+  });
+  const published = readiness.data?.ready === true;
   const { data: runsPage, refetch: refetchRuns } = useRuns({ page_size: 15 });
 
   // Live: only real run history. Mock: demo runs.
   const realRuns: RunRow[] = ((runsPage as { items?: Record<string, unknown>[] } | undefined)?.items ?? []).map(mapRun);
-  const runs: RunRow[] = isMock ? (RECENT_RUNS as RunRow[]) : realRuns;
+  const runs: RunRow[] = isMock ? (RECENT_RUNS as RunRow[]) : (published ? realRuns : []);
 
   const selectedRun = (selectedRunId ? runs.find((r) => r.id === selectedRunId) : runs[0]) ?? runs[0];
 
-  // Pipeline stages: dynamically computed for the active run
-  const liveStages = React.useMemo(() => {
-    // If we have a run or validated fares exist in DB
-    const count = selectedRun?.raw ?? 26;
-    const valid = selectedRun?.valid ?? count;
-    const rejected = selectedRun?.rejected ?? 0;
-    const dup = selectedRun?.dup ?? 0;
-    const corridorsStr = selectedRun?.corridors?.join(', ') || 'BOM-BLR, DEL-CCU, DEL-BOM';
-
-    return [
-      { name: 'INGEST', count: `${count} observations`, status: 'completed', desc: `Goibibo OTA dataset ingestion (${corridorsStr})` },
-      { name: 'NORMALIZE', count: `${count} parsed`, status: 'completed', desc: 'Standardized economy DTO & T+1/T+7' },
-      { name: 'VALIDATE', count: `${valid} passed`, status: 'completed', desc: `${rejected} sanity or bounds errors` },
-      { name: 'DEDUP', count: `${dup} dup`, status: 'completed', desc: 'SHA-256 quote fingerprint matching' },
-      { name: 'FEATURES', count: `${valid} vectors`, status: 'completed', desc: 'Distance, booking window medians' },
-      { name: 'FAREGUARD', count: `${valid} scored`, status: 'completed', desc: 'XGBoost expected benchmark model' },
-      { name: 'PRICEGUARD', count: '2 anom', status: 'completed', desc: 'Isolation Forest dynamic percentile check' },
-      { name: 'SHAP', count: '2 exp', status: 'completed', desc: 'TreeExplainer attribution drivers' },
-      { name: 'APIx ENGINE', count: '108.43', status: 'completed', desc: 'Laspeyres airfare index recomputed' },
-      { name: 'ALERTS', count: '1 alert', status: 'completed', desc: 'Price shock alert rule evaluation' },
-    ];
-  }, [selectedRun]);
+  const details = useQuery({
+    queryKey: ['run-details', selectedRun?.fullId],
+    queryFn: () => getData<{ pipeline_runs: Array<{ steps: Array<{ step_name: string; status: string; records_output: number; message?: string }> }> }>(`/ingestion/runs/${selectedRun!.fullId}`),
+    enabled: !isMock && Boolean(selectedRun?.fullId), refetchInterval: 3000,
+  });
+  const liveStages = (details.data?.pipeline_runs ?? []).flatMap(p => p.steps ?? []).map(s => ({
+    name: s.step_name, count: String(s.records_output ?? 0), status: s.status.toLowerCase(), desc: s.message ?? '',
+  }));
 
   const pipelineStages = isMock ? PIPELINE_STAGES : liveStages;
 
   // KPIs
-  const quotesToday = isMock ? 28452 : (selectedRun?.raw ?? (summary?.quotes_24h ?? 26));
-  const totalValidated = isMock ? 27611 : (selectedRun?.valid ?? (summary?.quotes_24h ?? 26));
+  const quotesToday = isMock ? 28452 : (selectedRun?.raw ?? (published ? summary?.quotes_24h ?? 0 : 0));
+  const totalValidated = isMock ? 27611 : (selectedRun?.valid ?? (published ? summary?.quotes_24h ?? 0 : 0));
   const totalRejected = isMock ? 412 : (selectedRun?.rejected ?? 0);
   const totalDuplicates = isMock ? 429 : (selectedRun?.dup ?? 0);
-  const totalSources = isMock ? 5 : (summary?.total_sources ?? 5);
-  const healthySources = isMock ? 5 : (summary?.healthy_sources ?? 4);
+  const totalSources = isMock ? 5 : (published ? summary?.total_sources ?? 0 : 0);
+  const healthySources = isMock ? 5 : (published ? summary?.healthy_sources ?? 0 : 0);
 
   const handleTriggerCollection = async () => {
     setIsTriggering(true);
@@ -152,15 +145,33 @@ export default function IngestionPage() {
         await new Promise((r) => setTimeout(r, 600));
         notify.success('Collection completed (demo)', { id: 'coll-run', description: 'Mock pipeline execution finished.' });
       } else {
-        const res = (await endpoints.triggerCollection()) as { data?: { quotes_processed?: number; routes_evaluated?: number } };
+        const res = await endpoints.triggerCollection() as {
+          status: string; quotes_validated?: number;
+          live_ingestion_jobs?: Array<{ collection_run_id: string }>;
+        };
+        await queryClient.invalidateQueries();
+        let failed = false;
+        for (const job of res.live_ingestion_jobs ?? []) {
+          let complete = false;
+          for (let attempt = 0; attempt < 120; attempt++) {
+            const run = await getData<{ metadata: { ingestion_state: string } }>(`/live/runs/${job.collection_run_id}`);
+            const state = run.metadata?.ingestion_state;
+            if (['COMPLETED', 'PARTIAL', 'FAILED'].includes(state)) {
+              failed ||= state === 'FAILED'; complete = true; break;
+            }
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+          if (!complete) {
+            notify.info('Processing continues in the background', { id: 'coll-run' });
+            await queryClient.invalidateQueries(); return;
+          }
+        }
+        await queryClient.invalidateQueries();
         await refetchRuns();
-        await queryClient.invalidateQueries({ queryKey: ['runs'] });
-        await queryClient.invalidateQueries({ queryKey: ['ingestion-status'] });
-        await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
-        await queryClient.invalidateQueries({ queryKey: ['fares'] });
-        notify.success('Pipeline run recorded', {
-          id: 'coll-run',
-          description: `Processed ${res?.data?.quotes_processed ?? 26} quotes across ${res?.data?.routes_evaluated ?? 3} corridors. All ML stages & APIx updated.`,
+        if (res.status === 'NO_DATA') notify.info('No imported or staged live observations available', { id: 'coll-run' });
+        else if (failed) notify.error('Some live ingestion failed; available processed data remains visible', { id: 'coll-run' });
+        else notify.success('Available observations processed', {
+          id: 'coll-run', description: 'Dashboard queries refreshed. Stage results show which analyses have sufficient data.',
         });
       }
     } catch (err) {
@@ -231,7 +242,7 @@ export default function IngestionPage() {
             {!isMock && (
               <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
                 <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                26 Goibibo quotes ingested across 3 corridors (BOM-BLR, DEL-CCU, DEL-BOM)
+                {readiness.data?.observations ?? 0} stored observations available for collection
               </span>
             )}
           </div>
@@ -243,9 +254,10 @@ export default function IngestionPage() {
             className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold text-xs rounded shadow-2xs transition-colors cursor-pointer"
           >
             <Play className="w-3.5 h-3.5 fill-current" />
-            <span>{isTriggering ? 'Running Pipeline...' : 'Run Automated Pipeline'}</span>
+            <span>{isTriggering ? 'Running Pipeline...' : 'Run Collection'}</span>
           </button>
           <button
+            hidden={!isMock}
             onClick={handleTriggerReplay}
             disabled={isReplaying}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 hover:bg-slate-50 disabled:opacity-50 text-[#101828] font-semibold text-xs rounded shadow-2xs transition-colors cursor-pointer"
@@ -266,7 +278,7 @@ export default function IngestionPage() {
           ) : (
             <span className="px-2.5 py-1 bg-blue-50 text-blue-800 text-xs font-semibold rounded border border-blue-200 flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              Source: Goibibo Domestic Flights (OTA)
+              Inputs: Imported + available live observations
             </span>
           )}
         </div>
@@ -278,14 +290,14 @@ export default function IngestionPage() {
           <span className="text-[11px] font-semibold text-[#667085] uppercase block">Quotes Ingested</span>
           <span className="text-2xl font-bold text-[#101828] tabular-nums mt-0.5">{quotesToday.toLocaleString('en-IN')}</span>
           <span className="text-[10px] text-emerald-600 font-medium block mt-0.5">
-            {isMock ? 'Across monitored routes' : 'Goibibo verified flight quotes'}
+            {isMock ? 'Across monitored routes' : 'Recorded observations'}
           </span>
         </div>
         <div className="bg-white border border-[#E4E7EC] rounded-lg p-3.5 shadow-2xs">
           <span className="text-[11px] font-semibold text-emerald-700 uppercase block">Validated Fares</span>
           <span className="text-2xl font-bold text-emerald-700 tabular-nums mt-0.5">{totalValidated.toLocaleString('en-IN')}</span>
           <span className="text-[10px] text-emerald-700 block mt-0.5">
-            {isMock ? '97.0% pass rate' : '100% sanity pass rate'}
+            {isMock ? '97.0% pass rate' : 'See validation results below'}
           </span>
         </div>
         <div className="bg-white border border-[#E4E7EC] rounded-lg p-3.5 shadow-2xs">
@@ -311,7 +323,7 @@ export default function IngestionPage() {
           <div>
             <div className="flex items-center gap-2">
               <span className="px-2 py-0.5 bg-blue-50 text-blue-700 font-mono font-bold text-xs rounded border border-blue-200">
-                {isMock ? 'RUN #1842' : (selectedRun ? `RUN #${selectedRun.id}` : 'RUN #GOIBIBO-01')}
+                {isMock ? 'RUN #1842' : (selectedRun ? `RUN #${selectedRun.id}` : 'NOT STARTED')}
               </span>
               <h3 className="text-sm font-bold text-[#101828]">
                 {isMock
@@ -324,12 +336,12 @@ export default function IngestionPage() {
                 ? 'Started: 02 Sep 2026 • 15:00:02 IST • Elapsed: 6m 39s • Status: COMPLETED'
                 : (selectedRun
                     ? `Started: ${selectedRun.started} • Elapsed: ${selectedRun.duration} • Status: ${selectedRun.status} • Corridors: ${selectedRun.corridors?.join(', ') || 'BOM-BLR, DEL-CCU, DEL-BOM'}`
-                    : '18 verified flight quotes ingested across 3 corridors • Status: COMPLETED')}
+                    : 'No processing run selected')}
             </p>
           </div>
           <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded border border-emerald-200 flex items-center gap-1.5 self-start sm:self-auto">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-            ALL 8 STAGES PASSED
+            {isMock ? 'DEMO STAGES' : (selectedRun?.status ?? 'NOT STARTED')}
           </span>
         </div>
 
@@ -350,7 +362,7 @@ export default function IngestionPage() {
               </div>
             </div>
             <div className="text-[11px] text-slate-500 italic">
-              {selectedRun.notes || '18 verified flight quotes ingested from Goibibo dataset across 3 corridors.'}
+              {selectedRun.notes || 'Recorded collection telemetry'}
             </div>
           </div>
         )}
@@ -364,7 +376,7 @@ export default function IngestionPage() {
             >
               <div className="flex items-center justify-between mb-1">
                 <span className="text-[10px] font-bold text-[#667085] uppercase tracking-wider">{stage.name}</span>
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span className="text-[9px] uppercase">{stage.status}</span>
               </div>
               <div className="text-sm font-black text-[#101828] font-mono tabular-nums my-1">
                 {stage.count}

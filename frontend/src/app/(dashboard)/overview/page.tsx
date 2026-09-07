@@ -462,7 +462,7 @@ export default function OverviewPage() {
             </p>
 
             <div className="space-y-2 max-h-[290px] overflow-y-auto pr-1">
-              {mockMarketSignals.map((sig) => (
+              {(meta.isMock ? mockMarketSignals : []).map((sig) => (
                 <div
                   key={sig.id}
                   className="p-2.5 rounded border border-[#E4E7EC] hover:bg-[#F8FAFC] transition-colors cursor-pointer text-xs"

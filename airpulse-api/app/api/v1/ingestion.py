@@ -91,7 +91,7 @@ async def get_ingestion_status(
     degraded_count = len(active_sources) - healthy_count
 
     routes_count_res = await db.execute(select(func.count()).select_from(Route).where(Route.active == True))
-    routes_count = routes_count_res.scalar() or 20
+    routes_count = routes_count_res.scalar() or 0
 
     today = date.today()
     today_quotes_res = await db.execute(
@@ -100,7 +100,7 @@ async def get_ingestion_status(
     today_quotes = today_quotes_res.scalar() or 0
     total_fares_res = await db.execute(select(func.count()).select_from(ValidatedFare))
     total_fares = total_fares_res.scalar() or 0
-    quotes_count = today_quotes if today_quotes > 0 else total_fares
+    quotes_count = today_quotes
 
     latest_pipe_res = await db.execute(
         select(PipelineRun).order_by(desc(PipelineRun.started_at)).limit(1)
@@ -114,27 +114,27 @@ async def get_ingestion_status(
     last_coll_str = (
         latest_col.started_at.strftime("%d %b %Y • %H:%M IST")
         if latest_col and latest_col.started_at
-        else (latest_pipe.started_at.strftime("%d %b %Y • %H:%M IST") if latest_pipe else "02 Sep 2026 • 15:00 IST")
+        else (latest_pipe.started_at.strftime("%d %b %Y • %H:%M IST") if latest_pipe and latest_pipe.started_at else None)
     )
 
     latest_index_res = await db.execute(
         select(AirfareIndex).order_by(desc(AirfareIndex.index_date)).limit(1)
     )
     latest_index = latest_index_res.scalars().first()
-    idx_val = latest_index.index_value if latest_index else 108.43
+    idx_val = latest_index.index_value if latest_index else None
 
     status_data = IngestionStatusResponse(
         system_mode="Live / Hybrid Database",
-        scheduler_status="Running",
+        scheduler_status="Not verified",
         last_collection=last_coll_str,
-        next_collection="02 Sep 2026 • 18:00 IST",
+        next_collection=None,
         active_sources=len(active_sources),
-        healthy_sources=max(1, healthy_count),
+        healthy_sources=healthy_count,
         degraded_sources=degraded_count,
         active_routes=routes_count,
         booking_windows=["T+1", "T+7", "T+15", "T+30", "T+45"],
         quotes_today=quotes_count,
-        latest_pipeline_status=latest_pipe.status if latest_pipe else "Completed",
+        latest_pipeline_status=latest_pipe.status if latest_pipe else "NOT_STARTED",
         latest_apix=idx_val,
     )
     return APIResponse(success=True, data=status_data)
@@ -233,17 +233,10 @@ async def trigger_manual_collection(
     Executes the canonical 10-stage pipeline:
     INGEST -> NORMALIZE -> VALIDATE -> DEDUP -> FEATURES -> FAREGUARD -> PRICEGUARD -> SHAP -> APIX -> ALERTS.
     """
-    from app.core.enums import DataOrigin, PipelineMode
-    from app.services.dataset_orchestrator import DatasetIngestionOrchestrator
+    from app.services.available_ingestion import run_available_ingestion
     from sqlalchemy import text
 
-    orchestrator = DatasetIngestionOrchestrator(db)
-    result = await orchestrator.run_pipeline(
-        source_name="Goibibo",
-        data_origin=DataOrigin.IMPORTED,
-        pipeline_mode=PipelineMode.LIVE_PROCESSING,
-        trigger_type="MANUAL",
-    )
+    result = await run_available_ingestion(db)
 
     actor_uuid = None
     raw_uid = getattr(current_user, "user_id", None)
@@ -257,6 +250,8 @@ async def trigger_manual_collection(
         except Exception:
             actor_uuid = None
 
+    if not result.get('pipeline_run_id'):
+        return APIResponse(success=True, data=result)
     audit = AuditService(db)
     await audit.log_event(
         actor_id=actor_uuid,
@@ -270,22 +265,29 @@ async def trigger_manual_collection(
     return APIResponse(success=True, data=result)
 
 
+@router.get('/readiness', response_model=APIResponse)
+async def ingestion_readiness(db: AsyncSession = Depends(get_db),
+                             current_user: UserContext = Depends(require_viewer)):
+    from app.services.available_ingestion import dashboard_readiness
+    return APIResponse(success=True, data=await dashboard_readiness(db))
+
+
 @router.post("/replay", response_model=APIResponse)
 async def replay_pipeline(
     db: AsyncSession = Depends(get_db),
     current_user: UserContext = Depends(require_analyst),
 ):
     """Trigger replay downstream pipeline for demo / reproducibility verification."""
-    from app.core.enums import DataOrigin, PipelineMode
     from app.services.dataset_orchestrator import DatasetIngestionOrchestrator
     from sqlalchemy import text
 
     orchestrator = DatasetIngestionOrchestrator(db)
     result = await orchestrator.run_pipeline(
-        source_name="Goibibo",
-        data_origin=DataOrigin.REPLAY,
-        pipeline_mode=PipelineMode.REPLAY,
+        data_origin="REPLAY",
+        pipeline_mode="REPLAY",
         trigger_type="REPLAY",
+        is_replay=True,
+        reprocess_existing_fares=True,
     )
 
     actor_uuid = None

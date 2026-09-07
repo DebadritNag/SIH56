@@ -30,7 +30,7 @@ def _parse_str_list(csv_val: Optional[str]) -> List[str]:
 
 def _fare_conditions(from_date, to_date, selected_windows, route_list):
     """Build shared WHERE conditions for validated_fares queries (real data)."""
-    conditions = []
+    conditions = [ValidatedFare.data_origin.in_(['IMPORTED', 'LIVE'])]
     if from_date:
         try:
             conditions.append(ValidatedFare.departure_at >= datetime.strptime(from_date, "%Y-%m-%d"))
@@ -247,29 +247,10 @@ async def get_booking_window_summary(
     ).group_by(ValidatedFare.booking_window_days).order_by(ValidatedFare.booking_window_days)
 
     out: List[Dict[str, Any]] = []
-    default_benchmarks = {
-        1: (11200.0, 184),
-        7: (7420.0, 492),
-        15: (5900.0, 310),
-        30: (4850.0, 205),
-        45: (4120.0, 128),
-    }
-
     try:
-        rows = (await db.execute(q)).all()
-        found_windows = {}
-        for r in rows:
-            if r.bw is not None:
-                found_windows[int(r.bw)] = (round(float(r.avg), 0) if r.avg else 0, int(r.n))
-
-        # Ensure all standard windows (1, 7, 15, 30, 45) have discrete values
-        combined_windows = []
-        for bw in (1, 7, 15, 30, 45):
-            if bw in found_windows:
-                combined_windows.append((bw, found_windows[bw][0], found_windows[bw][1]))
-            else:
-                combined_windows.append((bw, default_benchmarks[bw][0], default_benchmarks[bw][1]))
-
+        rows = (await db.execute(q.where(ValidatedFare.data_origin.in_(['IMPORTED','LIVE'])))).all()
+        combined_windows = [(int(r.bw), round(float(r.avg), 0), int(r.n)) for r in rows
+                            if r.bw is not None and r.avg is not None and int(r.bw) in selected_windows]
         total = sum(c[2] for c in combined_windows) or 1
         for bw, avg_f, n in combined_windows:
             out.append({

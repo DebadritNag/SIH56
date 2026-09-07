@@ -195,45 +195,15 @@ export function useRouteInsights(routeCode: string) {
       if (mode === "mock") {
         return base;
       }
-      try {
-        const res = (await endpoints.routeInsights(routeCode, signal)) as Record<string, unknown> | null;
-        if (res && typeof res === "object" && res.route_code) {
-          const realMedian = Number(res.current_median_fare) || base.current_median_fare;
-          const curve = Array.isArray(res.advance_purchase_curve) && res.advance_purchase_curve.length > 0
-            ? (res.advance_purchase_curve as any[])
-            : base.advance_purchase_curve.map((p) => {
-                const ratio = p.today_fare / (base.current_median_fare || 1);
-                const histRatio = p.median_30d_fare / (base.current_median_fare || 1);
-                return {
-                  ...p,
-                  today_fare: Math.round(realMedian * ratio),
-                  median_30d_fare: Math.round(realMedian * histRatio),
-                };
-              });
-
-          const sources = Array.isArray(res.sources_comparison) && res.sources_comparison.length > 0
-            ? (res.sources_comparison as any[])
-            : base.sources_comparison;
-
-          const merged: RouteInsightDetail = {
-            ...base,
-            route_code: String(res.route_code ?? base.route_code),
-            origin: String(res.origin_code ? `${res.origin_code}` : base.origin),
-            destination: String(res.destination_code ? `${res.destination_code}` : base.destination),
-            distance_km: Number(res.distance_km) || base.distance_km,
-            current_median_fare: realMedian,
-            change_7d_pct: Number(res.previous_week_change_pct) || base.change_7d_pct,
-            change_30d_pct: Number(res.previous_week_change_pct) || base.change_30d_pct,
-            data_confidence_pct: Number(res.route_apix_latest != null ? 98 : base.data_confidence_pct),
-            advance_purchase_curve: curve,
-            sources_comparison: sources,
-          };
-          return merged;
-        }
-        return base;
-      } catch {
-        return base;
-      }
+      const res = await endpoints.routeInsights(routeCode, signal) as Record<string, any>;
+      if (!res || res.current_median_fare == null) throw new Error('No observed fares for this route');
+      return {
+        ...base, route_code: res.route_code, origin: res.origin_code, destination: res.destination_code,
+        distance_km: res.distance_km ?? 0, traffic_weight_pct: 0, market_status: 'UNKNOWN',
+        data_confidence_pct: 0, current_median_fare: res.current_median_fare,
+        change_7d_pct: 0, change_30d_pct: 0,
+        advance_purchase_curve: [], sources_comparison: [],
+      };
     },
     placeholderData: keepPreviousData,
   });
