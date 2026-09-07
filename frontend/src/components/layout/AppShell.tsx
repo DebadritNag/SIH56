@@ -31,7 +31,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
   const rt = REALTIME_LABEL[realtimeStatus] ?? REALTIME_LABEL.disabled;
 
   return (
-    <div className="min-h-screen bg-[#F5F7FA] flex text-[#101828]">
+    <div className="min-h-screen bg-white flex text-[#101828]">
       {/* Sidebar Navigation */}
       <Sidebar
         collapsed={sidebarCollapsed}
