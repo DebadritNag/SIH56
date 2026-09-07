@@ -154,6 +154,9 @@ class LiveScraper:
             dep = today_date + timedelta(days=effective_bw)
         origin = origin.upper().strip()
         destination = destination.upper().strip()
+        if source_name.lower() == "happyfares":
+            from app.scraping.happyfares_browser import collect
+            return await collect(origin, destination, dep, max_results, is_nonstop)
         if "yatra" in source_name.lower() or "ota_source_04" in source_name.lower():
             return await self._run_yatra_probe(
                 source_name, origin, destination, dep, engine or "AUTO", max_results, is_nonstop

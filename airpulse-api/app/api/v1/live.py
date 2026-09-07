@@ -18,7 +18,7 @@ router = APIRouter(prefix='/live', tags=['Live acquisition'])
 
 
 class LiveRequest(BaseModel):
-    source: Literal['yatra'] = 'yatra'
+    source: Literal['yatra', 'happyfares'] = 'yatra'
     origin: str = Field(pattern=r'^[A-Z]{3}$')
     destination: str = Field(pattern=r'^[A-Z]{3}$')
     departure_date: date
@@ -34,21 +34,26 @@ class LiveRequest(BaseModel):
         return self
 
 
+def source_enabled(source):
+    if source == 'happyfares':
+        return bool(settings.HAPPYFARES_PROTOTYPE_ENABLED and settings.HAPPYFARES_REVIEW_NOTES.strip())
+    return bool(settings.YATRA_PROTOTYPE_ENABLED and settings.YATRA_REVIEW_NOTES.strip())
+
 @router.get('/config')
-async def configuration(user: UserContext = Depends(require_viewer)):
+async def configuration(source: Literal['yatra', 'happyfares'] = 'yatra', user: UserContext = Depends(require_viewer)):
     return {'success': True, 'data': {
-        'source': 'yatra', 'enabled': bool(settings.YATRA_PROTOTYPE_ENABLED and settings.YATRA_REVIEW_NOTES.strip()),
+        'source': source, 'enabled': source_enabled(source),
         'worker_enabled': settings.LIVE_WORKER_ENABLED, 'max_results': 15,
         'policy_status': 'MANUAL_REVIEW_REQUIRED',
-        'message': 'Bounded Yatra prototype. Access challenges stop collection without bypass.'}}
+        'message': 'Bounded public-page prototype. Access challenges stop collection without bypass.'}}
 
 
 @router.post('/runs', status_code=202)
 async def collect(payload: LiveRequest, db: AsyncSession = Depends(get_db), user: UserContext = Depends(require_analyst)):
     if not settings.LIVE_WORKER_ENABLED:
         raise HTTPException(503, 'Live worker is disabled')
-    if not settings.YATRA_PROTOTYPE_ENABLED or not settings.YATRA_REVIEW_NOTES.strip():
-        raise HTTPException(409, 'Set YATRA_PROTOTYPE_ENABLED=true and YATRA_REVIEW_NOTES on the backend')
+    if not source_enabled(payload.source):
+        raise HTTPException(409, f'Set {payload.source.upper()}_PROTOTYPE_ENABLED=true and {payload.source.upper()}_REVIEW_NOTES after review')
     from app.services.memory_budget import require_browser_memory
     try:
         require_browser_memory()

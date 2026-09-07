@@ -65,7 +65,12 @@ interface RequestOptions {
 }
 
 function buildUrl(path: string, query?: RequestOptions["query"]): string {
-  const url = new URL(`${config.apiV1Url}${path.startsWith("/") ? path : `/${path}`}`);
+  const base = config.apiV1Url;
+  const fullPath = `${base}${path.startsWith("/") ? path : `/${path}`}`;
+  // Relative paths (proxy) need to be resolved against the current origin in the browser.
+  const url = typeof window !== "undefined" && fullPath.startsWith("/")
+    ? new URL(fullPath, window.location.origin)
+    : new URL(fullPath);
   if (query) {
     for (const [key, value] of Object.entries(query)) {
       if (value !== undefined && value !== null && value !== "") {

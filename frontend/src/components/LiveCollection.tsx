@@ -10,15 +10,16 @@ type Run = { id: string; status: string; created_at: string; quotes_received: nu
 export default function LiveCollection() {
   const cache = useQueryClient();
   const [selected, setSelected] = useState<string | null>(null);
+  const [source, setSource] = useState("yatra");
   const [origin, setOrigin] = useState("DEL");
   const [destination, setDestination] = useState("BOM");
   const [departure, setDeparture] = useState(() => new Date(Date.now() + 7 * 86400000).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }));
   const [limit, setLimit] = useState(10);
-  const config = useQuery({ queryKey: ["live-config"], queryFn: () => getData<{ enabled: boolean; worker_enabled: boolean; message: string }>("/live/config") });
+  const config = useQuery({ queryKey: ["live-config", source], queryFn: () => getData<{ enabled: boolean; worker_enabled: boolean; message: string }>("/live/config", { source }) });
   const recent = useQuery({ queryKey: ["live-runs"], queryFn: () => getData<Run[]>("/live/runs"), refetchInterval: 5000 });
   const runId = selected ?? recent.data?.[0]?.id;
   const detail = useQuery({ queryKey: ["live-run", runId], queryFn: () => getData<Run>(`/live/runs/${runId}`), enabled: !!runId, refetchInterval: q => q.state.data?.pipelines?.some(p => ["QUEUED", "RUNNING"].includes(p.status)) ? 2000 : 5000 });
-  const collect = useMutation({ mutationFn: () => postData<{ collection_run_id: string }>("/live/runs", { source: "yatra", origin, destination, departure_date: departure, max_results: limit, engine: "AUTO" }), onSuccess: data => { setSelected(data.collection_run_id); cache.invalidateQueries({ queryKey: ["live-runs"] }); } });
+  const collect = useMutation({ mutationFn: () => postData<{ collection_run_id: string }>("/live/runs", { source, origin, destination, departure_date: departure, max_results: limit, engine: "AUTO" }), onSuccess: data => { setSelected(data.collection_run_id); cache.invalidateQueries({ queryKey: ["live-runs"] }); } });
   const ingest = useMutation({ mutationFn: () => postData(`/live/runs/${runId}/ingest`), onSuccess: () => cache.invalidateQueries({ queryKey: ["live-run", runId] }) });
   const run = detail.data;
   const state = run?.metadata?.ingestion_state;
@@ -33,8 +34,9 @@ export default function LiveCollection() {
   const busy = collect.isPending || recent.data?.some(r => ["QUEUED", "RUNNING"].includes(r.status));
   const inputClass = "rounded border border-slate-300 bg-white p-2 text-slate-900";
   return <main className="space-y-6 p-6">
-    <div><h1 className="text-2xl font-semibold">Live collection</h1><p className="mt-2 text-sm text-slate-500">Collect observed Yatra fares, review raw results, then send them through the ingestion pipeline.</p></div>
-    {config.data && !config.data.enabled && <p role="alert" className="rounded border border-amber-400 p-4">Yatra is disabled on the backend. Set YATRA_PROTOTYPE_ENABLED=true and YATRA_REVIEW_NOTES in Render, then restart the backend.</p>}
+    <div><h1 className="text-2xl font-semibold">Live collection</h1><p className="mt-2 text-sm text-slate-500">Collect observed OTA fares, review raw results, then send them through the ingestion pipeline.</p></div>
+    <label className="flex items-center gap-3">Source<select className={inputClass} value={source} onChange={e => setSource(e.target.value)}><option value="yatra">Yatra</option><option value="happyfares">HappyFares (prototype)</option></select></label>
+    {config.data && !config.data.enabled && <p role="alert" className="rounded border border-amber-400 p-4">{source} is disabled. Configure {source.toUpperCase()}_PROTOTYPE_ENABLED and {source.toUpperCase()}_REVIEW_NOTES after manual review.</p>}
     {config.data && !config.data.worker_enabled && <p role="alert">The backend live worker is disabled.</p>}
     <form className="flex flex-wrap items-end gap-4 rounded border p-4" onSubmit={e => { e.preventDefault(); collect.mutate(); }}>
       <label className="grid gap-1 text-sm">Origin<input className={inputClass} value={origin} maxLength={3} pattern="[A-Z]{3}" required onChange={e => setOrigin(e.target.value.toUpperCase())} /></label>

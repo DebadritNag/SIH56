@@ -1,0 +1,26 @@
+{
+  "pre_existing": false,
+  "rows_inserted": 1,
+  "migration_outcome": "newly_applied",
+  "post_count": 1,
+  "source_row": {
+    "name": "happyfares",
+    "display_name": "HappyFares",
+    "collection_method": "PLAYWRIGHT",
+    "enabled": true,
+    "active": true,
+    "rate_limit_per_minute": 1,
+    "max_retries": 0,
+    "supports_live_collection": true,
+    "requires_javascript": true,
+    "collector_version": "happyfares-public-v1",
+    "metadata": {
+      "scope": "public one-way economy search; one adult",
+      "hard_cap": 15,
+      "price_basis": "displayed discounted search total; checkout not verified",
+      "policy_status": "MANUAL_REVIEW_REQUIRED",
+      "live_prototype": true,
+      "preferred_engine": "PLAYWRIGHT"
+    }
+  }
+}

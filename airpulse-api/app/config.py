@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     # Bounded wait for the search form (trip-type tab) to hydrate after DOM load.
     YATRA_FORM_TIMEOUT_MS: int = Field(30000, ge=1000, le=60000)
     YATRA_SAVE_DIAGNOSTICS: bool = False
+    HAPPYFARES_PROTOTYPE_ENABLED: bool = False
+    HAPPYFARES_REVIEW_NOTES: str = ""
     LIVE_WORKER_ENABLED: bool = True
     YATRA_REVIEW_NOTES: str = ""
 

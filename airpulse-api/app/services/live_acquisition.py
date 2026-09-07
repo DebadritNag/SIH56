@@ -36,6 +36,10 @@ async def enqueue_collection(db, request, actor=None):
     cooldown = source.get('last_failure_at')
     if cooldown and utc_now()-cooldown < timedelta(minutes=5):
         raise ValueError('Source cooling down after a failed attempt; wait five minutes')
+    last_success = source.get('last_success_at')
+    interval = 60 / max(1, source.get('rate_limit_per_minute') or 1)
+    if last_success and (utc_now()-last_success).total_seconds() < interval:
+        raise ValueError('Source rate limit reached; wait before starting another collection')
     run_id = uuid4()
     await insert(db,'collection_runs',id=run_id,source_id=source['id'],run_type='LIVE_ACQUISITION',
         data_origin='LIVE',trigger_type='MANUAL',triggered_by=actor,status='QUEUED',
@@ -101,14 +105,14 @@ async def execute_acquisition(db, job):
     for q in quotes:
         if not q.get('gross_total') or q.get('gross_total',0)<=0 or not q.get('provenance',{}).get('observed_at'):
             continue
-        provenance = {**q['provenance'],'collection_run_id':str(run_id),'source':'Yatra'}
+        provenance = {**q['provenance'],'collection_run_id':str(run_id),'source':source['display_name'] or source['name']}
         payload = {**q,'provenance':provenance}
         checksum = hashlib.sha256(json.dumps(payload,sort_keys=True,separators=(',',':')).encode()).hexdigest()
         await insert(db,'raw_fares',collection_run_id=run_id,source_id=source['id'],data_origin='LIVE',
             origin_requested=request.origin,destination_requested=request.destination,
             departure_requested=request.departure_date,booking_window_requested=request.booking_window_days,
             collected_at=datetime.fromisoformat(provenance['observed_at'].replace('Z','+00:00')),http_status=result.get('http_status'),raw_payload=payload,response_hash=checksum,
-            collector_version=result.get('collector_version','yatra-homepage-v1'),parser_version='yatra-homepage-v1')
+            collector_version=result.get('collector_version','yatra-homepage-v1'),parser_version=result.get('collector_version','unknown'))
         count += 1
     state = 'READY_FOR_INGESTION' if count else 'FAILED'
     result.pop('quotes',None)
@@ -120,7 +124,7 @@ async def execute_acquisition(db, job):
             continue
         await insert(db,'pipeline_steps',pipeline_run_id=job['id'],step_name=st['stage'],step_order=i,
             status={'PASS':'COMPLETED','FAIL':'FAILED','PASSED':'COMPLETED'}.get(st['status'].upper(),st['status'].upper()),finished_at=utc_now(),
-            records_output=count if st['stage']=='RAW_STORAGE' else 0,message=st.get('detail'))
+            records_output=st.get('count',0),message=st.get('detail'))
     await insert(db,'pipeline_steps',pipeline_run_id=job['id'],step_name='RAW_STORAGE',step_order=99,
         status='COMPLETED' if count else 'SKIPPED',started_at=started,finished_at=utc_now(),records_output=count,
         message=f'{count} immutable raw live observations persisted')
