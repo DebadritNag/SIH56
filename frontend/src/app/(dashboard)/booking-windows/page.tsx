@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { Calendar, Info, RotateCw, Radio, CheckCircle2, TrendingUp } from 'lucide-react';
+import { Calendar, Info, RotateCw, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { formatINR } from '@/lib/formatters';
 import { useDataMode } from '@/lib/providers/DataModeProvider';
 import { useBookingWindowSummary } from '@/lib/hooks/useDashboard';
 import { DataSourceMeta } from '@/components/data/DataBadge';
+import { LiveModeBadge, DataCompositionStrip } from '@/components/data/LiveModeBadge';
+import { useLiveModeContext } from '@/lib/hooks/useLiveModeContext';
 import { GenerateReportButton } from '@/components/data/GenerateReportButton';
-import { CircleReloadingAnimation } from '@/components/ui/CircleReloadingAnimation';
 import { notify } from '@/lib/notify';
 
 const WINDOW_DATA = [
@@ -73,6 +74,8 @@ export default function BookingWindowsPage() {
   const isMock = mode === 'mock';
   const [isManualReloading, setIsManualReloading] = useState(false);
 
+  const { ctx, isLoading: ctxLoading } = useLiveModeContext();
+
   const {
     data: bwSummary,
     isLoading: isBwLoading,
@@ -80,31 +83,11 @@ export default function BookingWindowsPage() {
     refetch: refetchBw,
   } = useBookingWindowSummary();
 
-  // Real average fare + sample count per window from validated fares.
-  const realByCode = useMemo(() => {
-    const map = new Map<string, { fare: number; n: number }>();
-    for (const r of (
-      (bwSummary as
-        | { window_code?: number; avg_fare?: number; sample_count?: number }[]
-        | undefined) ?? []
-    )) {
-      if (r.window_code != null) {
-        map.set(`T+${r.window_code}`, {
-          fare: Number(r.avg_fare ?? 0),
-          n: Number(r.sample_count ?? 0),
-        });
-      }
-    }
-    return map;
-  }, [bwSummary]);
-
   const handleReload = async () => {
     setIsManualReloading(true);
     try {
       await refetchBw();
-      notify.success('Booking window telemetry reloaded', {
-        description: 'Synchronized discrete lead time curves and observation samples.',
-      });
+      notify.success('Booking window data reloaded');
     } catch {
       notify.error('Failed to reload booking windows');
     } finally {
@@ -114,25 +97,47 @@ export default function BookingWindowsPage() {
 
   const isBusy = isBwLoading || isBwFetching || isManualReloading;
 
+  // New backend shape: [{window, window_code, avg_fare, sample_count, available, availability_label, live_count, imported_count}]
+  // Map by label e.g. "T+7"
+  const realByLabel = useMemo(() => {
+    type BwRow = {
+      window?: string;
+      window_code?: number;
+      avg_fare?: number;
+      sample_count?: number;
+      available?: boolean;
+      availability_label?: string;
+      live_count?: number;
+      imported_count?: number;
+    };
+    const map = new Map<string, BwRow>();
+    for (const r of ((bwSummary as BwRow[] | undefined) ?? [])) {
+      const key = r.window ?? (r.window_code != null ? `T+${r.window_code}` : null);
+      if (key) map.set(key, r);
+    }
+    return map;
+  }, [bwSummary]);
+
   const windows = WINDOW_DATA.map((w) => {
     if (isMock) {
-      return {
-        ...w,
-        hasData: true,
-        isVerified: true,
-        sampleCount: 420,
-        statusText: 'Demo Baseline',
-      };
+      return { ...w, hasData: true, isVerified: true, sampleCount: 420,
+        liveCount: 5, importedCount: 26, availabilityLabel: '420 observations (demo)',
+        statusText: 'Demo Baseline' };
     }
-    const real = realByCode.get(w.code);
-    const hasEmpirical = !!real && real.n > 0;
+    const real = realByLabel.get(w.code);
+    const available = real?.available === true;
+    const n = real?.sample_count ?? 0;
     return {
       ...w,
-      medianFare: hasEmpirical ? real.fare : w.medianFare,
-      hasData: true,
-      isVerified: hasEmpirical,
-      sampleCount: real?.n ?? 0,
-      statusText: hasEmpirical ? `Live Verified (${real.n} obs)` : 'Live Corridors Active',
+      // Only show real fare when real data exists — never show mock fare for unavailable windows.
+      medianFare: available ? (real?.avg_fare ?? null) : null,
+      hasData: available,
+      isVerified: available,
+      sampleCount: n,
+      liveCount: real?.live_count ?? 0,
+      importedCount: real?.imported_count ?? 0,
+      availabilityLabel: real?.availability_label ?? (available ? `${n} observations` : 'No observations'),
+      statusText: available ? `${n} obs` : 'No observations',
     };
   });
 
@@ -146,25 +151,17 @@ export default function BookingWindowsPage() {
             <h1 className="text-xl md:text-2xl font-bold text-[#101828] tracking-tight">
               Advance Booking Windows &amp; Lead Time Economics
             </h1>
-            {!isMock ? (
-              <span className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-300">
-                <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
-                LIVE STATUS ACTIVE
-              </span>
-            ) : (
-              <span className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
-                MOCK DEMO MODE
-              </span>
-            )}
+            <LiveModeBadge ctx={ctx} loading={ctxLoading} isMock={isMock} />
           </div>
           <p className="text-xs text-[#475467] mt-0.5">
             Systematic segmentation of airfare observations by advance purchase horizon to isolate dynamic yield pricing from macro headline inflation.
           </p>
-          <div className="mt-1.5">
+          <div className="mt-1.5 flex flex-wrap items-center gap-3">
             <DataSourceMeta
               isMock={isMock}
               source={isMock ? 'Demo dataset' : 'AirPulse validated observations (Live)'}
             />
+            {!isMock && <DataCompositionStrip ctx={ctx} />}
           </div>
         </div>
 
@@ -188,29 +185,14 @@ export default function BookingWindowsPage() {
         </div>
       </div>
 
-      {/* Booking Windows Cards or Circular Reloading Animation */}
-      {isBusy && !bwSummary && !isMock ? (
-        <CircleReloadingAnimation
-          title="Synthesizing Advance Booking Windows &amp; Lead Time Curves..."
-          subtitle="Calculating discrete purchase-horizon tariffs (T+1 to T+45) and active observation counts across domestic corridors."
-          badge={!isMock ? 'LIVE HORIZON ANALYSIS' : 'LEAD TIME SYNTHESIS'}
-          minHeight="min-h-[300px]"
-        />
-      ) : (
-        <div className="relative">
-          {isBusy && (
-            <div className="absolute inset-0 bg-white/70 backdrop-blur-2xs z-20 flex items-center justify-center rounded-lg">
-              <CircleReloadingAnimation
-                title="Updating Lead Time Telemetry..."
-                subtitle="Re-evaluating dynamic yield spreads and advance pricing elasticity..."
-                badge="REFRESHING HORIZONS"
-                size="sm"
-                minHeight="min-h-[200px]"
-              />
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-3.5">
+      {/* Booking Windows Cards */}
+      <div className="relative">
+        {isBusy && (
+          <div className="absolute inset-0 bg-white/60 z-10 rounded-lg flex items-center justify-center">
+            <span className="text-xs text-[#667085] animate-pulse font-semibold">Updating windows…</span>
+          </div>
+        )}
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-3.5">
             {windows.map((w) => (
               <div
                 key={w.code}
@@ -225,33 +207,39 @@ export default function BookingWindowsPage() {
                   </div>
                   <h3 className="text-xs font-bold text-[#101828] line-clamp-1">{w.label}</h3>
 
-                  <div className="text-2xl font-bold text-[#101828] tabular-nums mt-2">
-                    {formatINR(w.medianFare)}
-                  </div>
+                  {/* Fare value — only shown when real observations exist */}
+                  {isMock || w.hasData ? (
+                    <div className="text-2xl font-bold text-[#101828] tabular-nums mt-2">
+                      {w.medianFare != null ? formatINR(w.medianFare) : '—'}
+                    </div>
+                  ) : (
+                    <div className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-slate-400">
+                      <AlertCircle className="w-3.5 h-3.5 text-slate-300" />
+                      No observations
+                    </div>
+                  )}
 
-                  {/* Real Live Status Badge */}
+                  {/* Observation status */}
                   <div className="mt-1 flex items-center gap-1.5">
                     {!isMock && (
-                      <span
-                        className={`w-2 h-2 rounded-full shrink-0 ${
-                          w.isVerified
-                            ? 'bg-emerald-500 animate-pulse'
-                            : 'bg-blue-500 animate-pulse'
-                        }`}
-                      />
+                      w.isVerified
+                        ? <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" />
+                        : <AlertCircle className="w-3 h-3 text-slate-300 shrink-0" />
                     )}
-                    <span
-                      className={`text-[10px] font-semibold ${
-                        isMock
-                          ? 'text-[#667085]'
-                          : w.isVerified
-                          ? 'text-emerald-700'
-                          : 'text-blue-700'
-                      }`}
-                    >
-                      {w.statusText}
+                    <span className={`text-[10px] font-semibold ${
+                      isMock ? 'text-[#667085]' : w.isVerified ? 'text-emerald-700' : 'text-slate-400'
+                    }`}>
+                      {w.availabilityLabel}
                     </span>
                   </div>
+
+                  {/* Live / Imported breakdown for verified windows */}
+                  {!isMock && w.isVerified && (w.liveCount > 0 || w.importedCount > 0) && (
+                    <div className="mt-1 flex items-center gap-2 text-[9px] font-mono text-[#94A3B8]">
+                      {w.liveCount > 0 && <span className="text-emerald-600">LIVE {w.liveCount}</span>}
+                      {w.importedCount > 0 && <span className="text-blue-500">IMP {w.importedCount}</span>}
+                    </div>
+                  )}
                 </div>
 
                 <div className="mt-3 pt-3 border-t border-[#F1F5F9] text-[11px] space-y-1">
@@ -274,9 +262,7 @@ export default function BookingWindowsPage() {
             ))}
           </div>
         </div>
-      )}
-
-      {/* Economic Methodology Explainer */}
+      </div>
       <div className="bg-white border border-[#E4E7EC] rounded-lg p-5 shadow-xs">
         <h3 className="text-sm font-bold text-[#101828] mb-2 flex items-center gap-1.5">
           <Info className="w-4 h-4 text-blue-600" />

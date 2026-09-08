@@ -12,7 +12,8 @@ import { clsx } from 'clsx';
 import { useDataMode } from '@/lib/providers/DataModeProvider';
 import { useFares } from '@/lib/hooks/useResources';
 import { DataSourceMeta } from '@/components/data/DataBadge';
-import { CircleReloadingAnimation } from '@/components/ui/CircleReloadingAnimation';
+import { LiveModeBadge, DataCompositionStrip } from '@/components/data/LiveModeBadge';
+import { useLiveModeContext } from '@/lib/hooks/useLiveModeContext';
 
 
 
@@ -272,6 +273,7 @@ export default function FaresPage() {
   const isMock = mode === 'mock';
   const [selectedFare, setSelectedFare] = useState<FareObservation | null>(null);
   const [showExportModal, setShowExportModal] = useState(false);
+  const { ctx: liveCtx, isLoading: liveCtxLoading } = useLiveModeContext();
 
   // Live: real validated fares from the backend (all imported observations).
   const { data: farePage, isLoading: isFaresLoading, isFetching: isFaresFetching } = useFares({ page_size: 200 });
@@ -339,6 +341,8 @@ export default function FaresPage() {
           <div className="mt-1.5">
             <div className="flex flex-wrap items-center gap-3 mt-1.5">
               <DataSourceMeta isMock={isMock} source={isMock ? 'Demo dataset' : 'AirPulse validated fares (live)'} />
+              <LiveModeBadge ctx={liveCtx} loading={liveCtxLoading} isMock={isMock} />
+              {!isMock && <DataCompositionStrip ctx={liveCtx} />}
               <DataFreshness
                 timestamp={liveFares[0]?.collected_at}
                 label="Latest observation processed"

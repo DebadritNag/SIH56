@@ -81,14 +81,18 @@ class IndexEngine:
                 basket_routes.append(br)
             await self.session.flush()
 
-        # 2. Fetch all validated, non-duplicate economy fares for this date
+        # 2. Fetch all validated, non-duplicate economy fares for this date.
+        # LIVE MODE RULE: only LIVE and IMPORTED origins are eligible.
+        # NEVER include SYNTHETIC, REPLAY, or MODELLED in the official index.
+        from sqlalchemy import or_
         fares_query = select(ValidatedFare).where(
             and_(
                 ValidatedFare.collected_at >= index_date,
                 ValidatedFare.collected_at < index_date.fromordinal(index_date.toordinal() + 1),
-                ValidatedFare.validation_status.in_(["valid", "warning"]),
+                ValidatedFare.validation_status.in_(["VALID", "valid", "WARNING", "warning"]),
                 ValidatedFare.is_duplicate == False,
-                ValidatedFare.cabin_class == "economy",
+                ValidatedFare.cabin.in_(["economy", "Economy", "ECONOMY"]),
+                ValidatedFare.data_origin.in_(["LIVE", "IMPORTED"]),
             )
         )
         fares_res = await self.session.execute(fares_query)
@@ -110,12 +114,19 @@ class IndexEngine:
         route_window_fares: Dict[Tuple[UUID, str], List[float]] = defaultdict(list)
         route_fares_all: Dict[UUID, List[float]] = defaultdict(list)
         observed_sources = set()
+        live_obs_count = 0
+        imported_obs_count = 0
 
         for f in fares:
             route_fares_all[f.route_id].append(float(f.normalized_total_fare))
             wb = get_window_bucket(f.booking_window_days)
             route_window_fares[(f.route_id, wb)].append(float(f.normalized_total_fare))
             observed_sources.add(f.source_id)
+            origin = str(f.data_origin or "").upper()
+            if origin == "LIVE":
+                live_obs_count += 1
+            elif origin == "IMPORTED":
+                imported_obs_count += 1
 
         # Base reference fare lookup (derived from route distance / base model if historical base not in DB)
         components: List[IndexComponent] = []
@@ -214,6 +225,17 @@ class IndexEngine:
                 "route_count": matched_routes_count,
                 "source_count": len(observed_sources),
                 "base_period": "2026-08",
+                # Live Mode origin composition — mandatory for provenance and badge display.
+                "live_observation_count": live_obs_count,
+                "imported_observation_count": imported_obs_count,
+                "total_eligible_count": sample_count_total,
+                "data_mode": (
+                    "HYBRID" if live_obs_count > 0 and imported_obs_count > 0
+                    else "LIVE_DATA" if live_obs_count > 0
+                    else "IMPORTED_FALLBACK" if imported_obs_count > 0
+                    else "EMPTY"
+                ),
+                "eligible_origins": ["LIVE", "IMPORTED"],
             },
         )
 

@@ -12,6 +12,8 @@ import { useDashboardSummary } from '@/lib/hooks/useDashboard';
 import { EmptyAnomaliesState, EmptySearchResultsState } from '@/components/states/EmptyState';
 import { GenerateReportButton } from '@/components/data/GenerateReportButton';
 import { MockBadge } from '@/components/data/DataBadge';
+import { LiveModeBadge, DataCompositionStrip } from '@/components/data/LiveModeBadge';
+import { useLiveModeContext } from '@/lib/hooks/useLiveModeContext';
 import { useDataMode } from '@/lib/providers/DataModeProvider';
 import { CircleReloadingAnimation } from '@/components/ui/CircleReloadingAnimation';
 import { DataFreshness } from '@/components/ui/DataFreshness';
@@ -34,6 +36,8 @@ export default function AnomaliesPage() {
 
   const { summary } = useDashboardSummary();
   const { mode: dataMode } = useDataMode();
+  const isMock = dataMode === 'mock';
+  const { ctx: liveCtx, isLoading: liveCtxLoading } = useLiveModeContext();
 
   const [localStatuses, setLocalStatuses] = useState<Record<string, string>>({});
   const anomalies: AnomalyItem[] = (anomalyPage?.items ?? []).map((a) =>
@@ -73,13 +77,15 @@ export default function AnomaliesPage() {
           <p className="text-xs text-[#475467] mt-0.5">
             Evaluate statistical anomalies identified by Isolation Forest &amp; FareGuard. Unusual fares are never automatically discarded—investigate cross-source agreement, SHAP drivers, and record audited decisions.
           </p>
-          <div className="mt-1.5">
+          <div className="mt-1.5 flex flex-wrap items-center gap-3">
             <DataFreshness
               timestamp={anomalies[0]?.timestamp}
               label="Latest PriceGuard evaluation"
               isRealtime={true}
               source="PriceGuard v1"
             />
+            <LiveModeBadge ctx={liveCtx} loading={liveCtxLoading} isMock={isMock} />
+            {!isMock && <DataCompositionStrip ctx={liveCtx} />}
           </div>
         </div>
         <div className="flex items-center gap-2 text-xs">

@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 from app.api.v1 import live
+from app.api.v1 import live_mode
 from app.api.v1 import (
     alerts,
     anomalies,
@@ -22,6 +23,7 @@ from app.api.v1 import (
 
 api_router = APIRouter()
 api_router.include_router(live.router)
+api_router.include_router(live_mode.router)
 
 api_router.include_router(health.router)
 api_router.include_router(auth.router)

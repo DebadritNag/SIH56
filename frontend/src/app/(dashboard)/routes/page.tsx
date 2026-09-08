@@ -7,6 +7,8 @@ import { EChartWrapper } from '@/components/charts/EChartWrapper';
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { LiveModeBadge, DataCompositionStrip } from '@/components/data/LiveModeBadge';
+import { useLiveModeContext } from '@/lib/hooks/useLiveModeContext';
 import {
   MapPin,
   TrendingUp,

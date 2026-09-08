@@ -8,6 +8,37 @@
 import { getData, getPaginated, postData, patchData, type Paginated } from "@/lib/api/client";
 
 // --- Raw backend response shapes --------------------------------------------
+
+/** Canonical Live Mode context from /live-mode/status */
+export interface LiveModeStatus {
+  mode: "HYBRID" | "LIVE_DATA" | "IMPORTED_FALLBACK" | "EMPTY";
+  mode_label: string;
+  health_badge: string | null;
+  live_count: number;
+  imported_count: number;
+  total_eligible: number;
+  routes: string[];
+  booking_windows: number[];
+  booking_window_buckets: string[];
+  historical_days: number;
+  earliest_departure: string | null;
+  latest_departure: string | null;
+  earliest_collected: string | null;
+  latest_collected: string | null;
+  apix_available: boolean;
+  apix_count: number;
+  latest_apix_date: string | null;
+  latest_live_collection_id: string | null;
+  latest_live_collection_date: string | null;
+  latest_dataset_import_id: string | null;
+  latest_dataset_import_date: string | null;
+  latest_ingestion_run_id: string | null;
+  latest_pipeline_run_id: string | null;
+  dgca_benchmark_available: boolean;
+  mospi_cpi_available: boolean;
+  eligible_origins: string[];
+}
+
 export interface BackendDashboardSummary {
   latest_index: number | null;
   daily_change_pct: number | null;
@@ -19,6 +50,15 @@ export interface BackendDashboardSummary {
   critical_anomalies: number;
   active_alerts: number;
   healthy_sources: number;
+  // Live Mode fields
+  data_mode?: string;
+  data_mode_label?: string;
+  health_badge?: string | null;
+  live_count?: number;
+  imported_count?: number;
+  booking_windows_available?: string[];
+  historical_days?: number;
+  index_source?: string;
   total_sources: number;
   coverage_quality_score?: number;
 }
@@ -135,6 +175,10 @@ export interface BackendIngestionStatus {
 
 // --- Endpoint functions ------------------------------------------------------
 export const endpoints = {
+  // Live Mode status (canonical mode resolver)
+  liveModeStatus: (signal?: AbortSignal) =>
+    getData<LiveModeStatus>("/live-mode/status", undefined, signal),
+
   // Dashboard
   dashboardSummary: (query?: Record<string, string | number | undefined>, signal?: AbortSignal) =>
     getData<BackendDashboardSummary>("/dashboard/summary", query, signal),

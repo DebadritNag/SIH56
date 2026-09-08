@@ -30,6 +30,8 @@ import {
   useSystemTrust,
 } from '@/lib/hooks/useDashboard';
 import { DataSourceMeta } from '@/components/data/DataBadge';
+import { LiveModeBadge, DataCompositionStrip } from '@/components/data/LiveModeBadge';
+import { useLiveModeContext } from '@/lib/hooks/useLiveModeContext';
 import { DataFreshness } from '@/components/ui/DataFreshness';
 import { GenerateReportButton } from '@/components/data/GenerateReportButton';
 import { formatPercent, formatINR } from '@/lib/formatters';
@@ -103,6 +105,9 @@ export default function OverviewPage() {
   const [contributorDirection, setContributorDirection] = useState<'up' | 'down'>('up');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastRefreshedTime, setLastRefreshedTime] = useState('17:52 IST');
+
+  // Live Mode context — mode badge, counts, run history.
+  const { ctx: liveCtx, isLoading: liveCtxLoading } = useLiveModeContext();
 
   // Keep state synchronized with URL back/forward navigation
   useEffect(() => {
@@ -219,6 +224,9 @@ export default function OverviewPage() {
               source={meta.source}
               lastUpdated={meta.lastUpdated}
             />
+            <LiveModeBadge ctx={liveCtx} loading={liveCtxLoading} isMock={meta.isMock} />
+            {!meta.isMock && <DataCompositionStrip ctx={liveCtx} />}
+          </div>
             <DataFreshness
               timestamp={meta.lastUpdated}
               label="DATA UPDATED"
