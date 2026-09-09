@@ -81,7 +81,7 @@ class Profile(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
     full_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     organization: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    role: Mapped[e.AppRole] = mapped_column(pg_enum(e.AppRole), nullable=False, server_default=text("'viewer'"))
+    role: Mapped[e.AppRole] = mapped_column(pg_enum(e.AppRole), nullable=False, server_default=text("'analyst'"))
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
     created_at: Mapped[datetime] = _ts_default()
     updated_at: Mapped[datetime] = _ts_default()

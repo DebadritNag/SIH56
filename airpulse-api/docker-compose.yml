@@ -1,7 +1,24 @@
 version: '3.8'
 
+# ---------------------------------------------------------------------------
+# AirPulse Docker Compose
+#
+# Production / EC2 usage:
+#   Populate a .env file (see .env.example) with Supabase DATABASE_URL values.
+#   The api/worker/beat services read DB credentials from the host environment
+#   (injected via env_file or explicit -e flags), so they connect to Supabase
+#   and NOT to the local postgres container.
+#
+# Pure-local dev (no Supabase):
+#   Unset DATABASE_URL / DATABASE_URL_SYNC so the defaults point at the local
+#   postgres container below.  Run `alembic upgrade head` inside the api
+#   container to create the schema.
+# ---------------------------------------------------------------------------
+
 services:
-  # Supabase Postgres or local PostgreSQL instance
+  # Local PostgreSQL — used ONLY when DATABASE_URL is not set in the environment.
+  # On EC2 this container is still started but the app services ignore it because
+  # DATABASE_URL is already set to Supabase.
   postgres:
     image: postgres:16-alpine
     container_name: airpulse_postgres
@@ -11,7 +28,7 @@ services:
       POSTGRES_PASSWORD: postgrespassword
       POSTGRES_DB: postgres
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -20,35 +37,59 @@ services:
       timeout: 5s
       retries: 5
 
-  # Redis broker & caching
+  # Redis broker & result backend
   redis:
     image: redis:7-alpine
     container_name: airpulse_redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
 
+  # ---------------------------------------------------------------------------
   # AirPulse FastAPI Application
+  # DATABASE_URL / DATABASE_URL_SYNC are read from the host .env (EC2: Supabase).
+  # Fallback values point at the local postgres service for pure-local dev.
+  # ---------------------------------------------------------------------------
   api:
     build: .
     container_name: airpulse_api
     restart: unless-stopped
+    env_file:
+      - .env
     ports:
       - "127.0.0.1:8000:10000"
     environment:
       - PORT=10000
-      - DATABASE_URL=postgresql+asyncpg://postgres:postgrespassword@postgres:5432/postgres
-      - DATABASE_URL_SYNC=postgresql://postgres:postgrespassword@postgres:5432/postgres
+      # DB: host .env overrides these; fallback = local postgres for dev
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://postgres:postgrespassword@postgres:5432/postgres}
+      - DATABASE_URL_SYNC=${DATABASE_URL_SYNC:-postgresql://postgres:postgrespassword@postgres:5432/postgres}
+      - DATABASE_POOL_URL=${DATABASE_POOL_URL:-postgresql+asyncpg://postgres:postgrespassword@postgres:5432/postgres}
+      # Supabase auth (required for JWT validation on EC2)
+      - SUPABASE_URL=${SUPABASE_URL:-}
+      - SUPABASE_JWT_SECRET=${SUPABASE_JWT_SECRET:-}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY:-}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY:-}
+      - SUPABASE_JWT_AUD=${SUPABASE_JWT_AUD:-authenticated}
+      - AUTH_STRICT=${AUTH_STRICT:-false}
+      # Redis
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/1
-      - CRAWL4AI_ENABLED=true
+      # Crawl4AI
+      - CRAWL4AI_ENABLED=${CRAWL4AI_ENABLED:-true}
+      - CRAWL4AI_BROWSER_CONCURRENCY=${CRAWL4AI_BROWSER_CONCURRENCY:-1}
+      - CRAWL4AI_DEFAULT_MAX_RESULTS=${CRAWL4AI_DEFAULT_MAX_RESULTS:-5}
+      # Live scraping
+      - LIVE_WORKER_ENABLED=${LIVE_WORKER_ENABLED:-true}
       - HAPPYFARES_PROTOTYPE_ENABLED=${HAPPYFARES_PROTOTYPE_ENABLED:-false}
       - HAPPYFARES_REVIEW_NOTES=${HAPPYFARES_REVIEW_NOTES:-}
-      - CRAWL4AI_BROWSER_CONCURRENCY=1
-      - CRAWL4AI_DEFAULT_MAX_RESULTS=5
-      - DEMO_MODE=true
-      - CORS_ORIGINS=["http://localhost:3000","http://127.0.0.1:3000","https://sih-56.vercel.app"]
+      - YATRA_PROTOTYPE_ENABLED=${YATRA_PROTOTYPE_ENABLED:-false}
+      - YATRA_REVIEW_NOTES=${YATRA_REVIEW_NOTES:-}
+      # App
+      - DEMO_MODE=${DEMO_MODE:-true}
+      - APP_ENV=${APP_ENV:-production}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - CORS_ORIGINS=${CORS_ORIGINS:-["https://sih-56.vercel.app"]}
     depends_on:
       postgres:
         condition: service_healthy
@@ -57,39 +98,62 @@ services:
     volumes:
       - ./models:/app/models
 
+  # ---------------------------------------------------------------------------
   # Celery Background Worker
+  # ---------------------------------------------------------------------------
   worker:
     build: .
     container_name: airpulse_worker
     restart: unless-stopped
     command: celery -A app.workers.celery_app worker --loglevel=info
+    env_file:
+      - .env
     environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:postgrespassword@postgres:5432/postgres
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://postgres:postgrespassword@postgres:5432/postgres}
+      - DATABASE_URL_SYNC=${DATABASE_URL_SYNC:-postgresql://postgres:postgrespassword@postgres:5432/postgres}
+      - DATABASE_POOL_URL=${DATABASE_POOL_URL:-postgresql+asyncpg://postgres:postgrespassword@postgres:5432/postgres}
+      - SUPABASE_URL=${SUPABASE_URL:-}
+      - SUPABASE_JWT_SECRET=${SUPABASE_JWT_SECRET:-}
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/1
-      - CRAWL4AI_ENABLED=true
+      - CRAWL4AI_ENABLED=${CRAWL4AI_ENABLED:-true}
+      - CRAWL4AI_BROWSER_CONCURRENCY=${CRAWL4AI_BROWSER_CONCURRENCY:-1}
+      - CRAWL4AI_DEFAULT_MAX_RESULTS=${CRAWL4AI_DEFAULT_MAX_RESULTS:-5}
+      - LIVE_WORKER_ENABLED=${LIVE_WORKER_ENABLED:-true}
       - HAPPYFARES_PROTOTYPE_ENABLED=${HAPPYFARES_PROTOTYPE_ENABLED:-false}
       - HAPPYFARES_REVIEW_NOTES=${HAPPYFARES_REVIEW_NOTES:-}
-      - CRAWL4AI_BROWSER_CONCURRENCY=1
-      - CRAWL4AI_DEFAULT_MAX_RESULTS=5
-      - DEMO_MODE=true
+      - YATRA_PROTOTYPE_ENABLED=${YATRA_PROTOTYPE_ENABLED:-false}
+      - YATRA_REVIEW_NOTES=${YATRA_REVIEW_NOTES:-}
+      - DEMO_MODE=${DEMO_MODE:-true}
+      - APP_ENV=${APP_ENV:-production}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
     depends_on:
       - postgres
       - redis
 
+  # ---------------------------------------------------------------------------
   # Celery Beat Periodic Scheduler
+  # ---------------------------------------------------------------------------
   beat:
     build: .
     container_name: airpulse_beat
     restart: unless-stopped
     command: celery -A app.workers.celery_app beat --loglevel=info
+    env_file:
+      - .env
     environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:postgrespassword@postgres:5432/postgres
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://postgres:postgrespassword@postgres:5432/postgres}
+      - DATABASE_URL_SYNC=${DATABASE_URL_SYNC:-postgresql://postgres:postgrespassword@postgres:5432/postgres}
+      - DATABASE_POOL_URL=${DATABASE_POOL_URL:-postgresql+asyncpg://postgres:postgrespassword@postgres:5432/postgres}
+      - SUPABASE_URL=${SUPABASE_URL:-}
+      - SUPABASE_JWT_SECRET=${SUPABASE_JWT_SECRET:-}
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/1
-      - DEMO_MODE=true
+      - DEMO_MODE=${DEMO_MODE:-true}
+      - APP_ENV=${APP_ENV:-production}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
     depends_on:
       - postgres
       - redis
