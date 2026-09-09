@@ -34,6 +34,17 @@ class Settings(BaseSettings):
     LIVE_WORKER_ENABLED: bool = True
     YATRA_REVIEW_NOTES: str = ""
 
+    # ---------------------------------------------------------------------------
+    # Crawl4AI — AI-augmented browser scraping (shares the Playwright/Chromium binary)
+    # ---------------------------------------------------------------------------
+    # Master switch. Keeps Crawl4AI dormant until explicitly enabled after review.
+    CRAWL4AI_ENABLED: bool = False
+    # Hard ceiling on concurrent headless browser sessions. Keep at 1 on t3.small
+    # (2 GB RAM) to avoid OOM kills when Chromium + uvicorn + Celery are co-located.
+    CRAWL4AI_BROWSER_CONCURRENCY: int = Field(1, ge=1, le=2)
+    # Maximum fare results per Crawl4AI collection run (OTA hard cap).
+    CRAWL4AI_DEFAULT_MAX_RESULTS: int = Field(5, ge=1, le=15)
+
     # Supabase PostgreSQL (asyncpg for async, psycopg2 for sync/migrations)
     # DATABASE_URL: direct connection (session mode) used by app + workers.
     # DATABASE_POOL_URL: transaction-pooler (pgBouncer, port 6543) connection used

@@ -40,6 +40,9 @@ scrapy>=2.11.0,<3.0.0
 # The PlaywrightCollector imports this lazily; the app runs fine without it (live airline
 # sources simply report NOT_CONFIGURED / BROWSER_LAUNCH_FAILURE until it is installed).
 playwright>=1.44.0,<2.0.0
+# Crawl4AI — AI-augmented browser-based scraping. Shares the Playwright/Chromium binary
+# already installed above; do NOT add a second playwright entry.
+crawl4ai>=0.4.0,<1.0.0
 
 # Utilities & Observability
 python-json-logger>=2.0.7,<3.0.0

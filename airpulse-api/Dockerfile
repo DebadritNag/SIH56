@@ -27,7 +27,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY requirements.txt .
 RUN pip install --upgrade pip && pip install -r requirements.txt
-RUN mkdir -p /ms-playwright && playwright install --with-deps chrome
+
+# Install Playwright browsers at build time so the container image is self-contained.
+# chrome  — used by YatraBrowserCollector / HappyFares (existing)
+# chromium — used by Crawl4AI (new)
+# --with-deps installs all required Linux system libraries for both channels.
+RUN mkdir -p /ms-playwright \
+    && playwright install --with-deps chrome \
+    && playwright install --with-deps chromium
+
+# Crawl4AI post-install: downloads its lightweight default extraction model.
+# Run with --skip-chromium because the Playwright chromium above is reused.
+RUN crawl4ai-setup --skip-chromium || python -c "import crawl4ai; print('crawl4ai ready')"
 
 COPY . .
 
