@@ -62,7 +62,7 @@ function RouteIntelligence({ live }: { live: boolean }) {
 
   const observed = useQuery({
     queryKey: ['route-layout-observations', selectedRouteCode],
-    queryFn: () => getData<{ current_median_fare: number | null; distance_km: number | null; observation_count: number; source_coverage_count: number; booking_window_breakdown: Record<string, number> }>(`/routes/${selectedRouteCode}/insights`),
+    queryFn: () => getData<{ average_fare: number | null; min_fare: number | null; max_fare: number | null; live_count: number; imported_count: number; latest_observation: string | null; current_median_fare: number | null; distance_km: number | null; observation_count: number; source_coverage_count: number; booking_window_breakdown: Record<string, number> }>(`/routes/${selectedRouteCode}/insights`),
     enabled: live,
   });
   const isFetching = live && observed.isFetching;
@@ -74,12 +74,13 @@ function RouteIntelligence({ live }: { live: boolean }) {
   } : getMockRouteDetail(selectedRouteCode);
   const observedWindows = Object.entries(observed.data?.booking_window_breakdown ?? {})
     .map(([label, fare]) => ({ day: Number(label.replace(/^T\+?/, '')), fare }))
-    .filter(p => selectedWindows.includes(p.day)).sort((a, b) => b.day - a.day);
+    .filter(p => selectedWindows.includes(p.day <= 2 ? 1 : p.day <= 10 ? 7 : p.day <= 20 ? 15 : p.day <= 35 ? 30 : 45)).sort((a, b) => b.day - a.day);
 
   return (
     <div className="space-y-5">
       {live && <p className="rounded border border-blue-100 bg-blue-50 p-3 text-xs text-blue-800">Live Mode · Stored imported and live observations. The curve shows mean fares by lead time; historical comparisons require matching reference data.</p>}
       {live && observed.isError && <p role="alert" className="rounded border border-red-200 p-3 text-red-700">{observed.error.message} <button onClick={() => void observed.refetch()}>Retry</button></p>}
+      {live && observed.data && <div className="rounded border bg-white p-4 text-sm">LIVE: {observed.data.live_count} · IMPORTED: {observed.data.imported_count} · Mean: {observed.data.average_fare == null ? '—' : formatINR(observed.data.average_fare)} · Min: {observed.data.min_fare == null ? '—' : formatINR(observed.data.min_fare)} · Max: {observed.data.max_fare == null ? '—' : formatINR(observed.data.max_fare)}<p className="mt-2 text-xs">Latest observation: {observed.data.latest_observation ?? 'Unavailable'}</p></div>}
       {/* Route Header (Financial Security Detail Header) */}
       <div className="bg-white border border-[#E4E7EC] rounded-lg p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>

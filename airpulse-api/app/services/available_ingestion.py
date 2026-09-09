@@ -55,8 +55,7 @@ async def run_available_ingestion(db):
 
 
 async def dashboard_readiness(db):
-    counts = await available_counts(db)
-    published = await rows(db, """SELECT id FROM collection_runs
-        WHERE metadata->>'published_dashboard'='true' LIMIT 1""")
-    return {'ready': bool(published) and sum(counts.values()) > 0,
-            'counts': counts, 'observations': sum(counts.values())}
+    from app.services.data_context_resolver import DataContextResolver
+    ctx = await DataContextResolver(db).resolve()
+    return {'ready': ctx.is_populated(), 'counts': {'LIVE': ctx.live_count, 'IMPORTED': ctx.imported_count},
+            'observations': ctx.total_eligible, 'revision': f'{ctx.latest_ingested_at}:{ctx.latest_pipeline_run_id}:{ctx.latest_apix_computed_at}'}

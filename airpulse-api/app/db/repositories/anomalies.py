@@ -21,7 +21,9 @@ class AnomalyRepository:
         limit: int = 50,
         offset: int = 0,
     ) -> Tuple[List[Anomaly], int]:
-        conditions = []
+        from app.db.models import ValidatedFare
+        from app.services.data_context_resolver import live_fare_predicate
+        conditions = [Anomaly.fare_id.in_(select(ValidatedFare.id).where(live_fare_predicate()))]
         if severity:
             conditions.append(Anomaly.severity == severity)
         if anomaly_type:

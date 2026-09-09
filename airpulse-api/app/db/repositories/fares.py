@@ -37,7 +37,8 @@ class FareRepository:
     async def list_validated_fares(
         self, filters: FareFilterParams, limit: int = 50, offset: int = 0
     ) -> Tuple[List[ValidatedFare], int]:
-        conditions = []
+        from app.services.data_context_resolver import live_fare_predicate
+        conditions = [live_fare_predicate()]
         if filters.origin:
             conditions.append(ValidatedFare.origin == filters.origin.upper())
         if filters.destination:
@@ -49,7 +50,8 @@ class FareRepository:
         if filters.date_to:
             conditions.append(func.date(ValidatedFare.departure_at) <= filters.date_to)
         if filters.booking_window is not None:
-            conditions.append(ValidatedFare.booking_window_days == filters.booking_window)
+            ranges = {1: (0, 2), 7: (3, 10), 15: (11, 20), 30: (21, 35), 45: (36, 365)}
+            conditions.append(ValidatedFare.booking_window_days.between(*ranges[filters.booking_window]) if filters.booking_window in ranges else ValidatedFare.booking_window_days == filters.booking_window)
         if filters.min_fare is not None:
             conditions.append(ValidatedFare.normalized_total_fare >= filters.min_fare)
         if filters.max_fare is not None:

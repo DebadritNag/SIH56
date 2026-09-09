@@ -1,6 +1,7 @@
 'use client';
 
 import { useDataMode } from '@/lib/providers/DataModeProvider';
+import ObservedHistory from '@/components/ObservedHistory';
 import React, { useState, useMemo } from 'react';
 import { History, TrendingUp, Download, CheckCircle2, RotateCw, SlidersHorizontal, RotateCcw } from 'lucide-react';
 import { BacktestComparisonChart } from '@/components/charts/BacktestComparisonChart';
@@ -11,7 +12,7 @@ import { notify } from '@/lib/notify';
 
 export default function BacktestingPage() {
   const { mode } = useDataMode();
-  if (mode === 'real') return <div className="rounded border bg-white p-8">No verified backtest results available. A DGCA comparison requires observed historical fares and a matching published benchmark.</div>;
+  if (mode === 'real') return <ObservedHistory />;
   return <DemoBacktestingPage />;
 }
 function DemoBacktestingPage() {

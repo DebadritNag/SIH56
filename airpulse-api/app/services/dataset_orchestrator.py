@@ -350,25 +350,37 @@ class DatasetIngestionOrchestrator:
         if raw_rows_data:
             for row in raw_rows_data:
                 # Handle both standard CSV format and raw CSS export
-                origin = (row.get("origin") or row.get("origin_code") or "DEL").upper().strip()
-                dest = (row.get("destination") or row.get("destination_code") or "BOM").upper().strip()
-                dep_date_str = row.get("departure_date") or row.get("departure_at") or "2026-09-06"
-                scrape_date_str = row.get("scrape_date") or row.get("collected_at") or "2026-09-05"
+                origin = (row.get("origin") or row.get("origin_code") or "").upper().strip()
+                dest = (row.get("destination") or row.get("destination_code") or "").upper().strip()
+                dep_date_str = row.get("departure_date") or row.get("departure_at")
+                scrape_date_str = row.get("observed_at") or row.get("scrape_date") or row.get("collected_at")
+                if not origin or not dest or not dep_date_str or not scrape_date_str:
+                    continue
 
                 # Parse dates
-                dep_date = datetime.strptime(dep_date_str[:10], "%Y-%m-%d").date() if "-" in dep_date_str else date(2026, 9, 6)
-                scrape_date = datetime.strptime(scrape_date_str[:10], "%Y-%m-%d").date() if "-" in scrape_date_str else date(2026, 9, 5)
+                try:
+                    dep_date = date.fromisoformat(dep_date_str[:10])
+                    observed_at = datetime.fromisoformat(scrape_date_str.replace('Z', '+00:00'))
+                    if observed_at.tzinfo is None:
+                        from zoneinfo import ZoneInfo
+                        observed_at = observed_at.replace(tzinfo=ZoneInfo('Asia/Kolkata'))
+                    scrape_date = observed_at.date()
+                except ValueError:
+                    continue
 
                 lead_days, bw_bucket = calculate_booking_window(dep_date, scrape_date)
 
-                fare_val = _clean_fare(row.get("total_fare") or row.get("fontSize18") or 10000)
-                airline = (row.get("airline") or row.get("boldFont") or "IndiGo").strip()
+                fare_val = _clean_fare(row.get("total_fare") or row.get("fontSize18") or '')
+                airline = (row.get("airline") or row.get("boldFont") or "").strip()
                 flight_no = (row.get("flight_number") or row.get("fliCode") or "").strip()
-                dep_t = _parse_hhmm(row.get("departure_time") or row.get("appendBottom2")) or time(8, 0)
+                dep_t = _parse_hhmm(row.get("departure_time") or row.get("appendBottom2"))
+                if not fare_val or not airline or dep_t is None or dep_date < scrape_date:
+                    continue
                 arr_t = _parse_hhmm(row.get("arrival_time") or row.get("appendBottom2 (2)"))
 
-                dep_dt = datetime.combine(dep_date, dep_t, tzinfo=timezone.utc)
-                arr_dt = datetime.combine(dep_date, arr_t, tzinfo=timezone.utc) if arr_t else None
+                from zoneinfo import ZoneInfo
+                dep_dt = datetime.combine(dep_date, dep_t, tzinfo=ZoneInfo('Asia/Kolkata')).astimezone(timezone.utc)
+                arr_dt = datetime.combine(dep_date, arr_t, tzinfo=ZoneInfo('Asia/Kolkata')).astimezone(timezone.utc) if arr_t else None
 
                 normalized_records.append({
                     "origin": origin,
@@ -379,7 +391,8 @@ class DatasetIngestionOrchestrator:
                     "booking_window_bucket": bw_bucket,
                     "airline": airline,
                     "flight_number": flight_no,
-                    "total_fare": fare_val or 10000.0,
+                    "total_fare": fare_val,
+                    "observed_at": observed_at,
                     "stops": _stops(row.get("stops") or row.get("flightsLayoverInfo")),
                     "raw_row": row,
                 })
@@ -387,7 +400,9 @@ class DatasetIngestionOrchestrator:
             # Normalize from existing validated fares
             res = await self.session.execute(select(ValidatedFare).where(ValidatedFare.data_origin.in_(["IMPORTED", "LIVE"])))
             for vf in res.scalars().all():
-                obs_date = vf.collected_at.date() if vf.collected_at else date(2026, 9, 5)
+                if not vf.collected_at or not vf.departure_at:
+                    continue
+                obs_date = vf.collected_at.date()
                 lead_days, bw_bucket = calculate_booking_window(vf.departure_at.date(), obs_date)
                 normalized_records.append({
                     "id": vf.id,
@@ -484,23 +499,26 @@ class DatasetIngestionOrchestrator:
                     cabin="economy",
                     fare_class="ECONOMY",
                     refundable=False,
-                    base_fare=Decimal(str(vr["total_fare"])),
-                    taxes=Decimal("0.0"),
-                    mandatory_fees=Decimal("0.0"),
-                    convenience_fee=Decimal("0.0"),
+                    base_fare=None,
+                    taxes=None,
+                    mandatory_fees=None,
+                    convenience_fee=None,
                     total_fare=Decimal(str(vr["total_fare"])),
                     normalized_total_fare=Decimal(str(vr["total_fare"])),
                     currency="INR",
                     validation_status="VALID",
                     is_duplicate=False,
                     quote_hash=q_hash,
-                    collected_at=utc_now(),
+                    collected_at=vr['observed_at'],
                 )
                 self.session.add(vf)
                 validated_entities.append(vf)
 
         await self.session.commit()
 
+        pipe_run.metadata_json = {**(pipe_run.metadata_json or {}),
+                                  'processed_fare_ids': [str(v.id) for v in validated_entities]}
+        await self.session.commit()
         await record_stage(
             order=4,
             name="DEDUP",
@@ -680,11 +698,11 @@ class DatasetIngestionOrchestrator:
             try:
                 # Run statistical engine for route median anomalies
                 anom_engine = AnomalyEngine(self.session)
-                anom_res = await anom_engine.run()
+                anom_res = await anom_engine.run(fare_ids=list(predictions_map))
                 anomalies_detected = anom_res.get("anomalies", 0)
 
                 pg_status = "COMPLETED"
-                pg_msg = f"PriceGuard Isolation Forest & MAD scored {fg_scored_count} observations; flagged {anomalies_detected} anomalies"
+                pg_msg = f"Route-median statistical detector evaluated {fg_scored_count} observations; flagged {anomalies_detected} anomalies"
             except Exception as pg_err:
                 logger.error(f"PriceGuard scoring error: {pg_err}")
                 pg_status = "FAILED"

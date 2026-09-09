@@ -11,16 +11,18 @@ export function LiveDataGate({ children }: { children: ReactNode }) {
   const { mode } = useDataMode();
   const path = usePathname();
   const client = useQueryClient();
-  const previous = useRef<boolean | undefined>(undefined);
+  const previous = useRef<string | undefined>(undefined);
   const q = useQuery({
     queryKey: ['ingestion-readiness', mode],
-    queryFn: () => getData<{ ready: boolean; observations: number }>('/ingestion/readiness'),
+    queryFn: () => getData<{ ready: boolean; observations: number; revision?: string }>('/ingestion/readiness'),
     enabled: mode === 'real', refetchInterval: 3000,
   });
   useEffect(() => {
-    if (q.data?.ready && previous.current === false) void client.invalidateQueries();
-    previous.current = q.data?.ready;
-  }, [q.data?.ready, client]);
+    if (!q.data) return;
+    const revision = `${q.data.ready}:${q.data.observations}:${q.data.revision}`;
+    if (previous.current !== undefined && previous.current !== revision) void client.invalidateQueries();
+    previous.current = revision;
+  }, [q.data, client]);
   const management = ['/ingestion', '/pipeline', '/scraping-test', '/sources', '/settings'];
   if (mode === 'mock' || management.some(p => path === p || path.startsWith(p + '/'))) return children;
   if (q.isPending) return <p className="p-8 text-slate-500">Checking processed observations…</p>;

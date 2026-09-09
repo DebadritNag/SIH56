@@ -31,7 +31,7 @@ class ProvenanceService:
             select(ValidatedFare).where(ValidatedFare.id == fare_id)
         )
         val_fare = val_res.scalars().first()
-        if not val_fare:
+        if not val_fare or val_fare.data_origin not in ('LIVE', 'IMPORTED'):
             return {"error": "Validated fare not found"}
 
         # 2. Raw fare record
@@ -226,7 +226,19 @@ class ProvenanceService:
             },
         ]
 
+        from app.services.live_store import rows
+        processing = await rows(self.session, """SELECT p.id,p.collection_run_id FROM pipeline_runs p
+            WHERE p.status IN ('COMPLETED','PARTIAL') AND
+            (p.metadata->'processed_fare_ids' ? :fare_id OR
+             (p.collection_run_id=:original AND p.pipeline_type='live_ingestion'))
+            ORDER BY p.created_at DESC LIMIT 1""", fare_id=str(fare_id), original=val_fare.collection_run_id)
+        payload = raw_fare.raw_payload or {} if raw_fare else {}
+        acquisition = 'CSV_IMPORT' if is_imported else (payload.get('provenance', {}).get('acquisition_method') or payload.get('provenance', {}).get('engine'))
         return {
+            "acquisition_method": acquisition,
+            "dataset_import_id": str(val_fare.collection_run_id) if is_imported and val_fare.collection_run_id else None,
+            "ingestion_run_id": str(processing[0]['collection_run_id']) if processing else None,
+            "pipeline_run_id": str(processing[0]['id']) if processing else None,
             "fare_id": str(val_fare.id),
             "airline_code": val_fare.airline,
             "route": f"{val_fare.origin}-{val_fare.destination}",

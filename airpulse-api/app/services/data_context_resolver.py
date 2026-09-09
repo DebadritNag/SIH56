@@ -19,7 +19,7 @@ Do NOT modify data_origin values to force Live Mode — provenance is immutable.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import func, select, text
@@ -29,6 +29,21 @@ from app.db.models import ValidatedFare
 
 # Canonical eligible origins for Live Mode — never include SYNTHETIC/REPLAY/MODELLED.
 LIVE_MODE_ORIGINS: tuple[str, ...] = ("LIVE", "IMPORTED")
+LIVE_FARE_SQL = "data_origin IN ('LIVE','IMPORTED') AND validation_status='VALID' AND NOT is_duplicate"
+
+def live_fare_predicate():
+    return (ValidatedFare.data_origin.in_(LIVE_MODE_ORIGINS) &
+            (ValidatedFare.validation_status == 'VALID') & ~ValidatedFare.is_duplicate)
+
+def resolve_mode(live, imported):
+    if live and imported:
+        return 'HYBRID', 'HYBRID LIVE + IMPORTED'
+    if live:
+        return 'LIVE_DATA', 'LIVE DATA'
+    if imported:
+        return 'IMPORTED_FALLBACK', 'IMPORTED FALLBACK'
+    return 'EMPTY', 'No data available'
+
 
 
 @dataclass
@@ -49,6 +64,10 @@ class LiveModeContext:
     booking_windows: List[int] = field(default_factory=list)
     booking_window_buckets: List[str] = field(default_factory=list)   # T+1, T+7 etc.
     historical_days: int = 0
+    latest_observed_at: Optional[datetime] = None
+    latest_ingested_at: Optional[datetime] = None
+    latest_apix_computed_at: Optional[datetime] = None
+    latest_live_collection_status: Optional[str] = None
     earliest_departure: Optional[date] = None
     latest_departure: Optional[date] = None
     earliest_collected: Optional[date] = None
@@ -79,6 +98,10 @@ class LiveModeContext:
 
     def to_dict(self) -> Dict[str, Any]:
         return {
+            "latest_observed_at": str(self.latest_observed_at) if self.latest_observed_at else None,
+            "latest_ingested_at": str(self.latest_ingested_at) if self.latest_ingested_at else None,
+            "latest_apix_computed_at": str(self.latest_apix_computed_at) if self.latest_apix_computed_at else None,
+            "latest_live_collection_status": self.latest_live_collection_status,
             "mode": self.mode,
             "mode_label": self.mode_label,
             "health_badge": self.health_badge,
@@ -136,132 +159,53 @@ class DataContextResolver:
         self._db = session
 
     async def resolve(self) -> LiveModeContext:
+        from app.services.live_store import rows
         ctx = LiveModeContext()
-
-        # ── 1. Fare counts by origin ──────────────────────────────────────────
-        counts_res = await self._db.execute(
-            select(ValidatedFare.data_origin, func.count(ValidatedFare.id))
-            .where(ValidatedFare.data_origin.in_(list(LIVE_MODE_ORIGINS)))
-            .group_by(ValidatedFare.data_origin)
-        )
-        for origin, cnt in counts_res.all():
-            if str(origin).upper() == "LIVE":
-                ctx.live_count = int(cnt)
-            elif str(origin).upper() == "IMPORTED":
-                ctx.imported_count = int(cnt)
+        counts = await rows(self._db, f"SELECT data_origin,count(*) AS n FROM validated_fares WHERE {LIVE_FARE_SQL} GROUP BY data_origin")
+        for row in counts:
+            if row['data_origin'] == 'LIVE': ctx.live_count = row['n']
+            if row['data_origin'] == 'IMPORTED': ctx.imported_count = row['n']
         ctx.total_eligible = ctx.live_count + ctx.imported_count
-
-        # ── 2. Mode determination ─────────────────────────────────────────────
-        if ctx.live_count > 0 and ctx.imported_count > 0:
-            ctx.mode = "HYBRID"
-            ctx.mode_label = "HYBRID LIVE + IMPORTED"
-        elif ctx.live_count > 0:
-            ctx.mode = "LIVE_DATA"
-            ctx.mode_label = "LIVE DATA"
-        elif ctx.imported_count > 0:
-            ctx.mode = "IMPORTED_FALLBACK"
-            ctx.mode_label = "IMPORTED FALLBACK"
-            ctx.health_badge = "LIVE SOURCE DEGRADED"
-        else:
-            ctx.mode = "EMPTY"
-            ctx.mode_label = "No data available"
-            return ctx  # Nothing more to compute
-
-        # ── 3. Observation metadata ───────────────────────────────────────────
-        meta_res = await self._db.execute(
-            select(
-                func.min(ValidatedFare.departure_at),
-                func.max(ValidatedFare.departure_at),
-                func.min(ValidatedFare.collected_at),
-                func.max(ValidatedFare.collected_at),
-            ).where(ValidatedFare.data_origin.in_(list(LIVE_MODE_ORIGINS)))
-        )
-        mrow = meta_res.one()
-        if mrow[0]:
-            ctx.earliest_departure = mrow[0].date()
-            ctx.latest_departure = mrow[1].date()
-            ctx.earliest_collected = mrow[2].date()
-            ctx.latest_collected = mrow[3].date()
-            if ctx.earliest_departure and ctx.latest_departure:
-                ctx.historical_days = (ctx.latest_departure - ctx.earliest_departure).days + 1
-
-        # ── 4. Routes + booking windows ───────────────────────────────────────
-        rw_res = await self._db.execute(
-            select(
-                ValidatedFare.origin,
-                ValidatedFare.destination,
-                ValidatedFare.booking_window_days,
-                func.count(ValidatedFare.id),
-            )
-            .where(ValidatedFare.data_origin.in_(list(LIVE_MODE_ORIGINS)))
-            .group_by(ValidatedFare.origin, ValidatedFare.destination, ValidatedFare.booking_window_days)
-        )
-        routes_set: set = set()
-        windows_set: set = set()
-        buckets_set: set = set()
-        for orig, dest, bw, _ in rw_res.all():
-            routes_set.add(f"{orig}-{dest}")
-            if bw is not None:
-                windows_set.add(int(bw))
-                buckets_set.add(_bucket_label(int(bw)))
-        ctx.routes = sorted(routes_set)
-        ctx.booking_windows = sorted(windows_set)
-        ctx.booking_window_buckets = sorted(buckets_set, key=lambda b: {"T+1":0,"T+7":1,"T+15":2,"T+30":3,"T+45":4}.get(b, 9))
-
-        # ── 5. APIx metadata ──────────────────────────────────────────────────
-        try:
-            apix_res = (await self._db.execute(text(
-                "SELECT count(*) AS n, max(index_date) AS latest FROM airfare_index WHERE index_type='national'"
-            ))).one()
-            ctx.apix_count = int(apix_res[0] or 0)
-            ctx.apix_available = ctx.apix_count > 0
-            ctx.latest_apix_date = apix_res[1]
-        except Exception:
-            pass
-
-        # ── 6. Run metadata ───────────────────────────────────────────────────
-        try:
-            live_run = (await self._db.execute(text(
-                "SELECT id, created_at::date FROM collection_runs "
-                "WHERE run_type='LIVE_ACQUISITION' ORDER BY created_at DESC LIMIT 1"
-            ))).first()
-            if live_run:
-                ctx.latest_live_collection_id = str(live_run[0])
-                ctx.latest_live_collection_date = live_run[1]
-        except Exception:
-            pass
-
-        try:
-            import_run = (await self._db.execute(text(
-                "SELECT id, created_at::date FROM collection_runs "
-                "WHERE data_origin='IMPORTED' ORDER BY created_at DESC LIMIT 1"
-            ))).first()
-            if import_run:
-                ctx.latest_dataset_import_id = str(import_run[0])
-                ctx.latest_dataset_import_date = import_run[1]
-        except Exception:
-            pass
-
-        try:
-            pipe_run = (await self._db.execute(text(
-                "SELECT id FROM pipeline_runs ORDER BY created_at DESC LIMIT 1"
-            ))).first()
-            if pipe_run:
-                ctx.latest_pipeline_run_id = str(pipe_run[0])
-        except Exception:
-            pass
-
-        # ── 7. Benchmark availability ─────────────────────────────────────────
-        try:
-            bench = (await self._db.execute(text(
-                "SELECT benchmark_type, count(*) FROM benchmark_fares GROUP BY benchmark_type"
-            ))).all()
-            for btype, cnt in bench:
-                if "dgca" in str(btype).lower():
-                    ctx.dgca_benchmark_available = int(cnt) > 0
-                elif "mospi" in str(btype).lower() or "cpi" in str(btype).lower():
-                    ctx.mospi_cpi_available = int(cnt) > 0
-        except Exception:
-            pass
-
+        ctx.mode, ctx.mode_label = resolve_mode(ctx.live_count, ctx.imported_count)
+        if ctx.mode == 'IMPORTED_FALLBACK': ctx.health_badge = 'LIVE SOURCE DEGRADED'
+        meta = (await rows(self._db, f"""SELECT min(departure_at) AS dep_min,max(departure_at) AS dep_max,
+            min(collected_at) AS obs_min,max(collected_at) AS obs_max,max(created_at) AS ingested,
+            count(DISTINCT (collected_at AT TIME ZONE 'UTC')::date) AS days
+            FROM validated_fares WHERE {LIVE_FARE_SQL}"""))[0]
+        ctx.historical_days = meta['days']
+        ctx.earliest_departure = meta['dep_min'].date() if meta['dep_min'] else None
+        ctx.latest_departure = meta['dep_max'].date() if meta['dep_max'] else None
+        ctx.earliest_collected = meta['obs_min'].date() if meta['obs_min'] else None
+        ctx.latest_collected = meta['obs_max'].date() if meta['obs_max'] else None
+        ctx.latest_observed_at, ctx.latest_ingested_at = meta['obs_max'], meta['ingested']
+        coverage = await rows(self._db, f"SELECT DISTINCT origin,destination,booking_window_days FROM validated_fares WHERE {LIVE_FARE_SQL}")
+        ctx.routes = sorted({f"{r['origin']}-{r['destination']}" for r in coverage})
+        ctx.booking_windows = sorted({r['booking_window_days'] for r in coverage if r['booking_window_days'] is not None})
+        ctx.booking_window_buckets = sorted({_bucket_label(d) for d in ctx.booking_windows}, key=lambda b:int(b[2:]))
+        indices = (await rows(self._db, """SELECT count(*) AS n,max(index_date) AS latest,max(calculated_at) AS computed
+            FROM airfare_index WHERE index_type='national' AND methodology_version='apix-live-matched-v1'"""))[0]
+        ctx.apix_count, ctx.latest_apix_date = indices['n'], indices['latest']
+        ctx.apix_available = bool(ctx.apix_count)
+        ctx.latest_apix_computed_at = indices['computed']
+        live = await rows(self._db, "SELECT id,created_at,status FROM collection_runs WHERE data_origin='LIVE' AND run_type='LIVE_ACQUISITION' ORDER BY created_at DESC LIMIT 1")
+        if live:
+            ctx.latest_live_collection_id, ctx.latest_live_collection_date = str(live[0]['id']), live[0]['created_at'].date()
+            ctx.latest_live_collection_status = live[0]['status']
+        imported = await rows(self._db, """SELECT id,created_at FROM collection_runs WHERE data_origin='IMPORTED'
+            AND COALESCE(metadata->>'original_filename','') != 'existing-observations'
+            AND run_type != 'REPLAY' ORDER BY created_at DESC LIMIT 1""")
+        if imported:
+            ctx.latest_dataset_import_id, ctx.latest_dataset_import_date = str(imported[0]['id']), imported[0]['created_at'].date()
+        ingestion = await rows(self._db, """SELECT id FROM collection_runs WHERE data_origin IN ('LIVE','IMPORTED')
+            AND run_type='INGESTION' ORDER BY created_at DESC LIMIT 1""")
+        if ingestion: ctx.latest_ingestion_run_id = str(ingestion[0]['id'])
+        pipeline = await rows(self._db, """SELECT p.id FROM pipeline_runs p JOIN collection_runs c ON c.id=p.collection_run_id
+            WHERE c.data_origin IN ('LIVE','IMPORTED') AND c.run_type != 'REPLAY' ORDER BY p.created_at DESC LIMIT 1""")
+        if pipeline: ctx.latest_pipeline_run_id = str(pipeline[0]['id'])
+        # A dataset must be verified before its benchmark can be advertised.
+        benchmarks = await rows(self._db, """SELECT DISTINCT b.benchmark_type FROM benchmark_fares b
+            JOIN reference_datasets d ON d.id=b.reference_dataset_id
+            WHERE d.metadata->>'verified'='true' AND d.status IN ('SYNCED','VERIFIED')""")
+        ctx.dgca_benchmark_available = any('dgca' in r['benchmark_type'].lower() for r in benchmarks)
+        ctx.mospi_cpi_available = any('cpi' in r['benchmark_type'].lower() for r in benchmarks)
         return ctx

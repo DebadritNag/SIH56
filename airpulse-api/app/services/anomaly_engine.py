@@ -48,9 +48,13 @@ class AnomalyEngine:
         rows = list((await self.session.execute(select(Route))).scalars().all())
         return {r.route_code: str(r.id) for r in rows}
 
-    async def run(self) -> Dict[str, Any]:
+    async def run(self, fare_ids=None) -> Dict[str, Any]:
+        from app.services.data_context_resolver import live_fare_predicate
+        predicates = [live_fare_predicate()]
+        if fare_ids is not None:
+            predicates.append(ValidatedFare.id.in_(fare_ids))
         fares = list((await self.session.execute(
-            select(ValidatedFare).where(ValidatedFare.validation_status == "VALID")
+            select(ValidatedFare).where(*predicates)
         )).scalars().all())
         if not fares:
             return {"status": "no_data", "anomalies": 0, "alerts": 0}
@@ -92,66 +96,9 @@ class AnomalyEngine:
                 dep_str = f.departure_at.strftime("%d %b %Y %H:%M IST") if f.departure_at else "—"
 
                 residual_val = round(val - med, 2)
-                lead_share = 0.45 if bw_days <= 3 else 0.35
-                demand_share = 0.25
-                timing_share = 0.15
-                fuel_share = 0.10
-                var_share = round(1.0 - (lead_share + demand_share + timing_share + fuel_share), 2)
-
-                shap_factors = [
-                    {
-                        "feature": f"T+{bw_days} booking lead window",
-                        "contribution_inr": max(120, round(residual_val * lead_share)),
-                        "description": "Short booking lead time constraint" if bw_days <= 3 else "Advance purchase curve baseline factor",
-                    },
-                    {
-                        "feature": "Route corridor demand & load proxy",
-                        "contribution_inr": max(90, round(residual_val * demand_share)),
-                        "description": "Elevated corridor traffic and seat depletion",
-                    },
-                    {
-                        "feature": "Departure schedule slot effect",
-                        "contribution_inr": max(70, round(residual_val * timing_share)),
-                        "description": "Prime business departure window timing",
-                    },
-                    {
-                        "feature": "Aviation turbine fuel & macro benchmark",
-                        "contribution_inr": max(45, round(residual_val * fuel_share)),
-                        "description": "MoSPI ATF price benchmark adjustment",
-                    },
-                    {
-                        "feature": "Corridor historical variance",
-                        "contribution_inr": max(25, round(residual_val * var_share)),
-                        "description": "Historical route price volatility spread",
-                    },
-                ]
-
-                cross_source = [
-                    {
-                        "source_name": f"{f.airline} Direct",
-                        "observed_fare": round(val, 0),
-                        "status": "Trigger Source",
-                    },
-                    {
-                        "source_name": "OTA Channel 01 (MakeMyTrip)",
-                        "observed_fare": round(val * 1.015, 0),
-                        "status": "Agreement (+1.5%)",
-                    },
-                    {
-                        "source_name": "OTA Channel 02 (EaseMyTrip)",
-                        "observed_fare": round(val * 0.992, 0),
-                        "status": "Agreement (-0.8%)",
-                    },
-                    {
-                        "source_name": "OTA Channel 03 (Cleartrip)",
-                        "observed_fare": round(val * 1.008, 0),
-                        "status": "Agreement (+0.8%)",
-                    },
-                ]
-
                 self.session.add(Anomaly(
                     id=uuid4(), fare_id=f.id, route_id=route_id, source_id=f.source_id,
-                    isolation_score=round(dev_pct / 100.0, 4),
+                    isolation_score=None,
                     anomaly_percentile=round(pct_rank, 4),
                     severity=sev, status="OPEN",
                     anomaly_type="unusually_high",
@@ -166,15 +113,15 @@ class AnomalyEngine:
                         "departure_time": dep_str,
                         "booking_window_days": bw_days,
                         "booking_window": bw_label,
-                        "base_fare": float(f.base_fare or val),
-                        "taxes": float(f.taxes or 0),
-                        "fees": float(f.mandatory_fees or 0),
-                        "raw_response_hash": f.quote_hash or f"sha256_{code.lower()}_{f.airline.lower()}",
+                        "base_fare": float(f.base_fare) if f.base_fare is not None else None,
+                        "taxes": float(f.taxes) if f.taxes is not None else None,
+                        "fees": float(f.mandatory_fees) if f.mandatory_fees is not None else None,
+                        "raw_response_hash": f.quote_hash,
                         "source_name": f"{f.airline} Portal / OTA",
                         "route_median": round(med, 2),
                         "deviation_pct": dev_pct,
-                        "shap_factors": shap_factors,
-                        "cross_source_check": cross_source,
+                        "shap_factors": [],
+                        "cross_source_check": [],
                         "summary": f"{f.airline} {f.origin}->{f.destination} fare is {dev_pct}% above the route median of ₹{round(med)}.",
                     },
                 ))

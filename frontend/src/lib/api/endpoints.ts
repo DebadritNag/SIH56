@@ -11,6 +11,10 @@ import { getData, getPaginated, postData, patchData, type Paginated } from "@/li
 
 /** Canonical Live Mode context from /live-mode/status */
 export interface LiveModeStatus {
+  latest_observed_at?: string | null;
+  latest_ingested_at?: string | null;
+  latest_apix_computed_at?: string | null;
+  latest_live_collection_status?: string | null;
   mode: "HYBRID" | "LIVE_DATA" | "IMPORTED_FALLBACK" | "EMPTY";
   mode_label: string;
   health_badge: string | null;

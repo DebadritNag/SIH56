@@ -30,7 +30,7 @@ async def list_indices(
     current_user: UserContext = Depends(require_viewer),
 ):
     from app.services.live_store import rows
-    where = """index_type=:scope AND (CAST(:scope_id AS text) IS NULL OR route_id::text=CAST(:scope_id AS text))
+    where = """methodology_version='apix-live-matched-v1' AND index_type=:scope AND (CAST(:scope_id AS text) IS NULL OR route_id::text=CAST(:scope_id AS text))
         AND (CAST(:start AS date) IS NULL OR index_date>=:start)
         AND (CAST(:end AS date) IS NULL OR index_date<=:end)"""
     params = dict(scope=scope,scope_id=scope_id,start=start_date,end=end_date)
@@ -50,7 +50,7 @@ async def get_latest_index(
     current_user: UserContext = Depends(require_viewer),
 ):
     from app.services.live_store import rows
-    records = await rows(db, """SELECT * FROM airfare_index WHERE index_type=:scope
+    records = await rows(db, """SELECT * FROM airfare_index WHERE methodology_version='apix-live-matched-v1' AND index_type=:scope
         AND (CAST(:scope_id AS text) IS NULL OR route_id::text=CAST(:scope_id AS text))
         ORDER BY index_date DESC,calculated_at DESC LIMIT 1""", scope=scope, scope_id=scope_id)
     return APIResponse(success=True, data=records[0] if records else None)

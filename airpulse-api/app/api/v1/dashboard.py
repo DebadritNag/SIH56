@@ -17,7 +17,7 @@ from app.core.security import require_viewer, UserContext
 from app.db.models import Alert, Anomaly, Route, Source, ValidatedFare
 from app.db.session import get_db
 from app.schemas.common import APIResponse
-from app.services.data_context_resolver import DataContextResolver, LIVE_MODE_ORIGINS
+from app.services.data_context_resolver import DataContextResolver, LIVE_MODE_ORIGINS, live_fare_predicate
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard Aggregations"])
 
@@ -42,7 +42,7 @@ def _parse_str_list(csv_val: Optional[str]) -> List[str]:
 
 def _fare_conditions(from_date, to_date, selected_windows, route_list):
     """WHERE conditions for validated_fares in Live Mode: LIVE + IMPORTED only."""
-    conditions = [ValidatedFare.data_origin.in_(list(LIVE_MODE_ORIGINS))]
+    conditions = [live_fare_predicate()]
     if from_date:
         try:
             conditions.append(ValidatedFare.departure_at >= datetime.strptime(from_date, "%Y-%m-%d"))
@@ -56,7 +56,9 @@ def _fare_conditions(from_date, to_date, selected_windows, route_list):
         except Exception:
             pass
     if selected_windows and len(selected_windows) < 5:
-        conditions.append(ValidatedFare.booking_window_days.in_(selected_windows))
+        from sqlalchemy import or_
+        ranges = {1: (0, 2), 7: (3, 10), 15: (11, 20), 30: (21, 35), 45: (36, 365)}
+        conditions.append(or_(*[ValidatedFare.booking_window_days.between(*ranges[w]) for w in selected_windows if w in ranges]))
     if route_list:
         from sqlalchemy import or_
         ors = []

@@ -262,7 +262,6 @@ export default function BookingWindowsPage() {
             ))}
           </div>
         </div>
-      </div>
       <div className="bg-white border border-[#E4E7EC] rounded-lg p-5 shadow-xs">
         <h3 className="text-sm font-bold text-[#101828] mb-2 flex items-center gap-1.5">
           <Info className="w-4 h-4 text-blue-600" />

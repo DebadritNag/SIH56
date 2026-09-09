@@ -62,7 +62,7 @@ def normalize_quote(raw):
                 quote_hash=hashlib.sha256(fingerprint.encode()).hexdigest(), collected_at=observed)
 
 
-async def calculate_live_index(db, pipeline_id):
+async def calculate_live_index(db, pipeline_id, as_of=None):
     baskets = await rows(db, 'SELECT * FROM index_baskets WHERE active=true ORDER BY created_at DESC LIMIT 1')
     if not baskets or not baskets[0]['base_period_start'] or not baskets[0]['base_period_end']:
         return {'status': 'INSUFFICIENT_DATA', 'reason': 'No configured observed base period'}
@@ -70,7 +70,7 @@ async def calculate_live_index(db, pipeline_id):
     weights = await rows(db, '''SELECT * FROM index_basket_routes WHERE basket_id=:id AND weight>0
         AND (effective_from IS NULL OR effective_from<=CURRENT_DATE)
         AND (effective_to IS NULL OR effective_to>=CURRENT_DATE)''', id=basket['id'])
-    today = utc_now().date()
+    today = as_of or utc_now().date()
     fares = await rows(db, """SELECT v.* FROM validated_fares v
         WHERE v.validation_status='VALID' AND NOT v.is_duplicate AND v.cabin='economy'
           AND v.data_origin IN ('LIVE','IMPORTED') AND v.collected_at >= :base
@@ -107,6 +107,10 @@ async def calculate_live_index(db, pipeline_id):
         metadata={'pipeline_run_id':str(pipeline_id), 'sample_count':len(observed),
                   'live_count':sum(f['data_origin']=='LIVE' for f in observed),
                   'imported_count':sum(f['data_origin']=='IMPORTED' for f in observed),
+                  'live_observation_count':sum(f['data_origin']=='LIVE' for f in observed),
+                  'imported_observation_count':sum(f['data_origin']=='IMPORTED' for f in observed),
+                  'total_eligible_count':len(observed),
+                  'data_mode': 'HYBRID' if any(f['data_origin']=='LIVE' for f in observed) and any(f['data_origin']=='IMPORTED' for f in observed) else 'LIVE_DATA' if any(f['data_origin']=='LIVE' for f in observed) else 'IMPORTED_FALLBACK',
                   'matched_weight_coverage':coverage, 'base_period_start':str(basket['base_period_start']),
                   'base_period_end':str(basket['base_period_end'])})
     for component in components:

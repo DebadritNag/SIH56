@@ -76,18 +76,26 @@ async def get_route_insights(
     _rc = (code or "-").split("-")
     origin, dest = (_rc[0] if len(_rc) > 0 else ""), (_rc[1] if len(_rc) > 1 else "")
 
+    from app.services.data_context_resolver import live_fare_predicate
     # Real aggregates from validated fares for this corridor.
     med = None
     bw_breakdown: dict = {}
     sources = 0
     obs_count = 0
+    row = [None, 0, 0, None, None, None, 0, 0, None]
     try:
         row = (await db.execute(
             select(
                 func.percentile_cont(0.5).within_group(ValidatedFare.normalized_total_fare),
                 func.count(func.distinct(ValidatedFare.source_id)),
                 func.count(ValidatedFare.id),
-            ).where(and_(ValidatedFare.origin == origin, ValidatedFare.destination == dest, ValidatedFare.data_origin.in_(['IMPORTED','LIVE'])))
+                func.avg(ValidatedFare.normalized_total_fare),
+                func.min(ValidatedFare.normalized_total_fare),
+                func.max(ValidatedFare.normalized_total_fare),
+                func.count(ValidatedFare.id).filter(ValidatedFare.data_origin == "LIVE"),
+                func.count(ValidatedFare.id).filter(ValidatedFare.data_origin == "IMPORTED"),
+                func.max(ValidatedFare.collected_at),
+            ).where(and_(ValidatedFare.origin == origin, ValidatedFare.destination == dest, live_fare_predicate()))
         )).one()
         med = float(row[0]) if row[0] is not None else None
         sources = int(row[1] or 0)
@@ -96,7 +104,7 @@ async def get_route_insights(
         bw_rows = (await db.execute(
             select(ValidatedFare.booking_window_days,
                    func.avg(ValidatedFare.normalized_total_fare))
-            .where(and_(ValidatedFare.origin == origin, ValidatedFare.destination == dest, ValidatedFare.data_origin.in_(['IMPORTED','LIVE'])))
+            .where(and_(ValidatedFare.origin == origin, ValidatedFare.destination == dest, live_fare_predicate()))
             .group_by(ValidatedFare.booking_window_days)
         )).all()
         for bw, avg in bw_rows:
@@ -111,6 +119,10 @@ async def get_route_insights(
         'current_median_fare': med, 'previous_day_change_pct': None,
         'previous_week_change_pct': None, 'trend_30d': None,
         'booking_window_breakdown': bw_breakdown, 'source_coverage_count': sources,
+        'average_fare': float(row[3]) if row[3] is not None else None,
+        'min_fare': float(row[4]) if row[4] is not None else None,
+        'max_fare': float(row[5]) if row[5] is not None else None,
+        'live_count': row[6], 'imported_count': row[7], 'latest_observation': row[8],
         'observation_count': obs_count, 'open_anomalies_count': None,
         'route_apix_latest': None, 'advance_purchase_curve': [], 'sources_comparison': [],
     })

@@ -40,3 +40,20 @@ async def live_mode_status(
     """
     ctx = await DataContextResolver(db).resolve()
     return APIResponse(success=True, data=ctx.to_dict())
+
+
+@router.get('/history', response_model=APIResponse)
+async def observed_history(db: AsyncSession = Depends(get_db), current_user: UserContext = Depends(require_viewer)):
+    from app.services.live_store import rows
+    from app.services.data_context_resolver import LIVE_FARE_SQL
+    observations = await rows(db, f"""SELECT (collected_at AT TIME ZONE 'UTC')::date AS date,
+        count(*) AS observations,avg(normalized_total_fare) AS mean_fare,
+        count(*) FILTER (WHERE data_origin='LIVE') AS live_count,
+        count(*) FILTER (WHERE data_origin='IMPORTED') AS imported_count
+        FROM validated_fares WHERE {LIVE_FARE_SQL} GROUP BY 1 ORDER BY 1""")
+    indices = await rows(db, """SELECT DISTINCT ON (index_date) index_date,index_value,metadata FROM airfare_index
+        WHERE index_type='national' AND methodology_version='apix-live-matched-v1'
+        ORDER BY index_date,calculated_at DESC""")
+    ctx = await DataContextResolver(db).resolve()
+    return APIResponse(success=True, data={'observations': observations, 'indices': indices,
+        'historical_days': ctx.historical_days, 'dgca_benchmark_available': ctx.dgca_benchmark_available})

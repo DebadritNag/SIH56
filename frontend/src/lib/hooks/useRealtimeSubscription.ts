@@ -70,6 +70,10 @@ export function useRealtimeSubscription(): { status: RealtimeStatus } {
         "postgres_changes",
         { event: "*", schema: "public", table },
         () => {
+          if (['collection_runs', 'pipeline_runs', 'pipeline_steps', 'airfare_index'].includes(table)) {
+            void queryClient.invalidateQueries();
+            return;
+          }
           const keys = TABLE_INVALIDATIONS[table] ?? [];
           for (const key of keys) {
             queryClient.invalidateQueries({ queryKey: key });

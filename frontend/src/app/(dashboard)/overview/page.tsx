@@ -225,8 +225,16 @@ export default function OverviewPage() {
               lastUpdated={meta.lastUpdated}
             />
             <LiveModeBadge ctx={liveCtx} loading={liveCtxLoading} isMock={meta.isMock} />
+            {!meta.isMock && <div className="mt-3 grid gap-2 text-xs text-slate-600 sm:grid-cols-2">
+              <span>Latest observation: {liveCtx.latest_observed_at ?? 'Unavailable'}</span>
+              <span>Latest ingestion timestamp: {liveCtx.latest_ingested_at ?? 'Unavailable'}</span>
+              <span>Latest APIx calculation: {liveCtx.latest_apix_computed_at ?? 'Unavailable'}</span>
+              <span>Latest live collection: {liveCtx.latest_live_collection_id ?? 'None'} · {liveCtx.latest_live_collection_status ?? 'No run'}</span>
+              <span>Latest dataset import: {liveCtx.latest_dataset_import_id ?? 'None'}</span>
+              <span>Latest ingestion run: {liveCtx.latest_ingestion_run_id ?? 'None'}</span>
+              <span>Latest pipeline run: {liveCtx.latest_pipeline_run_id ?? 'None'}</span>
+            </div>}
             {!meta.isMock && <DataCompositionStrip ctx={liveCtx} />}
-          </div>
             <DataFreshness
               timestamp={meta.lastUpdated}
               label="DATA UPDATED"

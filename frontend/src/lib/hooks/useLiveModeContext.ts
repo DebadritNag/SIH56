@@ -82,11 +82,7 @@ export function useLiveModeContext() {
     queryKey: ["live-mode-context", mode],
     queryFn: async ({ signal }) => {
       if (isMock) return MOCK_CONTEXT;
-      try {
-        return await endpoints.liveModeStatus(signal);
-      } catch {
-        return EMPTY_CONTEXT;
-      }
+      return endpoints.liveModeStatus(signal);
     },
     // Poll every 15 seconds so badge updates automatically when
     // new data is imported or a live collection run completes.

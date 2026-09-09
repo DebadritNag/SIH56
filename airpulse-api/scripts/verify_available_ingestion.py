@@ -18,6 +18,11 @@ async def main():
                 assert before == after, 'Existing observation lineage changed'
                 assert result['quotes_validated'] > 0, result
                 assert (await dashboard_readiness(db))['ready']
+                from app.services.provenance_service import ProvenanceService
+                for fare in before:
+                    provenance = await ProvenanceService(db).get_fare_provenance(fare['id'])
+                    assert provenance['ingestion_run_id'] == result['collection_run_id']
+                    assert provenance['pipeline_run_id']
                 from uuid import UUID
                 from app.api.v1.ingestion import get_collection_run_detail
                 detail = await get_collection_run_detail(UUID(result['collection_run_id']), db=db, current_user=None)
