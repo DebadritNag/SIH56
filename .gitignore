@@ -106,3 +106,4 @@ airpulse-api/tests/*
 airpulse-api/tests/unit/*
 !airpulse-api/tests/unit/test_happyfares_crawl4ai.py
 !airpulse-api/docs/HAPPYFARES_CRAWL4AI_EC2.md
+!airpulse-api/docs/EC2_CONFIGURATION.md

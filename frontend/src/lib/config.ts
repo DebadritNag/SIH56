@@ -23,7 +23,7 @@ export const config = {
    * Local-dev bearer token accepted by FastAPI when AUTH_STRICT=false.
    * Supabase auth session is wired. Empty string disables it.
    */
-  devBearerToken: process.env.NEXT_PUBLIC_DEV_BEARER_TOKEN || "",
+  devBearerToken: process.env.NODE_ENV === "development" && process.env.NEXT_PUBLIC_DEV_BEARER_TOKEN === "demo-token" ? "demo-token" : "",
 
   /** Public hCaptcha sitekey for auth-form bot protection. Empty string disables the widget. */
   hcaptchaSitekey: process.env.NEXT_PUBLIC_HCAPTCHA_SITEKEY || "",

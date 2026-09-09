@@ -1,25 +1,7 @@
-/**
- * Universal backend proxy — works in every environment:
- *
- *   Local dev (`npm run dev`)  → tries http://localhost:8000 first, falls back to EC2
- *   Vercel / production build  → goes directly to the EC2 backend via NEXT_PUBLIC_API_BASE_URL
- *   Any other deploy           → uses NEXT_PUBLIC_API_BASE_URL from env
- *
- * The browser always calls this same-origin route (/api/proxy/...) so there is
- * never a CORS issue regardless of which backend is actually used.
- * The EC2 IP is never hardcoded here — it comes from NEXT_PUBLIC_API_BASE_URL.
- */
+/** Compatibility route for older clients. Current clients use /backend-api rewrites. */
 import { type NextRequest, NextResponse } from "next/server";
-
-const LOCAL_BACKEND = "http://localhost:8000";
-
-// The configured backend from env.
-// Production: set NEXT_PUBLIC_API_BASE_URL=http://54.234.16.107 in Vercel dashboard.
-// Falls back to /backend-api (same-origin via next.config.ts rewrite) if not set.
-const CONFIGURED_BACKEND =
-  (process.env.NEXT_PUBLIC_API_BASE_URL || "/backend-api").replace(/\/$/, "");
-
-const IS_DEV = process.env.NODE_ENV === "development";
+const CONFIGURED_BACKEND = (process.env.BACKEND_ORIGIN || "http://127.0.0.1:8000").replace(/\/$/, "");
+const API_PREFIX = `/${(process.env.NEXT_PUBLIC_API_V1_PREFIX || "/api/v1").replace(/^\/+|\/+$/g, "")}`;
 
 /** Keep the upstream deadline below the route's execution budget. */
 async function tryFetch(url: string, init: RequestInit, timeoutMs = 50000): Promise<{ response: Response | null; timedOut: boolean }> {
@@ -57,22 +39,8 @@ async function handler(req: NextRequest, { params }: { params: Promise<{ path: s
   let usedBackend = CONFIGURED_BACKEND;
   let timedOut = false;
 
-  if (IS_DEV && !CONFIGURED_BACKEND.startsWith("/")) {
-    // In dev: try localhost first so a local FastAPI is used when running;
-    // fall back to the configured EC2 backend when it is not.
-    res = (await tryFetch(`${LOCAL_BACKEND}/api/v1/${pathStr}${search}`, init, 2000)).response;
-    if (res) {
-      usedBackend = LOCAL_BACKEND;
-    }
-  }
-
   if (!res) {
-    // Build the upstream URL. CONFIGURED_BACKEND may be:
-    //   - a full URL: http://54.234.16.107   → http://54.234.16.107/api/v1/...
-    //   - a same-origin path: /backend-api  → /backend-api/api/v1/... (rewritten by next.config.ts)
-    const upstream = CONFIGURED_BACKEND.startsWith("/")
-      ? `${req.nextUrl.origin}${CONFIGURED_BACKEND}/api/v1/${pathStr}${search}`
-      : `${CONFIGURED_BACKEND}/api/v1/${pathStr}${search}`;
+    const upstream = `${CONFIGURED_BACKEND}${API_PREFIX}/${pathStr}${search}`;
     const attempt = await tryFetch(upstream, init);
     res = attempt.response;
     timedOut = attempt.timedOut;
@@ -84,7 +52,7 @@ async function handler(req: NextRequest, { params }: { params: Promise<{ path: s
       { success: false, error: {
         message: timedOut
           ? "The backend did not respond within 50 seconds. Check EC2 instance health and API server logs."
-          : "The proxy could not connect to the configured backend. Check NEXT_PUBLIC_API_BASE_URL and EC2 service status.",
+          : "The proxy could not connect to the configured backend. Check server-only BACKEND_ORIGIN and EC2 service status.",
         code: timedOut ? "BACKEND_TIMEOUT" : "BACKEND_UNAVAILABLE",
       } },
       { status: timedOut ? 504 : 503, headers: { "cache-control": "no-store", "x-airpulse-error-source": "proxy" } }

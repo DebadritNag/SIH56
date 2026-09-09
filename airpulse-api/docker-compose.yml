@@ -34,8 +34,9 @@ services:
     container_name: airpulse_api
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:10000"
     environment:
+      - PORT=10000
       - DATABASE_URL=postgresql+asyncpg://postgres:postgrespassword@postgres:5432/postgres
       - DATABASE_URL_SYNC=postgresql://postgres:postgrespassword@postgres:5432/postgres
       - REDIS_URL=redis://redis:6379/0

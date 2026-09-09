@@ -31,7 +31,7 @@ async function main() {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   try {
     process.env.NODE_ENV = 'production';
-    process.env.NEXT_PUBLIC_API_BASE_URL = `http://127.0.0.1:${server.address().port}`;
+    process.env.BACKEND_ORIGIN = `http://127.0.0.1:${server.address().port}`;
     const filename = path.resolve(__dirname, '../src/app/api/proxy/[...path]/route.ts');
     const compiled = ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
       compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
