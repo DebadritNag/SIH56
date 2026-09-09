@@ -78,10 +78,10 @@ export default function LandingPage() {
                 {/* Subtle localized radial glow behind the logo only */}
                 <div
                   aria-hidden="true"
-                  className="absolute inset-0 -inset-x-4 -inset-y-2 rounded-full pointer-events-none"
+                  className="absolute inset-0 -inset-x-5 -inset-y-3 rounded-full pointer-events-none"
                   style={{
                     background:
-                      "radial-gradient(ellipse at center, rgba(0, 190, 255, 0.18) 0%, rgba(2, 132, 199, 0.08) 50%, transparent 75%)",
+                      "radial-gradient(ellipse at 28% 50%, rgba(0, 190, 255, 0.22) 0%, rgba(2, 132, 199, 0.10) 45%, transparent 72%)",
                   }}
                 />
                 <Image
@@ -90,7 +90,8 @@ export default function LandingPage() {
                   width={180}
                   height={60}
                   priority
-                  className="w-[150px] sm:w-[175px] h-auto object-contain relative z-10 filter brightness-[1.25] contrast-[1.18] saturate-[1.15] drop-shadow-[0_0_1px_rgba(255,255,255,0.45)] drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)] transition-transform duration-200 group-hover:scale-[1.02]"
+                  unoptimized
+                  className="w-[150px] sm:w-[175px] h-auto object-contain relative z-10 filter brightness-[1.22] contrast-[1.15] saturate-[1.15] drop-shadow-[0_0_1px_rgba(255,255,255,0.35)] transition-transform duration-200 group-hover:scale-[1.02]"
                 />
               </div>
             </Link>

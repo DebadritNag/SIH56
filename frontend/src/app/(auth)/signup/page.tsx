@@ -29,7 +29,12 @@ export default function SignupPage() {
   const [submitting, setSubmitting] = useState(false);
   const [confirmSent, setConfirmSent] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
   const needsCaptcha = captchaEnabled();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!loading && session) router.replace("/overview");
@@ -108,7 +113,7 @@ export default function SignupPage() {
         </>
       }
     >
-      {!configured && (
+      {mounted && !configured && (
         <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-400/30 bg-amber-500/10 p-3 text-xs text-amber-200">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           Authentication is not configured (missing Supabase env vars).
@@ -121,7 +126,7 @@ export default function SignupPage() {
             Full name
           </label>
           <div className="relative">
-            <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+            <User className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               id="fullName"
               type="text"
@@ -129,7 +134,7 @@ export default function SignupPage() {
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               placeholder="Dr. A. Sharma"
-              className="w-full rounded-lg border border-white/10 bg-[#0A1428] py-2.5 pl-9 pr-3 text-sm text-white placeholder:text-slate-500 focus:border-sky-400 focus:outline-none focus:ring-1 focus:ring-sky-400"
+              className="w-full rounded-lg border border-sky-400/20 bg-[#030e1e]/80 py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-slate-400 focus:bg-[#04142a]/95 focus:border-cyan-400 focus:outline-none focus:ring-1 focus:ring-cyan-400/30 transition-all"
             />
           </div>
         </div>
@@ -139,14 +144,14 @@ export default function SignupPage() {
             Organization
           </label>
           <div className="relative">
-            <Building2 className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+            <Building2 className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               id="org"
               type="text"
               value={organization}
               onChange={(e) => setOrganization(e.target.value)}
               placeholder="MoSPI / RBI / Research"
-              className="w-full rounded-lg border border-white/10 bg-[#0A1428] py-2.5 pl-9 pr-3 text-sm text-white placeholder:text-slate-500 focus:border-sky-400 focus:outline-none focus:ring-1 focus:ring-sky-400"
+              className="w-full rounded-lg border border-sky-400/20 bg-[#030e1e]/80 py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-slate-400 focus:bg-[#04142a]/95 focus:border-cyan-400 focus:outline-none focus:ring-1 focus:ring-cyan-400/30 transition-all"
             />
           </div>
         </div>
@@ -156,7 +161,7 @@ export default function SignupPage() {
             Official email address
           </label>
           <div className="relative">
-            <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+            <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               id="email"
               type="email"
@@ -165,7 +170,7 @@ export default function SignupPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="analyst@mospi.gov.in"
-              className="w-full rounded-lg border border-white/10 bg-[#0A1428] py-2.5 pl-9 pr-3 text-sm text-white placeholder:text-slate-500 focus:border-sky-400 focus:outline-none focus:ring-1 focus:ring-sky-400"
+              className="w-full rounded-lg border border-sky-400/20 bg-[#030e1e]/80 py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-slate-400 focus:bg-[#04142a]/95 focus:border-cyan-400 focus:outline-none focus:ring-1 focus:ring-cyan-400/30 transition-all"
             />
           </div>
         </div>
@@ -175,7 +180,7 @@ export default function SignupPage() {
             Password
           </label>
           <div className="relative">
-            <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+            <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               id="password"
               type="password"
@@ -184,7 +189,7 @@ export default function SignupPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="At least 8 characters"
-              className="w-full rounded-lg border border-white/10 bg-[#0A1428] py-2.5 pl-9 pr-3 text-sm text-white placeholder:text-slate-500 focus:border-sky-400 focus:outline-none focus:ring-1 focus:ring-sky-400"
+              className="w-full rounded-lg border border-sky-400/20 bg-[#030e1e]/80 py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-slate-400 focus:bg-[#04142a]/95 focus:border-cyan-400 focus:outline-none focus:ring-1 focus:ring-cyan-400/30 transition-all"
             />
           </div>
           {passwordTooShort && (
@@ -208,7 +213,7 @@ export default function SignupPage() {
         <button
           type="submit"
           disabled={submitting || !configured || (needsCaptcha && !captchaToken)}
-          className="flex w-full items-center justify-center gap-2 rounded-lg bg-sky-500 py-2.5 text-sm font-bold text-white shadow-lg shadow-sky-500/20 transition-colors hover:bg-sky-400 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#00A3FF] hover:bg-[#00B4FF] py-3 px-4 text-sm font-bold text-[#031326] shadow-[0_0_20px_rgba(0,163,255,0.45)] hover:shadow-[0_0_28px_rgba(0,180,255,0.65)] hover:scale-[1.01] transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
         >
           {submitting ? (
             <>
