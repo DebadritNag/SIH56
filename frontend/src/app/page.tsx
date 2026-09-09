@@ -63,26 +63,9 @@ export default function LandingPage() {
 
   return (
     <div className="bg-[#030B17] text-slate-100 font-sans antialiased selection:bg-brand-cyan selection:text-black overflow-x-hidden min-h-screen relative flex flex-col justify-between">
-      {/* Background Imagery & Ambient Gradients Layer */}
-      <div aria-hidden="true" className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-        {/* Local High-Resolution Aviation Backdrop */}
-        <Image
-          src="/background.png"
-          alt="VAYANTARA Aviation Background Panorama"
-          fill
-          priority
-          sizes="100vw"
-          className="object-cover object-center opacity-35 filter brightness-90 contrast-110"
-        />
-        {/* Nocturnal Blue Vignette overlay */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#030B17]/90 via-[#030B17]/70 to-[#030B17]" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#030B17]/95 via-transparent to-[#030B17]/95" />
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[500px] bg-brand-cyan/10 rounded-full blur-[140px] pointer-events-none" />
-      </div>
-
       <div className="relative z-10 flex flex-col justify-between min-h-screen">
         {/* BEGIN: HeaderNav */}
-        <header className="w-full px-6 lg:px-12 py-5 flex items-center justify-between border-b border-white/5 bg-[#030B17]/40 backdrop-blur-md sticky top-0 z-50">
+        <header className="w-full px-6 lg:px-12 py-4 sm:py-5 flex items-center justify-between border-b border-white/10 bg-[#030B17]/70 backdrop-blur-md sticky top-0 z-50">
           {/* Brand Logo Container */}
           <Link className="flex items-center group cursor-pointer" href="/" title="VAYANTARA Home">
             <div className="relative h-8 sm:h-9 w-36 sm:w-44 transition-transform duration-200 group-hover:scale-105">
@@ -92,7 +75,7 @@ export default function LandingPage() {
                 fill
                 priority
                 sizes="(max-width: 640px) 150px, 180px"
-                className="object-contain object-left filter brightness-110 drop-shadow-[0_0_12px_rgba(0,210,255,0.35)]"
+                className="object-contain object-left filter drop-shadow-[0_0_1px_rgba(255,255,255,0.9)] drop-shadow-[0_0_12px_rgba(0,210,255,0.7)] brightness-125 contrast-110"
               />
             </div>
           </Link>
@@ -176,82 +159,120 @@ export default function LandingPage() {
           </div>
         )}
 
-        {/* BEGIN: HeroSection */}
-        <main className="flex-grow flex flex-col justify-center px-6 lg:px-12 pt-6 pb-4">
-          {/* Top Hero Context Grid */}
-          <div className="grid grid-cols-12 items-center gap-4 py-6">
-            {/* Left Side Micro-Typography Narrative */}
-            <div className="col-span-12 lg:col-span-3 text-left hidden lg:block space-y-7 pl-2">
-              <div className="space-y-1">
-                <div className="text-xs tracking-[0.25em] font-semibold text-slate-300">OBSERVE</div>
-                <div className="text-xs tracking-[0.25em] font-semibold text-slate-300">ANALYZE</div>
-                <div className="text-xs tracking-[0.25em] font-semibold text-slate-300">INDEX</div>
-                <div className="text-xs tracking-[0.22em] font-bold text-sky-400">FOR A STRONGER INDIA</div>
+        {/* BEGIN: HeroSection (Section-Restricted Background & Luminous Center Lighting) */}
+        <section className="relative overflow-hidden pt-8 pb-12 sm:pt-10 sm:pb-16 lg:pt-12 lg:pb-16 min-h-[580px] lg:min-h-[660px] flex flex-col justify-center">
+          {/* Hero-Only Background & Lighting Layer */}
+          <div aria-hidden="true" className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
+            {/* Vivid Background Panorama Restricted to Hero */}
+            <Image
+              src="/background.png"
+              alt="VAYANTARA Aviation Background Panorama"
+              fill
+              priority
+              sizes="100vw"
+              className="object-cover object-center filter brightness-105 contrast-105 opacity-90 sm:opacity-95"
+            />
+
+            {/* Atmospheric Center Illumination behind Middle Logo */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] sm:w-[800px] lg:w-[950px] h-[360px] sm:h-[460px] bg-gradient-to-r from-sky-400/30 via-brand-cyan/25 to-blue-500/25 rounded-full blur-[90px] pointer-events-none" />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[280px] sm:w-[380px] h-[180px] sm:h-[240px] bg-white/20 rounded-full blur-[45px] pointer-events-none" />
+
+            {/* Subtle Top Vignette for Nav Contrast */}
+            <div className="absolute top-0 inset-x-0 h-24 bg-gradient-to-b from-[#030B17]/85 via-[#030B17]/40 to-transparent" />
+
+            {/* Subtle Side Vignettes */}
+            <div className="absolute inset-y-0 left-0 w-16 sm:w-28 bg-gradient-to-r from-[#030B17]/70 to-transparent" />
+            <div className="absolute inset-y-0 right-0 w-16 sm:w-28 bg-gradient-to-l from-[#030B17]/70 to-transparent" />
+
+            {/* Clean Bottom Transition into Dark Canvas */}
+            <div className="absolute bottom-0 inset-x-0 h-28 sm:h-36 bg-gradient-to-t from-[#030B17] via-[#030B17]/85 to-transparent" />
+          </div>
+
+          {/* Hero Content Container */}
+          <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-12">
+            <div className="grid grid-cols-12 items-center gap-4 py-4">
+              {/* Left Side Micro-Typography Narrative */}
+              <div className="col-span-12 lg:col-span-3 text-left hidden lg:block space-y-7 pl-2">
+                <div className="space-y-1 drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
+                  <div className="text-xs tracking-[0.25em] font-bold text-white">OBSERVE</div>
+                  <div className="text-xs tracking-[0.25em] font-bold text-white">ANALYZE</div>
+                  <div className="text-xs tracking-[0.25em] font-bold text-white">INDEX</div>
+                  <div className="text-xs tracking-[0.22em] font-black text-cyan-300">FOR A STRONGER INDIA</div>
+                </div>
+                <p className="text-[11px] leading-relaxed tracking-[0.2em] font-medium text-slate-200 uppercase max-w-[220px] drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
+                  A data driven contribution to a more connected and equitable India
+                </p>
               </div>
-              <p className="text-[10px] leading-relaxed tracking-[0.2em] font-medium text-slate-400 uppercase max-w-[210px]">
-                A data driven contribution to a more connected and equitable India
-              </p>
-            </div>
 
-            {/* Center Stage: Big Hero Identity & CTAs */}
-            <div className="col-span-12 lg:col-span-6 text-center flex flex-col items-center justify-center px-4">
-              {/* Centered Hero Logo / Brand Artwork */}
-              <div className="relative w-full max-w-[320px] sm:max-w-[420px] lg:max-w-[480px] h-[140px] sm:h-[180px] lg:h-[210px] mb-2 group cursor-pointer">
-                <Image
-                  src="/Hero middle.png"
-                  alt="VAYANTARA — Real-Time Airfare Intelligence & Price Index for India"
-                  fill
-                  priority
-                  sizes="(max-width: 640px) 320px, (max-width: 1024px) 420px, 480px"
-                  className="object-contain drop-shadow-[0_0_24px_rgba(0,210,255,0.45)] transition-transform duration-300 group-hover:scale-[1.02]"
-                />
-              </div>
+              {/* Center Stage: Big Hero Identity & CTAs */}
+              <div className="col-span-12 lg:col-span-6 text-center flex flex-col items-center justify-center px-4">
+                {/* Centered Hero Logo / Brand Artwork with bright backlighting and crisp hairline contrast */}
+                <div className="relative w-full max-w-[340px] sm:max-w-[440px] lg:max-w-[520px] h-[150px] sm:h-[195px] lg:h-[230px] mb-2 group cursor-pointer">
+                  {/* Dedicated local aura behind the artwork */}
+                  <div className="absolute inset-0 -m-4 bg-gradient-to-b from-sky-400/35 via-cyan-400/25 to-transparent rounded-full blur-2xl pointer-events-none" />
+                  <Image
+                    src="/Hero middle.png"
+                    alt="VAYANTARA — Real-Time Airfare Intelligence & Price Index for India"
+                    fill
+                    priority
+                    sizes="(max-width: 640px) 340px, (max-width: 1024px) 440px, 520px"
+                    className="object-contain filter drop-shadow-[0_0_2px_rgba(255,255,255,0.95)] drop-shadow-[0_0_24px_rgba(0,210,255,0.8)] brightness-120 contrast-110 transition-transform duration-300 group-hover:scale-[1.02]"
+                  />
+                </div>
 
-              {/* Accessible H1 heading for SEO and screen readers */}
-              <h1 className="sr-only">VAYANTARA — Real-Time Airfare Intelligence &amp; Price Index for India</h1>
+                {/* Accessible H1 heading for SEO and screen readers */}
+                <h1 className="sr-only">VAYANTARA — Real-Time Airfare Intelligence &amp; Price Index for India</h1>
 
-              {/* Divider Subtitle */}
-              <div className="flex items-center justify-center gap-3 text-xs tracking-wider text-slate-300 font-light mb-6 w-full mt-2">
-                <span className="h-[1px] w-12 sm:w-16 bg-gradient-to-r from-transparent to-brand-cyan" />
-                <span className="text-cyan-200 font-medium text-center">Turning Airfare Movement into Economic Signal</span>
-                <span className="h-[1px] w-12 sm:w-16 bg-gradient-to-l from-transparent to-brand-cyan" />
-              </div>
-
-              {/* Action Buttons Group */}
-              <div className="flex flex-wrap items-center justify-center gap-4">
-                <Link
-                  className="glow-cyan-btn inline-flex items-center px-6 py-2.5 rounded-full text-xs font-bold bg-gradient-to-r from-[#00D2FF] to-[#0284C7] text-brand-dark hover:brightness-110 active:scale-95 transition-all cursor-pointer"
-                  href="/overview"
-                >
-                  Explore Live Dashboard <span className="ml-2 font-black">→</span>
-                </Link>
-                <a
-                  className="inline-flex items-center px-6 py-2.5 rounded-full text-xs font-semibold bg-brand-navy/80 hover:bg-slate-800/90 text-white border border-slate-700/80 hover:border-brand-cyan/50 backdrop-blur-md transition-all cursor-pointer"
-                  href="#about"
-                >
-                  <span className="w-4 h-4 rounded-full bg-brand-cyan/20 flex items-center justify-center mr-2 text-[10px] text-brand-cyan">
-                    ▶
+                {/* Divider Subtitle */}
+                <div className="flex items-center justify-center gap-3 text-xs sm:text-sm tracking-wider font-light mb-6 w-full mt-2 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
+                  <span className="h-[1px] w-12 sm:w-20 bg-gradient-to-r from-transparent via-brand-cyan to-brand-cyan" />
+                  <span className="text-cyan-200 font-semibold text-center tracking-wide">
+                    Turning Airfare Movement into Economic Signal
                   </span>
-                  Learn More
-                </a>
-              </div>
-            </div>
+                  <span className="h-[1px] w-12 sm:w-20 bg-gradient-to-l from-transparent via-brand-cyan to-brand-cyan" />
+                </div>
 
-            {/* Right Side Micro-Typography Narrative */}
-            <div className="col-span-12 lg:col-span-3 text-right hidden lg:block space-y-16 pr-2">
-              <div className="space-y-1">
-                <div className="text-xs tracking-[0.25em] font-semibold text-slate-300">INDIA&apos;S</div>
-                <div className="text-xs tracking-[0.25em] font-semibold text-slate-300">AIR TRAVEL DATA</div>
-                <div className="text-xs tracking-[0.25em] font-semibold text-slate-300">A STRONGER</div>
-                <div className="text-xs tracking-[0.22em] font-bold text-sky-400">ECONOMY TOMORROW</div>
+                {/* Action Buttons Group */}
+                <div className="flex flex-wrap items-center justify-center gap-4">
+                  <Link
+                    className="glow-cyan-btn inline-flex items-center px-7 py-3 rounded-full text-xs sm:text-sm font-bold bg-gradient-to-r from-[#00D2FF] to-[#0284C7] text-brand-dark hover:brightness-110 active:scale-95 transition-all shadow-[0_0_25px_rgba(0,210,255,0.6)] cursor-pointer"
+                    href="/overview"
+                  >
+                    Explore Live Dashboard <span className="ml-2 font-black">→</span>
+                  </Link>
+                  <a
+                    className="inline-flex items-center px-7 py-3 rounded-full text-xs sm:text-sm font-semibold bg-brand-navy/90 hover:bg-slate-800 text-white border border-brand-cyan/40 hover:border-brand-cyan shadow-lg backdrop-blur-md transition-all cursor-pointer"
+                    href="#about"
+                  >
+                    <span className="w-4 h-4 rounded-full bg-brand-cyan/20 flex items-center justify-center mr-2 text-[10px] text-brand-cyan">
+                      ▶
+                    </span>
+                    Learn More
+                  </a>
+                </div>
               </div>
-              <div className="space-y-1">
-                <div className="text-[11px] tracking-[0.28em] font-semibold text-slate-400">PEOPLE</div>
-                <div className="text-[11px] tracking-[0.28em] font-semibold text-slate-400">POLICY</div>
-                <div className="text-[11px] tracking-[0.28em] font-semibold text-slate-400">PROGRESS</div>
+
+              {/* Right Side Micro-Typography Narrative */}
+              <div className="col-span-12 lg:col-span-3 text-right hidden lg:block space-y-16 pr-2">
+                <div className="space-y-1 drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
+                  <div className="text-xs tracking-[0.25em] font-bold text-white">INDIA&apos;S</div>
+                  <div className="text-xs tracking-[0.25em] font-bold text-white">AIR TRAVEL DATA</div>
+                  <div className="text-xs tracking-[0.25em] font-bold text-white">A STRONGER</div>
+                  <div className="text-xs tracking-[0.22em] font-black text-cyan-300">ECONOMY TOMORROW</div>
+                </div>
+                <div className="space-y-1 drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
+                  <div className="text-[11px] tracking-[0.28em] font-bold text-slate-300">PEOPLE</div>
+                  <div className="text-[11px] tracking-[0.28em] font-bold text-slate-300">POLICY</div>
+                  <div className="text-[11px] tracking-[0.28em] font-bold text-slate-300">PROGRESS</div>
+                </div>
               </div>
             </div>
           </div>
+        </section>
+        {/* END: HeroSection */}
+
+        {/* Main Content Area: Ticker, Features, Banner */}
+        <main className="flex-grow flex flex-col justify-center px-6 lg:px-12 pt-2 pb-6">
 
           {/* BEGIN: LiveMetricsTicker */}
           <section aria-label="Real-Time Metrics" className="w-full max-w-7xl mx-auto my-3">
