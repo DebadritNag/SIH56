@@ -65,63 +65,79 @@ export default function LandingPage() {
     <div className="bg-[#030B17] text-slate-100 font-sans antialiased selection:bg-brand-cyan selection:text-black overflow-x-hidden min-h-screen relative flex flex-col justify-between">
       <div className="relative z-10 flex flex-col justify-between min-h-screen">
         {/* BEGIN: HeaderNav */}
-        <header className="w-full px-6 lg:px-12 py-4 sm:py-5 flex items-center justify-between border-b border-white/10 bg-[#030B17]/70 backdrop-blur-md sticky top-0 z-50">
-          {/* Brand Logo Container */}
-          <Link className="flex items-center group cursor-pointer" href="/" title="VAYANTARA Home">
-            <div className="relative h-8 sm:h-9 w-36 sm:w-44 transition-transform duration-200 group-hover:scale-105">
-              <Image
-                src="/top left.png"
-                alt="VAYANTARA"
-                fill
-                priority
-                sizes="(max-width: 640px) 150px, 180px"
-                className="object-contain object-left filter drop-shadow-[0_0_1px_rgba(255,255,255,0.9)] drop-shadow-[0_0_12px_rgba(0,210,255,0.7)] brightness-125 contrast-110"
-              />
+        <header
+          className="w-full border-b border-white/10 backdrop-blur-md sticky top-0 z-50 transition-colors duration-200"
+          style={{
+            background: "linear-gradient(180deg, rgba(6, 21, 34, 0.98) 0%, rgba(4, 17, 29, 0.96) 100%)",
+          }}
+        >
+          <div className="w-full max-w-[94vw] mx-auto px-4 sm:px-6 lg:px-8 py-3.5 sm:py-4 flex items-center justify-between">
+            {/* Brand Logo Container */}
+            <Link className="flex items-center group cursor-pointer shrink-0" href="/" title="VAYANTARA Home">
+              <div className="relative flex items-center justify-center py-1">
+                {/* Subtle localized radial glow behind the logo only */}
+                <div
+                  aria-hidden="true"
+                  className="absolute inset-0 -inset-x-4 -inset-y-2 rounded-full pointer-events-none"
+                  style={{
+                    background:
+                      "radial-gradient(ellipse at center, rgba(0, 190, 255, 0.18) 0%, rgba(2, 132, 199, 0.08) 50%, transparent 75%)",
+                  }}
+                />
+                <Image
+                  src="/top left.png"
+                  alt="VAYANTARA"
+                  width={180}
+                  height={60}
+                  priority
+                  className="w-[150px] sm:w-[175px] h-auto object-contain relative z-10 filter brightness-[1.25] contrast-[1.18] saturate-[1.15] drop-shadow-[0_0_1px_rgba(255,255,255,0.45)] drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)] transition-transform duration-200 group-hover:scale-[1.02]"
+                />
+              </div>
+            </Link>
+
+            {/* Navigation Links */}
+            <nav className="hidden md:flex items-center space-x-7 text-xs font-medium tracking-wide">
+              <Link className="text-white relative py-1.5 font-semibold" href="/">
+                Home
+                <span className="absolute bottom-0 left-0 w-full h-[2.5px] bg-brand-cyan rounded-full shadow-[0_0_8px_#00D2FF]" />
+              </Link>
+              <a className="text-slate-300 hover:text-white transition-colors duration-150" href="#about">
+                About
+              </a>
+              <a className="text-slate-300 hover:text-white transition-colors duration-150" href="#features">
+                Features
+              </a>
+              <Link className="text-slate-300 hover:text-white transition-colors duration-150" href="/methodology">
+                Data &amp; Methodology
+              </Link>
+              <Link className="text-slate-300 hover:text-white transition-colors duration-150" href="/overview">
+                Dashboard
+              </Link>
+              <Link className="text-slate-300 hover:text-white transition-colors duration-150" href="/downloads">
+                Reports
+              </Link>
+              <a className="text-slate-300 hover:text-white transition-colors duration-150" href="#resources">
+                Resources
+              </a>
+            </nav>
+
+            {/* Action Items (Search & Get Access) */}
+            <div className="flex items-center space-x-4">
+              <button
+                aria-label="Search routes and intelligence"
+                className="p-2 text-slate-300 hover:text-brand-cyan transition-colors cursor-pointer"
+                type="button"
+                onClick={() => setSearchOpen(!searchOpen)}
+              >
+                <Search className="w-4 h-4" />
+              </button>
+              <Link
+                className="glow-cyan-btn inline-flex items-center justify-center px-5 py-2 text-xs font-semibold rounded-full bg-gradient-to-r from-brand-cyan to-sky-400 text-brand-dark hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+                href="/signup"
+              >
+                Get Access <span className="ml-1.5 font-bold">→</span>
+              </Link>
             </div>
-          </Link>
-
-          {/* Navigation Links */}
-          <nav className="hidden md:flex items-center space-x-7 text-xs font-medium tracking-wide">
-            <Link className="text-white relative py-1.5 font-semibold" href="/">
-              Home
-              <span className="absolute bottom-0 left-0 w-full h-[2.5px] bg-brand-cyan rounded-full shadow-[0_0_8px_#00D2FF]" />
-            </Link>
-            <a className="text-slate-300 hover:text-white transition-colors duration-150" href="#about">
-              About
-            </a>
-            <a className="text-slate-300 hover:text-white transition-colors duration-150" href="#features">
-              Features
-            </a>
-            <Link className="text-slate-300 hover:text-white transition-colors duration-150" href="/methodology">
-              Data &amp; Methodology
-            </Link>
-            <Link className="text-slate-300 hover:text-white transition-colors duration-150" href="/overview">
-              Dashboard
-            </Link>
-            <Link className="text-slate-300 hover:text-white transition-colors duration-150" href="/downloads">
-              Reports
-            </Link>
-            <a className="text-slate-300 hover:text-white transition-colors duration-150" href="#resources">
-              Resources
-            </a>
-          </nav>
-
-          {/* Action Items (Search & Get Access) */}
-          <div className="flex items-center space-x-4">
-            <button
-              aria-label="Search routes and intelligence"
-              className="p-2 text-slate-300 hover:text-brand-cyan transition-colors cursor-pointer"
-              type="button"
-              onClick={() => setSearchOpen(!searchOpen)}
-            >
-              <Search className="w-4 h-4" />
-            </button>
-            <Link
-              className="glow-cyan-btn inline-flex items-center justify-center px-5 py-2 text-xs font-semibold rounded-full bg-gradient-to-r from-brand-cyan to-sky-400 text-brand-dark hover:brightness-110 active:scale-95 transition-all cursor-pointer"
-              href="/signup"
-            >
-              Get Access <span className="ml-1.5 font-bold">→</span>
-            </Link>
           </div>
         </header>
         {/* END: HeaderNav */}
@@ -178,18 +194,14 @@ export default function LandingPage() {
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[280px] sm:w-[380px] h-[180px] sm:h-[240px] bg-white/20 rounded-full blur-[45px] pointer-events-none" />
 
             {/* Subtle Top Vignette for Nav Contrast */}
-            <div className="absolute top-0 inset-x-0 h-24 bg-gradient-to-b from-[#030B17]/85 via-[#030B17]/40 to-transparent" />
-
-            {/* Subtle Side Vignettes */}
-            <div className="absolute inset-y-0 left-0 w-16 sm:w-28 bg-gradient-to-r from-[#030B17]/70 to-transparent" />
-            <div className="absolute inset-y-0 right-0 w-16 sm:w-28 bg-gradient-to-l from-[#030B17]/70 to-transparent" />
+            <div className="absolute top-0 inset-x-0 h-16 bg-gradient-to-b from-[#061522]/50 to-transparent" />
 
             {/* Clean Bottom Transition into Dark Canvas */}
             <div className="absolute bottom-0 inset-x-0 h-28 sm:h-36 bg-gradient-to-t from-[#030B17] via-[#030B17]/85 to-transparent" />
           </div>
 
-          {/* Hero Content Container */}
-          <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-12">
+          {/* Hero Content Container with Consistent 94vw Container */}
+          <div className="relative z-10 w-full max-w-[94vw] mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-12 items-center gap-4 py-4">
               {/* Left Side Micro-Typography Narrative */}
               <div className="col-span-12 lg:col-span-3 text-left hidden lg:block space-y-7 pl-2">
@@ -207,7 +219,7 @@ export default function LandingPage() {
               {/* Center Stage: Big Hero Identity & CTAs */}
               <div className="col-span-12 lg:col-span-6 text-center flex flex-col items-center justify-center px-4">
                 {/* Centered Hero Logo / Brand Artwork with bright backlighting and crisp hairline contrast */}
-                <div className="relative w-full max-w-[340px] sm:max-w-[440px] lg:max-w-[520px] h-[150px] sm:h-[195px] lg:h-[230px] mb-2 group cursor-pointer">
+                <div className="relative w-full max-w-[340px] sm:max-w-[440px] lg:max-w-[500px] h-[150px] sm:h-[190px] lg:h-[220px] mb-2 group cursor-pointer">
                   {/* Dedicated local aura behind the artwork */}
                   <div className="absolute inset-0 -m-4 bg-gradient-to-b from-sky-400/35 via-cyan-400/25 to-transparent rounded-full blur-2xl pointer-events-none" />
                   <Image
@@ -215,7 +227,7 @@ export default function LandingPage() {
                     alt="VAYANTARA — Real-Time Airfare Intelligence & Price Index for India"
                     fill
                     priority
-                    sizes="(max-width: 640px) 340px, (max-width: 1024px) 440px, 520px"
+                    sizes="(max-width: 640px) 340px, (max-width: 1024px) 440px, 500px"
                     className="object-contain filter drop-shadow-[0_0_2px_rgba(255,255,255,0.95)] drop-shadow-[0_0_24px_rgba(0,210,255,0.8)] brightness-120 contrast-110 transition-transform duration-300 group-hover:scale-[1.02]"
                   />
                 </div>
@@ -271,281 +283,288 @@ export default function LandingPage() {
         </section>
         {/* END: HeroSection */}
 
-        {/* Main Content Area: Ticker, Features, Banner */}
-        <main className="flex-grow flex flex-col justify-center px-6 lg:px-12 pt-2 pb-6">
-
-          {/* BEGIN: LiveMetricsTicker */}
-          <section aria-label="Real-Time Metrics" className="w-full max-w-7xl mx-auto my-3">
-            <div className="glass-panel rounded-2xl px-6 py-3.5 flex flex-wrap lg:flex-nowrap items-center justify-between gap-6">
-              {/* Metric 1: National APIx */}
-              <div className="flex items-center gap-3.5 min-w-[170px]">
-                <div className="text-brand-cyan">
-                  <svg className="w-6 h-6 transform -rotate-45" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" />
-                  </svg>
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <CountUp
-                      end={108.43}
-                      decimals={2}
-                      className="text-lg font-bold tracking-tight text-white font-display tabular-nums"
-                    />
-                    <span className="text-[11px] font-semibold text-emerald-400 flex items-center">↑ +4.2%</span>
-                  </div>
-                  <p className="text-[10px] tracking-wider text-slate-400 uppercase font-medium">NATIONAL APIx</p>
-                </div>
-              </div>
-
-              <div className="hidden lg:block w-[1px] h-8 bg-slate-700/60" />
-
-              {/* Metric 2: Quotes / 24H */}
-              <div className="flex items-center gap-3.5 min-w-[170px]">
-                <div className="text-brand-cyan">
-                  <Database className="w-6 h-6" />
-                </div>
-                <div>
-                  <CountUp
-                    end={28452}
-                    className="text-lg font-bold tracking-tight text-white font-display tabular-nums"
-                  />
-                  <p className="text-[10px] tracking-wider text-slate-400 uppercase font-medium">QUOTES / 24H</p>
-                </div>
-              </div>
-
-              <div className="hidden lg:block w-[1px] h-8 bg-slate-700/60" />
-
-              {/* Metric 3: Data Confidence */}
-              <div className="flex items-center gap-3.5 min-w-[170px]">
-                <div className="text-brand-cyan">
-                  <BarChart3 className="w-6 h-6" />
-                </div>
-                <div>
-                  <CountUp
-                    end={94.8}
-                    decimals={1}
-                    suffix="%"
-                    className="text-lg font-bold tracking-tight text-white font-display tabular-nums"
-                  />
-                  <p className="text-[10px] tracking-wider text-slate-400 uppercase font-medium">DATA CONFIDENCE</p>
-                </div>
-              </div>
-
-              <div className="hidden lg:block w-[1px] h-8 bg-slate-700/60" />
-
-              {/* Metric 4: Routes Tracked */}
-              <div className="flex items-center gap-3.5 min-w-[150px]">
-                <div className="text-brand-cyan">
-                  <Zap className="w-6 h-6" />
-                </div>
-                <div>
-                  <CountUp
-                    end={81}
-                    className="text-lg font-bold tracking-tight text-white font-display tabular-nums"
-                  />
-                  <p className="text-[10px] tracking-wider text-slate-400 uppercase font-medium">ROUTES TRACKED</p>
-                </div>
-              </div>
-
-              <div className="hidden lg:block w-[1px] h-8 bg-slate-700/60" />
-
-              {/* Status Indicator Right Side */}
-              <div className="flex items-center gap-2.5 text-[10px] tracking-widest uppercase font-semibold text-slate-300">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-                </span>
-                <span className="text-emerald-400">LIVE DATA</span>
-                <span className="text-slate-600">•</span>
-                <span>MULTIPLE SOURCES</span>
-                <span className="text-slate-600">•</span>
-                <span>TRANSPARENT METHODOLOGY</span>
-              </div>
-            </div>
-          </section>
-          {/* END: LiveMetricsTicker */}
-
-          {/* BEGIN: FeatureCardsGrid */}
-          <section id="features" aria-label="Core Capabilities" className="w-full max-w-7xl mx-auto my-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3.5">
-              {/* Card 1: Airfare Price Index */}
-              <Link
-                href="/apix"
-                className="glass-card rounded-xl p-4 flex flex-col justify-between group min-h-[140px] cursor-pointer"
-              >
-                <div>
-                  <div className="text-brand-cyan mb-2.5">
-                    <LineChart className="w-5 h-5" />
-                  </div>
-                  <h3 className="text-xs font-bold text-white mb-1 tracking-tight">Airfare Price Index</h3>
-                  <p className="text-[11px] text-slate-400 leading-snug">Track real-time and historical price movements</p>
-                </div>
-                <div className="flex justify-end pt-3">
-                  <span className="w-5 h-5 rounded-full border border-slate-700 flex items-center justify-center text-slate-400 group-hover:text-brand-cyan group-hover:border-brand-cyan text-[10px] transition-colors">
-                    →
-                  </span>
-                </div>
-              </Link>
-
-              {/* Card 2: Route Intelligence */}
-              <Link
-                href="/routes"
-                className="glass-card rounded-xl p-4 flex flex-col justify-between group min-h-[140px] cursor-pointer"
-              >
-                <div>
-                  <div className="text-brand-cyan mb-2.5">
-                    <MapPin className="w-5 h-5" />
-                  </div>
-                  <h3 className="text-xs font-bold text-white mb-1 tracking-tight">Route Intelligence</h3>
-                  <p className="text-[11px] text-slate-400 leading-snug">
-                    Compare fares across routes, airlines and time windows
-                  </p>
-                </div>
-                <div className="flex justify-end pt-3">
-                  <span className="w-5 h-5 rounded-full border border-slate-700 flex items-center justify-center text-slate-400 group-hover:text-brand-cyan group-hover:border-brand-cyan text-[10px] transition-colors">
-                    →
-                  </span>
-                </div>
-              </Link>
-
-              {/* Card 3: Booking Window Analysis */}
-              <Link
-                href="/booking-windows"
-                className="glass-card rounded-xl p-4 flex flex-col justify-between group min-h-[140px] cursor-pointer"
-              >
-                <div>
-                  <div className="text-brand-cyan mb-2.5">
-                    <Calendar className="w-5 h-5" />
-                  </div>
-                  <h3 className="text-xs font-bold text-white mb-1 tracking-tight">Booking Window Analysis</h3>
-                  <p className="text-[11px] text-slate-400 leading-snug">Understand how fares change over time</p>
-                </div>
-                <div className="flex justify-end pt-3">
-                  <span className="w-5 h-5 rounded-full border border-slate-700 flex items-center justify-center text-slate-400 group-hover:text-brand-cyan group-hover:border-brand-cyan text-[10px] transition-colors">
-                    →
-                  </span>
-                </div>
-              </Link>
-
-              {/* Card 4: Data & Provenance */}
-              <Link
-                href="/ingestion"
-                className="glass-card rounded-xl p-4 flex flex-col justify-between group min-h-[140px] cursor-pointer"
-              >
-                <div>
-                  <div className="text-brand-cyan mb-2.5">
-                    <ShieldCheck className="w-5 h-5" />
-                  </div>
-                  <h3 className="text-xs font-bold text-white mb-1 tracking-tight">Data &amp; Provenance</h3>
-                  <p className="text-[11px] text-slate-400 leading-snug">
-                    Transparent, auditable and verifiable data pipeline
-                  </p>
-                </div>
-                <div className="flex justify-end pt-3">
-                  <span className="w-5 h-5 rounded-full border border-slate-700 flex items-center justify-center text-slate-400 group-hover:text-brand-cyan group-hover:border-brand-cyan text-[10px] transition-colors">
-                    →
-                  </span>
-                </div>
-              </Link>
-
-              {/* Card 5: AI & Anomaly Detection */}
-              <Link
-                href="/anomalies"
-                className="glass-card rounded-xl p-4 flex flex-col justify-between group min-h-[140px] cursor-pointer"
-              >
-                <div>
-                  <div className="text-brand-cyan mb-2.5">
-                    <Cpu className="w-5 h-5" />
-                  </div>
-                  <h3 className="text-xs font-bold text-white mb-1 tracking-tight">AI &amp; Anomaly Detection</h3>
-                  <p className="text-[11px] text-slate-400 leading-snug">
-                    Detect unusual price behavior with explainable AI
-                  </p>
-                </div>
-                <div className="flex justify-end pt-3">
-                  <span className="w-5 h-5 rounded-full border border-slate-700 flex items-center justify-center text-slate-400 group-hover:text-brand-cyan group-hover:border-brand-cyan text-[10px] transition-colors">
-                    →
-                  </span>
-                </div>
-              </Link>
-
-              {/* Card 6: Reports & Downloads */}
-              <Link
-                href="/downloads"
-                className="glass-card rounded-xl p-4 flex flex-col justify-between group min-h-[140px] cursor-pointer"
-              >
-                <div>
-                  <div className="text-brand-cyan mb-2.5">
-                    <FileText className="w-5 h-5" />
-                  </div>
-                  <h3 className="text-xs font-bold text-white mb-1 tracking-tight">Reports &amp; Downloads</h3>
-                  <p className="text-[11px] text-slate-400 leading-snug">
-                    Generate insights for policy, research and analysis
-                  </p>
-                </div>
-                <div className="flex justify-end pt-3">
-                  <span className="w-5 h-5 rounded-full border border-slate-700 flex items-center justify-center text-slate-400 group-hover:text-brand-cyan group-hover:border-brand-cyan text-[10px] transition-colors">
-                    →
-                  </span>
-                </div>
-              </Link>
-            </div>
-          </section>
-          {/* END: FeatureCardsGrid */}
-
-          {/* Live route ticker bar */}
-          <div className="w-full max-w-7xl mx-auto my-3 overflow-hidden rounded-xl border border-white/5 bg-[#061325]/60 backdrop-blur-sm py-2 px-4">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold tracking-widest text-brand-cyan uppercase shrink-0 mr-4 flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-brand-cyan animate-pulse" />
-                ACTIVE CORRIDORS:
-              </span>
-              <div className="overflow-hidden flex-1 relative">
-                <div className="ap-ticker-track">
-                  {[...NAV_TICKER, ...NAV_TICKER, ...NAV_TICKER].map((t, i) => (
-                    <span key={i} className="mx-5 inline-flex items-center gap-1.5 text-xs">
-                      <span className="font-mono font-medium text-slate-300">{t.route}</span>
-                      <span className={t.up ? "text-emerald-400 font-semibold" : "text-rose-400 font-semibold"}>
-                        {t.change}
-                      </span>
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
+        {/* Main Content Area: KPI Strip, Feature Cards, Ticker, Impact Banner */}
+        <main className="relative flex-grow flex flex-col justify-center px-4 sm:px-6 lg:px-8 pt-3 pb-8">
+          {/* Ambient subtle background glow and texture for rich depth without overpowering */}
+          <div aria-hidden="true" className="absolute inset-0 pointer-events-none overflow-hidden">
+            <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[85vw] max-w-[1300px] h-[450px] bg-gradient-to-b from-brand-cyan/5 via-sky-500/[0.03] to-transparent rounded-full blur-[120px]" />
           </div>
 
-          {/* BEGIN: BottomMissionBanner */}
-          <footer className="w-full max-w-7xl mx-auto my-3">
-            <div className="glass-panel rounded-xl px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-              {/* Text with Left Blue Border Accent */}
-              <div className="flex items-center gap-4 text-left w-full sm:w-auto">
-                <div className="w-1.5 h-9 bg-brand-cyan rounded-full shadow-[0_0_10px_#00D2FF]" />
-                <div>
-                  <h4 className="text-xs font-bold tracking-[0.16em] uppercase text-white font-display">
-                    A CREDIBLE TOMORROW THROUGH BETTER DATA
-                  </h4>
-                  <p className="text-xs text-slate-400 font-normal">
-                    Empowering evidence-based policy with transparent airfare intelligence.
-                  </p>
+          <div className="w-full max-w-[94vw] mx-auto space-y-4 relative z-10">
+            {/* BEGIN: LiveMetricsTicker (KPI Strip) */}
+            <section aria-label="Real-Time Metrics" className="w-full">
+              <div className="rounded-2xl px-6 sm:px-8 py-5 flex flex-wrap xl:flex-nowrap items-center justify-between gap-6 border border-cyan-500/25 bg-gradient-to-r from-[#071b30]/95 via-[#0a2642]/90 to-[#07192d]/95 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.15)]">
+                {/* Metric 1: National APIx */}
+                <div className="flex items-center gap-4 min-w-[180px]">
+                  <div className="text-brand-cyan shrink-0">
+                    <svg className="w-6 h-6 transform -rotate-45 drop-shadow-[0_0_8px_rgba(0,210,255,0.6)]" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <CountUp
+                        end={108.43}
+                        decimals={2}
+                        className="text-xl sm:text-2xl font-bold tracking-tight text-white font-display tabular-nums"
+                      />
+                      <span className="text-xs font-semibold text-emerald-400 flex items-center">↑ +4.2%</span>
+                    </div>
+                    <p className="text-[10px] tracking-wider text-slate-400 uppercase font-medium mt-0.5">NATIONAL APIx</p>
+                  </div>
+                </div>
+
+                <div className="hidden xl:block w-[1px] h-10 bg-white/10 shrink-0" />
+
+                {/* Metric 2: Quotes / 24H */}
+                <div className="flex items-center gap-4 min-w-[180px]">
+                  <div className="text-brand-cyan shrink-0">
+                    <Database className="w-6 h-6 drop-shadow-[0_0_8px_rgba(0,210,255,0.6)]" />
+                  </div>
+                  <div>
+                    <CountUp
+                      end={28452}
+                      className="text-xl sm:text-2xl font-bold tracking-tight text-white font-display tabular-nums"
+                    />
+                    <p className="text-[10px] tracking-wider text-slate-400 uppercase font-medium mt-0.5">QUOTES / 24H</p>
+                  </div>
+                </div>
+
+                <div className="hidden xl:block w-[1px] h-10 bg-white/10 shrink-0" />
+
+                {/* Metric 3: Data Confidence */}
+                <div className="flex items-center gap-4 min-w-[180px]">
+                  <div className="text-brand-cyan shrink-0">
+                    <BarChart3 className="w-6 h-6 drop-shadow-[0_0_8px_rgba(0,210,255,0.6)]" />
+                  </div>
+                  <div>
+                    <CountUp
+                      end={94.8}
+                      decimals={1}
+                      suffix="%"
+                      className="text-xl sm:text-2xl font-bold tracking-tight text-white font-display tabular-nums"
+                    />
+                    <p className="text-[10px] tracking-wider text-slate-400 uppercase font-medium mt-0.5">DATA CONFIDENCE</p>
+                  </div>
+                </div>
+
+                <div className="hidden xl:block w-[1px] h-10 bg-white/10 shrink-0" />
+
+                {/* Metric 4: Routes Tracked */}
+                <div className="flex items-center gap-4 min-w-[170px]">
+                  <div className="text-brand-cyan shrink-0">
+                    <Zap className="w-6 h-6 drop-shadow-[0_0_8px_rgba(0,210,255,0.6)]" />
+                  </div>
+                  <div>
+                    <CountUp
+                      end={81}
+                      className="text-xl sm:text-2xl font-bold tracking-tight text-white font-display tabular-nums"
+                    />
+                    <p className="text-[10px] tracking-wider text-slate-400 uppercase font-medium mt-0.5">ROUTES TRACKED</p>
+                  </div>
+                </div>
+
+                <div className="hidden xl:block w-[1px] h-10 bg-white/10 shrink-0" />
+
+                {/* Status Indicators Right Side */}
+                <div className="flex items-center gap-3 text-[10px] tracking-widest uppercase font-semibold text-slate-300 shrink-0">
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500 shadow-[0_0_8px_#10B981]" />
+                  </span>
+                  <span className="text-emerald-400">LIVE DATA</span>
+                  <span className="text-slate-600">•</span>
+                  <span>MULTIPLE SOURCES</span>
+                  <span className="text-slate-600">•</span>
+                  <span>TRANSPARENT METHODOLOGY</span>
                 </div>
               </div>
-              {/* Action Impact Button */}
-              <Link
-                className="glow-cyan-btn inline-flex items-center justify-center px-6 py-2 rounded-full text-xs font-bold bg-gradient-to-r from-brand-cyan to-sky-400 text-brand-dark hover:brightness-110 active:scale-95 transition-all self-end sm:self-center whitespace-nowrap cursor-pointer"
-                href="/overview"
-              >
-                Our Impact <span className="ml-1.5">→</span>
-              </Link>
+            </section>
+            {/* END: LiveMetricsTicker */}
+
+            {/* BEGIN: FeatureCardsGrid (6 cohesive cards spanning full width) */}
+            <section id="features" aria-label="Core Capabilities" className="w-full">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-3.5">
+                {/* Card 1: Airfare Price Index */}
+                <Link
+                  href="/apix"
+                  className="rounded-xl p-5 sm:p-6 flex flex-col justify-between group min-h-[175px] cursor-pointer bg-gradient-to-b from-[#081f38]/90 via-[#06182c]/90 to-[#040f1d]/90 border border-cyan-500/25 hover:border-cyan-400/50 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_4px_20px_rgba(0,0,0,0.4)] hover:shadow-[0_8px_25px_rgba(0,210,255,0.15)] hover:-translate-y-0.5 transition-all duration-200"
+                >
+                  <div>
+                    <div className="text-brand-cyan mb-3.5">
+                      <LineChart className="w-5 h-5 drop-shadow-[0_0_6px_rgba(0,210,255,0.5)]" />
+                    </div>
+                    <h3 className="text-sm font-bold text-white mb-2 tracking-tight">Airfare Price Index</h3>
+                    <p className="text-xs text-slate-300/85 leading-relaxed">Track real-time and historical price movements</p>
+                  </div>
+                  <div className="flex justify-end pt-4 mt-auto">
+                    <span className="w-6 h-6 rounded-full border border-white/20 flex items-center justify-center text-slate-400 group-hover:text-brand-cyan group-hover:border-cyan-400/60 group-hover:bg-cyan-500/10 text-xs transition-all">
+                      →
+                    </span>
+                  </div>
+                </Link>
+
+                {/* Card 2: Route Intelligence */}
+                <Link
+                  href="/routes"
+                  className="rounded-xl p-5 sm:p-6 flex flex-col justify-between group min-h-[175px] cursor-pointer bg-gradient-to-b from-[#081f38]/90 via-[#06182c]/90 to-[#040f1d]/90 border border-cyan-500/25 hover:border-cyan-400/50 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_4px_20px_rgba(0,0,0,0.4)] hover:shadow-[0_8px_25px_rgba(0,210,255,0.15)] hover:-translate-y-0.5 transition-all duration-200"
+                >
+                  <div>
+                    <div className="text-brand-cyan mb-3.5">
+                      <MapPin className="w-5 h-5 drop-shadow-[0_0_6px_rgba(0,210,255,0.5)]" />
+                    </div>
+                    <h3 className="text-sm font-bold text-white mb-2 tracking-tight">Route Intelligence</h3>
+                    <p className="text-xs text-slate-300/85 leading-relaxed">
+                      Compare fares across routes, airlines and time windows
+                    </p>
+                  </div>
+                  <div className="flex justify-end pt-4 mt-auto">
+                    <span className="w-6 h-6 rounded-full border border-white/20 flex items-center justify-center text-slate-400 group-hover:text-brand-cyan group-hover:border-cyan-400/60 group-hover:bg-cyan-500/10 text-xs transition-all">
+                      →
+                    </span>
+                  </div>
+                </Link>
+
+                {/* Card 3: Booking Window Analysis */}
+                <Link
+                  href="/booking-windows"
+                  className="rounded-xl p-5 sm:p-6 flex flex-col justify-between group min-h-[175px] cursor-pointer bg-gradient-to-b from-[#081f38]/90 via-[#06182c]/90 to-[#040f1d]/90 border border-cyan-500/25 hover:border-cyan-400/50 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_4px_20px_rgba(0,0,0,0.4)] hover:shadow-[0_8px_25px_rgba(0,210,255,0.15)] hover:-translate-y-0.5 transition-all duration-200"
+                >
+                  <div>
+                    <div className="text-brand-cyan mb-3.5">
+                      <Calendar className="w-5 h-5 drop-shadow-[0_0_6px_rgba(0,210,255,0.5)]" />
+                    </div>
+                    <h3 className="text-sm font-bold text-white mb-2 tracking-tight">Booking Window Analysis</h3>
+                    <p className="text-xs text-slate-300/85 leading-relaxed">Understand how fares change over time</p>
+                  </div>
+                  <div className="flex justify-end pt-4 mt-auto">
+                    <span className="w-6 h-6 rounded-full border border-white/20 flex items-center justify-center text-slate-400 group-hover:text-brand-cyan group-hover:border-cyan-400/60 group-hover:bg-cyan-500/10 text-xs transition-all">
+                      →
+                    </span>
+                  </div>
+                </Link>
+
+                {/* Card 4: Data & Provenance */}
+                <Link
+                  href="/ingestion"
+                  className="rounded-xl p-5 sm:p-6 flex flex-col justify-between group min-h-[175px] cursor-pointer bg-gradient-to-b from-[#081f38]/90 via-[#06182c]/90 to-[#040f1d]/90 border border-cyan-500/25 hover:border-cyan-400/50 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_4px_20px_rgba(0,0,0,0.4)] hover:shadow-[0_8px_25px_rgba(0,210,255,0.15)] hover:-translate-y-0.5 transition-all duration-200"
+                >
+                  <div>
+                    <div className="text-brand-cyan mb-3.5">
+                      <ShieldCheck className="w-5 h-5 drop-shadow-[0_0_6px_rgba(0,210,255,0.5)]" />
+                    </div>
+                    <h3 className="text-sm font-bold text-white mb-2 tracking-tight">Data &amp; Provenance</h3>
+                    <p className="text-xs text-slate-300/85 leading-relaxed">
+                      Transparent, auditable and verifiable data pipeline
+                    </p>
+                  </div>
+                  <div className="flex justify-end pt-4 mt-auto">
+                    <span className="w-6 h-6 rounded-full border border-white/20 flex items-center justify-center text-slate-400 group-hover:text-brand-cyan group-hover:border-cyan-400/60 group-hover:bg-cyan-500/10 text-xs transition-all">
+                      →
+                    </span>
+                  </div>
+                </Link>
+
+                {/* Card 5: AI & Anomaly Detection */}
+                <Link
+                  href="/anomalies"
+                  className="rounded-xl p-5 sm:p-6 flex flex-col justify-between group min-h-[175px] cursor-pointer bg-gradient-to-b from-[#081f38]/90 via-[#06182c]/90 to-[#040f1d]/90 border border-cyan-500/25 hover:border-cyan-400/50 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_4px_20px_rgba(0,0,0,0.4)] hover:shadow-[0_8px_25px_rgba(0,210,255,0.15)] hover:-translate-y-0.5 transition-all duration-200"
+                >
+                  <div>
+                    <div className="text-brand-cyan mb-3.5">
+                      <Cpu className="w-5 h-5 drop-shadow-[0_0_6px_rgba(0,210,255,0.5)]" />
+                    </div>
+                    <h3 className="text-sm font-bold text-white mb-2 tracking-tight">AI &amp; Anomaly Detection</h3>
+                    <p className="text-xs text-slate-300/85 leading-relaxed">
+                      Detect unusual price behavior with explainable AI
+                    </p>
+                  </div>
+                  <div className="flex justify-end pt-4 mt-auto">
+                    <span className="w-6 h-6 rounded-full border border-white/20 flex items-center justify-center text-slate-400 group-hover:text-brand-cyan group-hover:border-cyan-400/60 group-hover:bg-cyan-500/10 text-xs transition-all">
+                      →
+                    </span>
+                  </div>
+                </Link>
+
+                {/* Card 6: Reports & Downloads */}
+                <Link
+                  href="/downloads"
+                  className="rounded-xl p-5 sm:p-6 flex flex-col justify-between group min-h-[175px] cursor-pointer bg-gradient-to-b from-[#081f38]/90 via-[#06182c]/90 to-[#040f1d]/90 border border-cyan-500/25 hover:border-cyan-400/50 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_4px_20px_rgba(0,0,0,0.4)] hover:shadow-[0_8px_25px_rgba(0,210,255,0.15)] hover:-translate-y-0.5 transition-all duration-200"
+                >
+                  <div>
+                    <div className="text-brand-cyan mb-3.5">
+                      <FileText className="w-5 h-5 drop-shadow-[0_0_6px_rgba(0,210,255,0.5)]" />
+                    </div>
+                    <h3 className="text-sm font-bold text-white mb-2 tracking-tight">Reports &amp; Downloads</h3>
+                    <p className="text-xs text-slate-300/85 leading-relaxed">
+                      Generate insights for policy, research and analysis
+                    </p>
+                  </div>
+                  <div className="flex justify-end pt-4 mt-auto">
+                    <span className="w-6 h-6 rounded-full border border-white/20 flex items-center justify-center text-slate-400 group-hover:text-brand-cyan group-hover:border-cyan-400/60 group-hover:bg-cyan-500/10 text-xs transition-all">
+                      →
+                    </span>
+                  </div>
+                </Link>
+              </div>
+            </section>
+            {/* END: FeatureCardsGrid */}
+
+            {/* BEGIN: Active Corridors Ticker */}
+            <div className="w-full rounded-xl border border-white/10 bg-[#061525]/90 backdrop-blur-md py-3 px-4 sm:px-6 shadow-[inset_0_1px_1px_rgba(255,255,255,0.06)]">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold tracking-widest text-brand-cyan uppercase shrink-0 mr-4 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-brand-cyan animate-pulse shadow-[0_0_6px_#00D2FF]" />
+                  ACTIVE CORRIDORS: %
+                </span>
+                <div className="overflow-hidden flex-1 relative">
+                  <div className="ap-ticker-track">
+                    {[...NAV_TICKER, ...NAV_TICKER, ...NAV_TICKER].map((t, i) => (
+                      <span key={i} className="mx-5 inline-flex items-center gap-1.5 text-xs">
+                        <span className="font-mono font-medium text-slate-300">{t.route}</span>
+                        <span className={t.up ? "text-emerald-400 font-semibold" : "text-rose-400 font-semibold"}>
+                          {t.change}
+                        </span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
-          </footer>
-          {/* END: BottomMissionBanner */}
+            {/* END: Active Corridors Ticker */}
+
+            {/* BEGIN: BottomMissionBanner (Impact Banner) */}
+            <footer className="w-full">
+              <div className="rounded-2xl px-6 sm:px-8 py-5 flex flex-col sm:flex-row items-center justify-between gap-4 border border-cyan-500/25 bg-gradient-to-r from-[#06182a]/95 via-[#08223c]/90 to-[#06182a]/95 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.12)]">
+                {/* Text with Left Blue Border Accent */}
+                <div className="flex items-center gap-4 text-left w-full sm:w-auto">
+                  <div className="w-1.5 h-7 bg-brand-cyan rounded-full shadow-[0_0_10px_#00D2FF] shrink-0" />
+                  <div>
+                    <h4 className="text-xs sm:text-sm font-bold tracking-[0.16em] uppercase text-white font-display">
+                      A CREDIBLE TOMORROW THROUGH BETTER DATA
+                    </h4>
+                    <p className="text-xs text-slate-300/80 font-normal mt-0.5">
+                      Empowering evidence-based policy with transparent airfare intelligence.
+                    </p>
+                  </div>
+                </div>
+                {/* Action Impact Button */}
+                <Link
+                  className="glow-cyan-btn inline-flex items-center justify-center px-8 py-2.5 rounded-full text-xs font-bold bg-gradient-to-r from-brand-cyan to-sky-400 text-brand-dark hover:brightness-110 active:scale-95 transition-all shadow-[0_0_20px_rgba(0,210,255,0.45)] self-end sm:self-center whitespace-nowrap cursor-pointer shrink-0"
+                  href="/overview"
+                >
+                  Our Impact <span className="ml-1.5 font-black">→</span>
+                </Link>
+              </div>
+            </footer>
+            {/* END: BottomMissionBanner */}
+          </div>
         </main>
         {/* END: HeroSection */}
 
         {/* BEGIN: Detailed In-Page Anchor Sections for Navigation */}
-        <section id="about" className="py-16 px-6 lg:px-12 border-t border-white/5 bg-[#030B17]/80">
-          <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
+        <section id="about" className="py-16 px-4 sm:px-6 lg:px-8 border-t border-white/5 bg-[#030B17]/80">
+          <div className="w-full max-w-[94vw] mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="space-y-3">
               <div className="text-xs font-bold tracking-[0.2em] text-brand-cyan uppercase">
                 THE VAYANTARA MISSION
@@ -585,8 +604,8 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section id="resources" className="py-8 px-6 lg:px-12 border-t border-white/5 bg-[#020710] text-center text-xs text-slate-500">
-          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+        <section id="resources" className="py-8 px-4 sm:px-6 lg:px-8 border-t border-white/5 bg-[#020710] text-center text-xs text-slate-500">
+          <div className="w-full max-w-[94vw] mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               <div className="relative h-6 w-28">
                 <Image
