@@ -42,7 +42,7 @@ scrapy>=2.11.0,<3.0.0
 playwright>=1.44.0,<2.0.0
 # Crawl4AI — AI-augmented browser-based scraping. Shares the Playwright/Chromium binary
 # already installed above; do NOT add a second playwright entry.
-crawl4ai>=0.4.0,<1.0.0
+crawl4ai==0.9.3
 
 # Utilities & Observability
 python-json-logger>=2.0.7,<3.0.0

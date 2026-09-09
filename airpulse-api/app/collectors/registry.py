@@ -56,6 +56,10 @@ class CollectorRegistry:
         stype = (source_type or "").lower()
         method = (collection_method or "").lower()
 
+        if (source_name or '').lower() == 'happyfares' or str(source_id).lower() == 'happyfares':
+            from app.collectors.crawl4ai_collector import Crawl4AICollector
+            return Crawl4AICollector(str(source_id), 'HappyFares')
+
         if stype == "synthetic" or method == "synthetic":
             return SyntheticCollector(source_id=str(source_id), source_name=source_name)
         if stype == "replay" or method == "replay":

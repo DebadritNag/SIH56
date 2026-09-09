@@ -46,6 +46,15 @@ class CollectionOrchestrator:
             src_query = select(Source).where(Source.enabled == True, Source.active == True)
         sources = list((await self.session.execute(src_query)).scalars().all())
 
+        # HappyFares must enter the durable Celery staging gateway. Batch runs
+        # automatically process their output, which would bypass explicit ingestion.
+        if source_id and any(s.name.lower() == 'happyfares' for s in sources):
+            raise ValueError('Use Live Collection for HappyFares, then Send to Data Ingestion')
+        batch_sources = [s for s in sources if s.name.lower() != 'happyfares']
+        if sources and not batch_sources:
+            raise ValueError('HappyFares requires Live Collection and explicit ingestion')
+        sources = batch_sources
+
         if not sources:
             # Register a default synthetic collector source if none found
             default_src = Source(

@@ -97,3 +97,12 @@ airpulse-api/supabase/migrations/
 # Markdown docs (not tracked)
 # ---------------------------------------------------------------------------
 *.md
+
+# HappyFares implementation verification artifacts are deployable source.
+!airpulse-api/app/scripts/test_happyfares_crawl4ai.py
+!airpulse-api/tests/
+airpulse-api/tests/*
+!airpulse-api/tests/unit/
+airpulse-api/tests/unit/*
+!airpulse-api/tests/unit/test_happyfares_crawl4ai.py
+!airpulse-api/docs/HAPPYFARES_CRAWL4AI_EC2.md

@@ -5,6 +5,7 @@ celery_app = Celery(
     "airpulse_worker",
     broker=settings.CELERY_BROKER_URL,
     backend=settings.CELERY_RESULT_BACKEND,
+    include=['app.workers.collection_tasks'],
 )
 
 celery_app.conf.update(
@@ -16,6 +17,7 @@ celery_app.conf.update(
     task_track_started=True,
     task_time_limit=3600,
     worker_prefetch_multiplier=1,
+    worker_concurrency=1,
 )
 
 # Celery Beat Periodic Schedule

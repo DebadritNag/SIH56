@@ -1,8 +1,7 @@
 """Durable, bounded live acquisition and explicit canonical-ingestion gateway.
 
-Jobs live in PostgreSQL, not a browser request or Render's ephemeral filesystem.
-The embedded consumer supports the existing single Render service; the same
-consumer can run as a dedicated worker without changing the API.
+Jobs live in PostgreSQL. HappyFares acquisition runs on the existing EC2 Celery
+worker; the embedded consumer continues to handle explicit ingestion jobs.
 """
 import asyncio
 import hashlib
@@ -44,10 +43,20 @@ async def enqueue_collection(db, request, actor=None):
     await insert(db,'collection_runs',id=run_id,source_id=source['id'],run_type='LIVE_ACQUISITION',
         data_origin='LIVE',trigger_type='MANUAL',triggered_by=actor,status='QUEUED',
         routes_requested=1,searches_requested=1,metadata={'request':request,'ingestion_state':'ACQUIRING'})
+    celery_job = source['name'].lower() == 'happyfares'
     job_id = await insert(db,'pipeline_runs',collection_run_id=run_id,pipeline_type='live_acquisition',
-        status='QUEUED',metadata={'request':request})
+        status='QUEUED',metadata={'request':request, 'dispatcher':'celery' if celery_job else 'embedded'})
     await audit(db,run_id,'LIVE_COLLECTION_QUEUED',{'pipeline_run_id':str(job_id)},actor)
     await db.commit()
+    if celery_job:
+        from app.workers.collection_tasks import collect_staged_live_task
+        try:
+            await asyncio.to_thread(collect_staged_live_task.apply_async, args=[str(job_id)], retry=False)
+        except Exception:
+            await db.execute(text("UPDATE pipeline_runs SET status='FAILED',finished_at=now(),error_summary='Celery dispatch failed; no source request made' WHERE id=:id"), {'id':job_id})
+            await db.execute(text("UPDATE collection_runs SET status='FAILED',finished_at=now(),metadata=metadata || '{\"ingestion_state\":\"FAILED\"}'::jsonb WHERE id=:id"), {'id':run_id})
+            await db.commit()
+            raise ValueError('Celery dispatch failed; no source request made')
     return {'collection_run_id':str(run_id),'pipeline_run_id':str(job_id),'status':'QUEUED'}
 
 
@@ -88,14 +97,19 @@ async def get_live_run(db, run_id):
 
 
 async def execute_acquisition(db, job):
-    from app.services.live_scraper import LiveScraper
     from app.schemas.runs import SearchRequest
     run_id = job['collection_run_id']
     run = (await rows(db,'SELECT * FROM collection_runs WHERE id=:id',id=run_id))[0]
     source = (await rows(db,'SELECT * FROM sources WHERE id=:id',id=run['source_id']))[0]
     request = SearchRequest(**job['metadata']['request'])
     started = utc_now()
-    result = await LiveScraper().run(source_name=source['name'],source_type='ota',
+    if source['name'].lower() == 'happyfares':
+        from app.collectors.registry import CollectorRegistry
+        collector = CollectorRegistry.build_for_source(str(source['id']), source['name'], 'ota')
+        result = await collector.run(request)
+    else:
+        from app.services.live_scraper import LiveScraper
+        result = await LiveScraper().run(source_name=source['name'],source_type='ota',
         source_id=str(source['id']),collection_run_id=str(run_id),origin=request.origin,destination=request.destination,
         departure=request.departure_date,booking_window_days=request.booking_window_days,
         max_results=request.max_results,engine=job['metadata']['request'].get('engine','AUTO'),is_nonstop=request.is_nonstop)
@@ -117,8 +131,12 @@ async def execute_acquisition(db, job):
     state = 'READY_FOR_INGESTION' if count else 'FAILED'
     result.pop('quotes',None)
     result.update(ready_for_ingestion=bool(count),raw_rows=count)
+    result.update(run_id=str(run_id), source=source['display_name'] or source['name'],
+                  engine=result.get('collection_engine'), observations_found=count)
     if count:
-        result.update(status='COMPLETED', recommended_remediation='Raw observations saved. Send to ingestion to update analytics.')
+        result.update(recommended_remediation='Raw observations saved. Send to ingestion to update analytics.')
+    elif result.get('status') in ('SUCCESS', 'PARTIAL', 'PASSED', 'COMPLETED'):
+        result.update(status='PARSE_ERROR', failure_reason='No valid raw observations could be staged')
     for i, st in enumerate(result.get('stages',[])):
         if st['stage'] == 'RAW_STORAGE':
             continue
@@ -141,7 +159,7 @@ async def execute_acquisition(db, job):
     return {'records_processed':count,'records_failed':int(not count),'status':'COMPLETED' if count else 'FAILED','result':result}
 
 
-async def consume_one(session_factory=AsyncSessionLocal):
+async def consume_one(session_factory=AsyncSessionLocal, job_id=None):
     async with session_factory() as db:
         # A crashed process must not silently repeat a source request. Active jobs
         # retain a row lock and are skipped by this bounded stale-job recovery.
@@ -154,7 +172,10 @@ async def consume_one(session_factory=AsyncSessionLocal):
                 metadata=metadata || '{"ingestion_state":"FAILED"}'::jsonb WHERE id=:id"""),{'id':old['collection_run_id']})
         await db.commit()
         jobs = await rows(db,"""SELECT * FROM pipeline_runs WHERE pipeline_type IN ('live_acquisition','live_ingestion')
-            AND status='QUEUED' ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1""")
+            AND status='QUEUED'
+            AND ((CAST(:job AS uuid) IS NOT NULL AND id=CAST(:job AS uuid)) OR
+                 (CAST(:job AS uuid) IS NULL AND coalesce(metadata->>'dispatcher','embedded') <> 'celery'))
+            ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1""", job=str(job_id) if job_id else None)
         if not jobs:
             return False
         job = jobs[0]

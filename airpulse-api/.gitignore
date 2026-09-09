@@ -90,6 +90,15 @@ logs/
 celerybeat-schedule
 celerybeat.pid
 
+# Ship the bounded HappyFares diagnostic, its tests, and EC2 runbook.
+!app/scripts/test_happyfares_crawl4ai.py
+!tests/
+tests/*
+!tests/unit/
+tests/unit/*
+!tests/unit/test_happyfares_crawl4ai.py
+!docs/HAPPYFARES_CRAWL4AI_EC2.md
+
 # ---------------------------------------------------------------------------
 # Editor / OS
 # ---------------------------------------------------------------------------

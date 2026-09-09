@@ -22,7 +22,7 @@ class LiveRequest(BaseModel):
     origin: str = Field(pattern=r'^[A-Z]{3}$')
     destination: str = Field(pattern=r'^[A-Z]{3}$')
     departure_date: date
-    engine: Literal['AUTO'] = 'AUTO'
+    engine: Literal['AUTO', 'CRAWL4AI'] = 'AUTO'
     max_results: int = Field(default=10, ge=1, le=15)
     is_nonstop: bool | None = None
 
@@ -31,41 +31,53 @@ class LiveRequest(BaseModel):
         days = (self.departure_date - datetime.now(ZoneInfo('Asia/Kolkata')).date()).days
         if self.origin == self.destination or not 0 <= days <= 365:
             raise ValueError('Choose different airports and a departure within the next 365 days')
+        if self.source == 'happyfares':
+            if {self.origin, self.destination} != {'DEL', 'BOM'}:
+                raise ValueError('HappyFares prototype currently supports DEL and BOM only')
+            self.engine = 'CRAWL4AI'
+        elif self.engine == 'CRAWL4AI':
+            raise ValueError('Crawl4AI is configured for HappyFares only')
         return self
 
 
 def source_enabled(source):
     if source == 'happyfares':
-        return bool(settings.HAPPYFARES_PROTOTYPE_ENABLED and settings.HAPPYFARES_REVIEW_NOTES.strip())
+        return bool(settings.CRAWL4AI_ENABLED and settings.HAPPYFARES_PROTOTYPE_ENABLED and settings.HAPPYFARES_REVIEW_NOTES.strip())
     return bool(settings.YATRA_PROTOTYPE_ENABLED and settings.YATRA_REVIEW_NOTES.strip())
 
 @router.get('/config')
 async def configuration(source: Literal['yatra', 'happyfares'] = 'yatra', user: UserContext = Depends(require_viewer)):
     from app.services.memory_budget import require_browser_memory
-    browser_available, browser_message = True, None
-    try:
-        require_browser_memory()
-    except MemoryError as exc:
-        browser_available, browser_message = False, str(exc)
+    browser_available, browser_message = None, 'Browser availability is checked on the Celery worker when collection starts.'
+    if source != 'happyfares':
+        browser_available, browser_message = True, None
+        try:
+            require_browser_memory()
+        except MemoryError as exc:
+            browser_available, browser_message = False, str(exc)
     return {'success': True, 'data': {
         'source': source, 'enabled': source_enabled(source),
         'browser_available': browser_available, 'browser_message': browser_message,
-        'worker_enabled': settings.LIVE_WORKER_ENABLED, 'max_results': 15,
-        'policy_status': 'MANUAL_REVIEW_REQUIRED',
+        'worker_enabled': settings.CRAWL4AI_ENABLED if source == 'happyfares' else settings.LIVE_WORKER_ENABLED, 'max_results': 15,
+        'engine': 'CRAWL4AI' if source == 'happyfares' else 'PLAYWRIGHT',
+        'execution_host': 'celery' if source == 'happyfares' else 'embedded',
+        'policy_status': 'REVIEW_CONFIGURED' if source_enabled(source) else 'MANUAL_REVIEW_REQUIRED',
         'message': 'Bounded public-page prototype. Access challenges stop collection without bypass.'}}
 
 
 @router.post('/runs', status_code=202)
 async def collect(payload: LiveRequest, db: AsyncSession = Depends(get_db), user: UserContext = Depends(require_analyst)):
-    if not settings.LIVE_WORKER_ENABLED:
+    if payload.source != 'happyfares' and not settings.LIVE_WORKER_ENABLED:
         raise HTTPException(503, 'Live worker is disabled')
     if not source_enabled(payload.source):
-        raise HTTPException(409, f'Set {payload.source.upper()}_PROTOTYPE_ENABLED=true and {payload.source.upper()}_REVIEW_NOTES after review')
+        extra = ' and CRAWL4AI_ENABLED=true' if payload.source == 'happyfares' else ''
+        raise HTTPException(409, f'Set {payload.source.upper()}_PROTOTYPE_ENABLED=true and {payload.source.upper()}_REVIEW_NOTES after review{extra}')
     from app.services.memory_budget import require_browser_memory
-    try:
-        require_browser_memory()
-    except MemoryError as exc:
-        raise HTTPException(503, str(exc)) from exc
+    if payload.source != 'happyfares':
+        try:
+            require_browser_memory()
+        except MemoryError as exc:
+            raise HTTPException(503, str(exc)) from exc
     request = payload.model_dump(mode='json')
     request['booking_window_days'] = (payload.departure_date - datetime.now(ZoneInfo('Asia/Kolkata')).date()).days
     try:
