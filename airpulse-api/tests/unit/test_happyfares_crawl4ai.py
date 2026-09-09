@@ -75,7 +75,7 @@ async def test_staging_only_and_hard_cap():
     collector.run.return_value = {'status':'SUCCESS', 'quotes':[q]*20, 'stages':[], 'collection_engine':'CRAWL4AI'}
     db = AsyncMock()
     inserts = AsyncMock()
-    with patch('app.services.live_acquisition.rows', AsyncMock(side_effect=[[{'source_id':source_id}], [{'id':source_id,'name':'happyfares','display_name':'HappyFares'}]])), patch('app.services.live_acquisition.insert', inserts), patch('app.services.live_acquisition.audit', AsyncMock()), patch.object(CollectorRegistry, 'build_for_source', return_value=collector):
+    with patch('app.services.live_acquisition.rows', AsyncMock(side_effect=[[{'source_id':source_id}], [{'id':source_id,'name':'happyfares','display_name':'HappyFares'}]])), patch('app.services.live_acquisition.insert', inserts), patch('app.services.live_acquisition.audit', AsyncMock()), patch('app.services.live_acquisition.publish_progress', AsyncMock()), patch.object(CollectorRegistry, 'build_for_source', return_value=collector):
         result = await execute_acquisition(db, {'id':job_id, 'collection_run_id':run_id, 'metadata':{'request':request(max_results=20).model_dump(mode='json')}})
     tables = [call.args[1] for call in inserts.await_args_list]
     assert tables.count('raw_fares') == 15
@@ -129,10 +129,15 @@ async def test_crawler_hooks_and_cleanup(count, http, body, expected):
     client.__aenter__.return_value = client
     client.get.return_value = SimpleNamespace(status_code=200,text='User-agent: *\nAllow: /')
     with patch.dict(sys.modules, {'crawl4ai':fake}), patch('app.collectors.crawl4ai_collector.httpx.AsyncClient', return_value=client), patch('app.services.memory_budget.require_browser_memory'), patch('app.config.settings.CRAWL4AI_ENABLED', True), patch('app.config.settings.HAPPYFARES_PROTOTYPE_ENABLED', True), patch('app.config.settings.HAPPYFARES_REVIEW_NOTES', 'unit test only'):
-        result = await Crawl4AICollector('hf').run(request(max_results=20))
+        progress = AsyncMock()
+        result = await Crawl4AICollector('hf').run(request(max_results=20), on_progress=progress)
     assert result['status'] == expected
     assert len(result['quotes']) == (15 if expected == 'SUCCESS' else 0)
     assert Crawler.closed and Crawler.config.headless
+    events = [call.args[0] for call in progress.await_args_list]
+    assert [event['stage'] for event in events[:3]] == ['POLICY_CHECK', 'BROWSER_LAUNCH', 'NAVIGATION']
+    assert events[-1]['status'] == expected
+    assert events[-1]['stages'][-1]['status'] == ('COMPLETED' if expected == 'SUCCESS' else 'FAILED')
 
 @pytest.mark.asyncio
 async def test_main_api_sends_crawl4ai_request_to_staging():
@@ -154,8 +159,8 @@ async def test_main_api_sends_crawl4ai_request_to_staging():
 @pytest.mark.asyncio
 async def test_happyfares_config_checks_browser_on_worker():
     from app.api.v1.live import configuration
-    with patch('app.config.settings.CRAWL4AI_ENABLED', True), patch('app.config.settings.LIVE_WORKER_ENABLED', False), patch('app.services.memory_budget.require_browser_memory', side_effect=AssertionError('Wrong host')):
-        config = (await configuration('happyfares', None))['data']
+    with patch('app.api.v1.live.rows', AsyncMock(return_value=[])), patch('app.config.settings.CRAWL4AI_ENABLED', True), patch('app.config.settings.LIVE_WORKER_ENABLED', False), patch('app.services.memory_budget.require_browser_memory', side_effect=AssertionError('Wrong host')):
+        config = (await configuration('happyfares', None, AsyncMock()))['data']
     assert config['engine'] == 'CRAWL4AI' and config['worker_enabled']
     assert config['browser_available'] is None and config['execution_host'] == 'celery'
 
@@ -169,7 +174,17 @@ async def test_enqueue_dispatches_celery_after_commit():
     db = AsyncMock()
     def dispatched(*args, **kwargs):
         assert db.commit.await_count == 1
-    with patch('app.services.live_acquisition.rows', AsyncMock(side_effect=[[source], [source], []])), patch('app.services.live_acquisition.insert', AsyncMock(side_effect=[uuid4(), job_id])), patch('app.services.live_acquisition.audit', AsyncMock()), patch.object(collect_staged_live_task, 'apply_async', side_effect=dispatched) as dispatch:
+    with patch('app.services.live_acquisition.rows', AsyncMock(side_effect=[[source], [source], []])), patch('app.services.live_acquisition.insert', AsyncMock(side_effect=[uuid4(), job_id])), patch('app.services.live_acquisition.audit', AsyncMock()), patch('app.services.live_acquisition.publish_progress', AsyncMock()), patch.object(collect_staged_live_task, 'apply_async', side_effect=dispatched) as dispatch:
         queued = await enqueue_collection(db, {'source':'happyfares'})
     assert queued['pipeline_run_id'] == str(job_id)
     dispatch.assert_called_once_with(args=[str(job_id)], retry=False)
+
+
+def test_source_cooldown_deadline_and_expiry():
+    from datetime import datetime, timezone, timedelta
+    from app.services.live_acquisition import source_cooldown
+    now = datetime(2026, 9, 9, 12, 0, tzinfo=timezone.utc)
+    assert source_cooldown({}, now) is None
+    assert source_cooldown({'last_failure_at': now - timedelta(minutes=2)}, now) == now + timedelta(minutes=3)
+    assert source_cooldown({'last_failure_at': now - timedelta(minutes=5)}, now) is None
+    assert source_cooldown({'last_failure_at': now - timedelta(minutes=6)}, now) is None

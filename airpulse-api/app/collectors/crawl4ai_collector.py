@@ -47,13 +47,24 @@ class Crawl4AICollector(BaseCollector):
         from app.config import settings
         return {'source': self.source_name, 'engine': 'CRAWL4AI', 'enabled': settings.CRAWL4AI_ENABLED}
 
-    async def run(self, request):
+    async def run(self, request, on_progress=None):
         from app.config import settings
         from app.collectors.sources import happyfares as adapter
         result = dict(status='FAILED', quotes=[], collection_engine='CRAWL4AI',
             collector_version=self.collector_version, stages=[], started_at=datetime.now(timezone.utc).isoformat())
         stage = 'POLICY_CHECK'
+        timeline = []
+        async def enter(name):
+            nonlocal stage
+            if timeline and timeline[-1]['status'] == 'RUNNING':
+                timeline[-1].update(status='COMPLETED', finished_at=datetime.now(timezone.utc).isoformat())
+            stage = name
+            timeline.append({'stage':name, 'status':'RUNNING', 'started_at':datetime.now(timezone.utc).isoformat()})
+            if on_progress:
+                await on_progress({'stage':name, 'status':'RUNNING', 'engine':'CRAWL4AI',
+                    'updated_at':datetime.now(timezone.utc).isoformat(), 'stages':[dict(s) for s in timeline]})
         try:
+            await enter('POLICY_CHECK')
             if not (settings.CRAWL4AI_ENABLED and settings.HAPPYFARES_PROTOTYPE_ENABLED and settings.HAPPYFARES_REVIEW_NOTES.strip()):
                 raise CollectionStopped('SKIPPED_POLICY', 'Enable Crawl4AI and configure HappyFares prototype review before collection')
             if request.passengers != 1 or request.currency != 'INR' or request.cabin.value.lower() != 'economy':
@@ -68,7 +79,7 @@ class Crawl4AICollector(BaseCollector):
             policy.parse(robots.text.splitlines())
             if not policy.can_fetch('AirPulseResearch', url):
                 raise CollectionStopped('SKIPPED_POLICY', 'robots.txt disallows the public search page')
-            stage = 'BROWSER_LAUNCH'
+            await enter('BROWSER_LAUNCH')
             from app.services.memory_budget import require_browser_memory
             require_browser_memory()
             from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
@@ -82,7 +93,7 @@ class Crawl4AICollector(BaseCollector):
                 return page
             async def extract(page, context, response=None, **kwargs):
                 nonlocal stage
-                stage = 'RESULT_DETECTION'
+                await enter('RESULT_DETECTION')
                 result['http_status'] = response.status if response else None
                 async def guard():
                     check_access(blocked[0] if blocked else result.get('http_status'), await page.locator('body').inner_text(timeout=10000))
@@ -102,7 +113,7 @@ class Crawl4AICollector(BaseCollector):
                     await asyncio.sleep(1)
                 else:
                     raise CollectionStopped('TIMEOUT', 'No visible result cards within 30 seconds')
-                stage = 'EXTRACT_VALIDATE'
+                await enter('EXTRACT_VALIDATE')
                 seen = set()
                 observed = datetime.now(timezone.utc).isoformat()
                 cards = page.locator(adapter.CARD)
@@ -125,8 +136,8 @@ class Crawl4AICollector(BaseCollector):
                     # Preserve the typed error; never classify those excerpts.
                     hook_failures.append(exc)
                     raise
-            stage = 'NAVIGATION'
             async with AsyncWebCrawler(config=BrowserConfig(browser_type='chromium', headless=True, verbose=False)) as crawler:
+                await enter('NAVIGATION')
                 crawler.crawler_strategy.set_hook('on_page_context_created', setup)
                 crawler.crawler_strategy.set_hook('after_goto', guarded_extract)
                 crawled = await crawler.arun(url=url, config=CrawlerRunConfig(cache_mode=CacheMode.BYPASS,
@@ -147,5 +158,11 @@ class Crawl4AICollector(BaseCollector):
         result['completed_at'] = datetime.now(timezone.utc).isoformat()
         result['observations_found'] = len(result['quotes'])
         result['failure_stage'] = None if result['quotes'] else result['status']
-        result['stages'] = [dict(stage=stage, status='COMPLETED' if result['quotes'] else 'FAILED', count=len(result['quotes']), detail=result.get('failure_reason'))]
+        if timeline:
+            timeline[-1].update(status='COMPLETED' if result['quotes'] else 'FAILED',
+                count=len(result['quotes']), detail=result.get('failure_reason'), finished_at=result['completed_at'])
+        result['stages'] = timeline
+        if on_progress:
+            await on_progress({'stage':stage, 'status':result['status'], 'engine':'CRAWL4AI',
+                'updated_at':result['completed_at'], 'stages':[dict(s) for s in timeline]})
         return result

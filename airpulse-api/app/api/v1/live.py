@@ -46,7 +46,12 @@ def source_enabled(source):
     return bool(settings.YATRA_PROTOTYPE_ENABLED and settings.YATRA_REVIEW_NOTES.strip())
 
 @router.get('/config')
-async def configuration(source: Literal['yatra', 'happyfares'] = 'yatra', user: UserContext = Depends(require_viewer)):
+async def configuration(source: Literal['yatra', 'happyfares'] = 'yatra', user: UserContext = Depends(require_viewer), db: AsyncSession = Depends(get_db)):
+    from app.core.utils import utc_now
+    from app.services.live_acquisition import source_cooldown
+    now = utc_now()
+    source_rows = await rows(db, 'SELECT last_failure_at FROM sources WHERE name=:source LIMIT 1', source=source)
+    cooldown_until = source_cooldown(source_rows[0], now) if source_rows else None
     from app.services.memory_budget import require_browser_memory
     browser_available, browser_message = None, 'Browser availability is checked on the Celery worker when collection starts.'
     if source != 'happyfares':
@@ -57,6 +62,8 @@ async def configuration(source: Literal['yatra', 'happyfares'] = 'yatra', user: 
             browser_available, browser_message = False, str(exc)
     return {'success': True, 'data': {
         'source': source, 'enabled': source_enabled(source),
+        'server_now': now.isoformat(),
+        'cooldown_until': cooldown_until.isoformat() if cooldown_until else None,
         'browser_available': browser_available, 'browser_message': browser_message,
         'worker_enabled': settings.CRAWL4AI_ENABLED if source == 'happyfares' else settings.LIVE_WORKER_ENABLED, 'max_results': 15,
         'engine': 'CRAWL4AI' if source == 'happyfares' else 'PLAYWRIGHT',

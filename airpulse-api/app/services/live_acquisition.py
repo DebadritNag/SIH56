@@ -18,6 +18,29 @@ from app.services.live_store import rows, insert, audit
 logger = logging.getLogger(__name__)
 
 
+def source_cooldown(source, now=None):
+    """Return the same server deadline used for admission and the UI timer."""
+    now = now or utc_now()
+    failure = source.get('last_failure_at')
+    until = failure + timedelta(minutes=5) if failure else None
+    return until if until and until > now else None
+
+
+async def publish_progress(db, run_id, progress):
+    """Commit operational telemetry separately; never publish staged fares here."""
+    from sqlalchemy.ext.asyncio import async_sessionmaker
+    try:
+        async with async_sessionmaker(db.bind, expire_on_commit=False)() as telemetry:
+            async with asyncio.timeout(3):
+                await telemetry.execute(text("""UPDATE collection_runs
+                    SET metadata=coalesce(metadata,'{}'::jsonb) || CAST(:progress AS jsonb)
+                    WHERE id=:id AND status='RUNNING'"""),
+                    {'id':run_id, 'progress':json.dumps({'progress':progress}, default=str)})
+                await telemetry.commit()
+    except Exception:
+        logger.warning('Could not publish collection progress for %s', run_id)
+
+
 async def enqueue_collection(db, request, actor=None):
     sources = await rows(db, """SELECT * FROM sources WHERE enabled AND active
         AND metadata->>'live_prototype'='true' ORDER BY priority,id""")
@@ -32,8 +55,8 @@ async def enqueue_collection(db, request, actor=None):
         WHERE c.source_id=:source AND p.pipeline_type='live_acquisition' AND p.status IN ('QUEUED','RUNNING') LIMIT 1""", source=source['id'])
     if busy:
         raise ValueError('A collection for this source is already queued or running')
-    cooldown = source.get('last_failure_at')
-    if cooldown and utc_now()-cooldown < timedelta(minutes=5):
+    cooldown = source_cooldown(source)
+    if cooldown:
         raise ValueError('Source cooling down after a failed attempt; wait five minutes')
     last_success = source.get('last_success_at')
     interval = 60 / max(1, source.get('rate_limit_per_minute') or 1)
@@ -103,10 +126,12 @@ async def execute_acquisition(db, job):
     source = (await rows(db,'SELECT * FROM sources WHERE id=:id',id=run['source_id']))[0]
     request = SearchRequest(**job['metadata']['request'])
     started = utc_now()
+    async def progress_update(progress):
+        await publish_progress(db, run_id, progress)
     if source['name'].lower() == 'happyfares':
         from app.collectors.registry import CollectorRegistry
         collector = CollectorRegistry.build_for_source(str(source['id']), source['name'], 'ota')
-        result = await collector.run(request)
+        result = await collector.run(request, on_progress=progress_update)
     else:
         from app.services.live_scraper import LiveScraper
         result = await LiveScraper().run(source_name=source['name'],source_type='ota',
@@ -115,6 +140,10 @@ async def execute_acquisition(db, job):
         max_results=request.max_results,engine=job['metadata']['request'].get('engine','AUTO'),is_nonstop=request.is_nonstop)
     # Claim row remains locked until the observed evidence and final state are committed.
     quotes = result.get('quotes',[])[:15]
+    if quotes:
+        await progress_update({'stage':'RAW_STORAGE', 'status':'RUNNING',
+            'engine':result.get('collection_engine'), 'updated_at':utc_now().isoformat(),
+            'stages':result.get('stages',[]) + [{'stage':'RAW_STORAGE','status':'RUNNING'}]})
     count = 0
     for q in quotes:
         if not q.get('gross_total') or q.get('gross_total',0)<=0 or not q.get('provenance',{}).get('observed_at'):
