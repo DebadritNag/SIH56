@@ -31,6 +31,15 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "VAYANTARA | Real-Time Airfare Intelligence & Price Index for India",
   description: "Official National Airfare Price Intelligence Platform & High-Frequency Price Index for India. Turning airfare movement across routes, time, and booking windows into transparent economic signal.",
+  icons: {
+    icon: [
+      { url: "/app.png", type: "image/png" },
+    ],
+    shortcut: ["/app.png"],
+    apple: [
+      { url: "/app.png", type: "image/png" },
+    ],
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
