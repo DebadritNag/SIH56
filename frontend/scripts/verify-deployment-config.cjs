@@ -14,8 +14,11 @@ function load(file) {
   assert.deepEqual(await config.rewrites(),[{source:'/backend-api/:path*',destination:'http://13.53.46.72/:path*'}]);
   process.env.NEXT_PUBLIC_API_BASE_URL='/backend-api'; process.env.NEXT_PUBLIC_API_V1_PREFIX='/api/v1';
   assert.equal(load('src/lib/config.ts').config.apiV1Url,'/backend-api/api/v1');
+  process.env.NEXT_PUBLIC_DEV_BEARER_TOKEN='demo-token';
+  assert.equal((await config.rewrites())[0].destination,'http://13.53.46.72/:path*');
+  assert.equal(load('src/lib/config.ts').config.devBearerToken,'');
   process.env.NEXT_PUBLIC_DEV_BEARER_TOKEN='test-not-a-real-secret';
-  await assert.rejects(config.rewrites(),/must be empty/);
+  await assert.rejects(config.rewrites(),/arbitrary credentials/);
   assert.equal(load('src/lib/config.ts').config.devBearerToken,'');
   delete process.env.NEXT_PUBLIC_DEV_BEARER_TOKEN; delete process.env.BACKEND_ORIGIN;
   await assert.rejects(config.rewrites(),/BACKEND_ORIGIN/);

@@ -13,7 +13,7 @@ NEXT_PUBLIC_API_V1_PREFIX=/api/v1
 NEXT_PUBLIC_DEV_BEARER_TOKEN=
 ```
 
-Keep the existing NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY and NEXT_PUBLIC_HCAPTCHA_SITEKEY values. Delete the obsolete EC2_BACKEND_URL setting. BACKEND_ORIGIN is server-only and must be available at build time; production builds reject a missing origin or nonempty public development token. Supabase session JWTs continue to authorize users normally.
+Keep the existing NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY and NEXT_PUBLIC_HCAPTCHA_SITEKEY values. Delete the obsolete EC2_BACKEND_URL setting. BACKEND_ORIGIN is server-only and must be available at build time; production builds reject a missing origin or an arbitrary public development token. A legacy demo-token value is tolerated but ignored by the production client; leaving this variable empty is still recommended. Supabase session JWTs continue to authorize users normally.
 
 The rewrite is `/backend-api/:path*` -> `${BACKEND_ORIGIN}/:path*`. Browser API requests therefore use `/backend-api/api/v1/...`. The older `/api/proxy/...` compatibility route also uses BACKEND_ORIGIN directly, avoiding a second request through Vercel itself. All client API requests and downloads use the central API client.
 

@@ -11,8 +11,10 @@ const nextConfig: NextConfig = {
       throw new Error("BACKEND_ORIGIN must be an HTTP(S) origin without credentials, path, query or fragment.");
     }
     const devToken = process.env.NEXT_PUBLIC_DEV_BEARER_TOKEN;
-    if (devToken && (process.env.NODE_ENV === "production" || devToken !== "demo-token")) {
-      throw new Error("NEXT_PUBLIC_DEV_BEARER_TOKEN must be empty in production; only the non-secret demo-token is supported locally.");
+    // Older Vercel environments may still contain this non-secret sentinel.
+    // config.ts disables it in production; it must not prevent a deployment.
+    if (devToken && devToken !== "demo-token") {
+      throw new Error("Remove NEXT_PUBLIC_DEV_BEARER_TOKEN from Vercel: arbitrary credentials must not be browser-visible. Only the non-secret demo-token is supported for local development.");
     }
 
     return [
