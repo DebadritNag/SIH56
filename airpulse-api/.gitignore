@@ -13,6 +13,12 @@
 *.sql
 supabase/migrations/
 
+# Exception: Alembic-managed SQL fragments MUST be tracked so EC2 can run
+# `alembic upgrade head` after `git pull`. Without these files the migration
+# Python scripts raise FileNotFoundError at startup.
+!alembic/versions/sql/
+!alembic/versions/sql/*.sql
+
 # Supabase local temp / linked project ref
 supabase/.temp/
 supabase/.branches/
