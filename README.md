@@ -1,439 +1,521 @@
 # AirPulse — Real-Time Airfare Price Index for India
 
-> **Smart India Hackathon SIH26056** — *"Development of a Real-time Airfare Price Index for
-> India through Automated Web Scraping of Airline and Online Travel Aggregator Portals for
-> Augmentation of the Consumer Price Index (CPI)."*
+> **Smart India Hackathon SIH 2026** — **Problem Statement SIH26056**  
+> *"Development of a Real-time Airfare Price Index for India through Automated Web Scraping of Airline and Online Travel Aggregator Portals for Augmentation of the Consumer Price Index (CPI)."*
 
-AirPulse is an **airfare statistical intelligence and inflation-measurement platform** for
-the Ministry of Statistics & Programme Implementation (**MoSPI**), the Reserve Bank of India
-(**RBI**), and national economic researchers. It automatically collects domestic airfares,
-preserves immutable cryptographic provenance, validates and de-duplicates observations, and
-computes a transparent, high-frequency **Airfare Price Index (APIx)** to augment the CPI.
+AirPulse is an **airfare statistical intelligence and inflation-measurement platform** developed for the Ministry of Statistics & Programme Implementation (**MoSPI**), the Reserve Bank of India (**RBI**), and national economic researchers. It automates the collection of domestic airfare quotes across multiple airline and Online Travel Aggregator (OTA) portals, preserves immutable cryptographic provenance, enforces strict physical-sanity validation, and computes a transparent, high-frequency **Airfare Price Index (APIx)** to augment the national Consumer Price Index (CPI).
 
-AirPulse is **not** a flight-booking app. It is a government-grade analytics platform.
+AirPulse is **not** a consumer flight-booking application; it is an institutional-grade macroeconomic analytics platform designed to deliver statistically uncompromised price intelligence.
 
 ---
 
-## What it does
+## What AirPulse Does
 
-1. Ingests domestic airfare quotes from OTA/airline sources. *(Today: real scraped CSV
-   exports imported via scripts; automated Playwright collectors are scaffolded for future
-   scheduled runs — see "Current implementation status" below.)*
-2. Preserves cryptographic, immutable raw provenance (SHA-256) before any parsing.
-3. Normalizes fragmented fare components into a canonical standard product.
-4. Enforces strict schema and physical-sanity validation.
-5. Detects duplicate quotes without deleting them.
-6. Distinguishes corrupt data from genuine market price shocks.
-7. Computes the official **APIx** at daily / weekly / monthly frequencies (from *validated
-   observed fares only* — never from ML predictions).
-8. Provides explainable ML QA: **FareGuard** (expected fare), **PriceGuard** (anomalies),
-   and gated **SHAP** attribution.
-9. Continuously monitors source health, rate limits, and degradation.
-10. Ingests official context from **MoSPI eSankhyiki** and route weights from **DGCA**.
-11. Exposes an executive, government-grade analytical dashboard with full audit trails.
+1. **Automated Multi-Source Acquisition**: Collects scheduled economy fare quotes across domestic airline and OTA portals via bounded, headless browser and HTTP collectors.
+2. **Cryptographic Raw Provenance**: Computes SHA-256 hashes for all raw payloads and enforces immutable storage before downstream parsing.
+3. **Canonical Normalization**: Standardizes disparate vendor structures into uniform route, cabin, flight number, departure timing, and net/gross fare definitions.
+4. **Physical Sanity & Schema Validation**: Rejects invalid records (e.g., negative prices, fare bounds outside ₹500–₹500,000, identical origin and destination) into audit logs without data deletion.
+5. **Deterministic Deduplication**: Flags duplicate observations using SHA-256 quote hashes without purging records, maintaining complete observation history.
+6. **Economic Shock Differentiation**: Distinguishes corrupt data inputs from genuine macroeconomic market shocks (e.g., holiday surges, capacity crunches) via cross-source corroboration.
+7. **Official APIx Index Computation**: Derives a route- and booking-window-aware Laspeyres price index strictly from validated, observed fares (never from ML predictions).
+8. **Decoupled Machine Learning QA**: Applies **FareGuard** (XGBoost expected fare), **PriceGuard** (Isolation Forest anomaly detection), and gated **SHAP** attribution strictly for data quality control and outlier review.
+9. **Official Reference Benchmarking**: Synchronizes historical **MoSPI eSankhyiki** CPI (General) All-India datasets as external economic benchmarks.
+10. **Executive Analytics Dashboard**: Provides high-frequency index trendlines, route volatility heatmaps, lead-time yield curves, and downloadable audit-grade PDF dossiers.
 
 ---
 
-## Unique Selling Propositions (USPs)
+## Current System Architecture
 
-- **Pure Statistical Integrity (Zero ML Imputation)**: The official Airfare Price Index (APIx) is calculated strictly from verified, observed market quotes using the chained Laspeyres / Jevons index methodology—never from imputed, predicted, or synthetic ML data.
-- **Cryptographic Provenance & Tamper-Proof Audit Trail**: Every raw collection payload (HTML, JSON, CSV) is timestamped in UTC, hashed using SHA-256 before parsing, and permanently archived, ensuring full chain-of-custody institutional verifiability.
-- **Decoupled Dual-Branch Architecture**: The Statistical Index pipeline (Branch A) and Machine Learning QA pipeline (Branch B) run completely independently; any ML training or scoring degradation never halts or delays the publication of the official price index.
-- **Transparent & Explainable Anomaly Detection (Gated SHAP)**: Anomalies flagged by PriceGuard (Isolation Forest) are paired with tree-based SHAP feature attributions, giving economists interpretable marginal rupee impacts (booking window lead days, carrier premiums, holiday surges) rather than opaque black-box flags.
-- **Economic Intelligence: Corrupt Data vs. Price Shocks**: The system strictly differentiates between corrupt records (physical sanity violations like negative fares or invalid IATA pairs) and genuine market price shocks (cross-airline corroboration, festive demand spikes), preventing false-positive data purging.
-- **Standardized Multi-Booking Window Basket**: Eliminates advance-purchase bias caused by airline yield management by segmenting quotes into canonical lead-time buckets (`T+1`, `T+7`, `T+14`, `T+30`), weighted by official DGCA passenger traffic volume statistics.
-- **Native MoSPI eSankhyiki & DGCA Integration**: Incorporates the official MoSPI CPI (General) All-India Combined series as an external reference benchmark and dynamically calibrates route weights using DGCA domestic traffic shares.
-- **Automated Live Pipeline Mode**: New fare data entering the system triggers downstream stages automatically—executing SHA-256 hashing, normalization, validation, deduplication, feature extraction, FareGuard evaluation, PriceGuard anomaly scoring, and index recomputation end-to-end.
-- **Institutional Governance & Role-Based Access (RBAC)**: Government-grade operational model with role-based access (MoSPI Analyst, MoSPI Admin, Auditor, Observer), immutable audit event logging, and on-demand PDF executive dossier generation.
+AirPulse adopts a decoupled, multi-tier architecture designed to maintain complete operational independence between high-frequency statistical indexing, machine learning quality checks, and web presentation.
+
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                              PRESENTATION LAYER                              │
+│         Next.js 16 Dashboard (React 19, TypeScript, Tailwind CSS, ECharts)    │
+│         Hosted on Vercel · Dynamic API Routing via Environment Variables     │
+└───────────────────────┬──────────────────────────────┬───────────────────────┘
+                        │ REST (Bearer JWT)            │ Supabase Realtime
+                        │                              │ (WebSocket Notifications)
+                        ▼                              │
+┌──────────────────────────────────────────────────────┴───────────────────────┐
+│                              APPLICATION LAYER                               │
+│                   FastAPI (Async Python 3.11+) on Render                     │
+│  • JWT Verification & RBAC (Viewer, Analyst, Admin)                          │
+│  • Services: Normalization, Validation, Deduplication, Feature Extraction    │
+│  • Statistical Engine: Laspeyres/Jevons Matched Basket Index (APIx)          │
+│  • ML QA Engine: FareGuard (XGBoost), PriceGuard (Isolation Forest), SHAP    │
+└───────────────────────┬──────────────────────────────────────────────────────┘
+                        │ SQLAlchemy 2.x asyncpg (Service Role)
+                        ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                        CANONICAL DATA & STORAGE (Supabase)                   │
+│  PostgreSQL 17 (Triggers, RLS)  │  Supabase Auth  │  Private Storage Buckets │
+│  • Immutable raw_fares          │  • JWT tokens   │  • Raw HTML/JSON payloads│
+│  • Validated fares & APIx index │  • Role profiles│  • Reference datasets    │
+└──────────────────────────────────────────────────────────────────────────────┘
+                        ▲
+                        │ Task Scheduling & Ingestion Triggers
+┌───────────────────────┴──────────────────────────────────────────────────────┐
+│                             BACKGROUND WORKERS                               │
+│  Celery Worker + Beat  │  Redis Broker  │  Embedded Async Ingestion Pipeline │
+│  • Bounded Crawl4AI / Playwright browser runs                                │
+│  • Scheduled matrix search (Route × Booking Window × Source)                 │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+### End-to-End Processing Pipeline
+
+The platform enforces a strict unidirectional pipeline from raw collection to published index metrics:
+
+```
+[ Acquisition Layer ]
+  │  Multi-source crawling (Crawl4AI / Playwright / HTTP / Replay / Synthetic)
+  ▼
+[ Collection / Staging ]
+  │  Payloads staged with run metadata in collection_runs
+  ▼
+[ Send to Data Ingestion ]  ◄── EXPLICIT INGESTION GATE (Manual or Worker-Triggered)
+  │  (Staged data DOES NOT affect analytics or index until this step!)
+  ▼
+[ Canonical Raw Store ]
+  │  raw_fares table: SHA-256 hashed, immutable PostgreSQL trigger enforced
+  ▼
+[ Normalize ]
+  │  Uniform fields: IST/UTC timestamps, route codes, carrier, gross/base/tax fares
+  ▼
+[ Validate ]
+  │  Strict physical sanity: ₹500–₹500,000 range, origin ≠ destination, valid IATA
+  │  Rejections logged with explicit reason codes; valid rows move forward
+  ▼
+[ Deduplicate ]
+  │  Deterministic quote_hash; duplicates marked (is_duplicate = true), never purged
+  ▼
+[ Feature Generation ]
+  │  Historical route medians, lead days, day of week; missing features kept as null
+  ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  DECOUPLED EXECUTION BRANCHES                                                │
+│                                                                              │
+│  [ Branch A: Statistical Index Engine ]   [ Branch B: ML Quality Assurance ] │
+│  • Filter strictly for eligible fares     • FareGuard (XGBoost prediction)   │
+│  • Route & booking-window relatives       • PriceGuard (Isolation Forest)    │
+│  • Laspeyres matched-basket aggregation   • Gated SHAP on anomalies (p≥0.75) │
+│  • Coverage quality metric (Q score)      • Statistical alerts logged        │
+└──────────────────────────────────────┬───────────────────────────────────────┘
+                                       ▼
+                             [ APIx / Index Persistence ]
+                                       ▼
+                             [ Dashboard & Alerts ]
+```
+
+> [!IMPORTANT]
+> **Explicit Ingestion Gate:**
+> Staged collection payloads do **NOT** affect analytics, price index calculations, or ML models until they pass through the Data Ingestion step. This architectural boundary prevents incomplete scrapes, in-flight browser sessions, or corrupt payloads from contaminating the canonical analytical database.
 
 ---
 
-## Official reference data (MoSPI eSankhyiki) & real-fare ingestion
+## Unique Selling Propositions (USPs) — Four Pillars
 
-AirPulse integrates the SIH-provided **MoSPI eSankhyiki** portal as an *official / reference*
-statistical source — distinct from high-frequency market fare observations. It is **not**
-implemented as an airline/OTA collector.
+AirPulse is designed around four defensible institutional pillars tailored for national statistical agencies:
 
-- **Official-data connector** (`MospiESankhyikiAdapter`): real portal health checks, dataset
-  discovery, format detection (CSV/XLS/XLSX/JSON), and SHA-256 checksums. It never fabricates
-  data — if the source is unreachable, the sync is recorded as `FAILED`/`PARTIAL` and the
-  previously synced version stays active.
-- **Immutable versioning + provenance**: `reference_datasets` → `reference_dataset_versions`
-  (checksum, schema fingerprint, immutable original stored in the private
-  `reference-datasets` bucket) → `benchmark_fares` (normalized series). Every sync is tracked
-  in `reference_sync_runs` with audit events.
-- **Real benchmark ingested**: the official **MoSPI CPI (General)** All-India Combined index
-  (Jan-2025 → Jul-2026, base 2012=100) is synchronized and used as a **contextual** backtest
-  benchmark — with an explicit comparability note (CPI covers a broader basket than airfares).
+### 1. TRUST: Cryptographic Provenance & Institutional Auditability
+- **Observation-Level Provenance**: Every fare quote permanently preserves its raw extraction evidence, exact HTTP status, source URL, scraping engine, and timestamp.
+- **Cryptographic Immutability**: Every raw payload is hashed via SHA-256 before parsing and written to `raw_fares`, protected by PostgreSQL database triggers preventing mutation or deletion.
+- **Zero Synthetic Contamination in Live Mode**: Live Mode exclusively computes metrics from verified `LIVE` observations and genuine `IMPORTED` fallbacks. Synthetic data is strictly barred from Live Mode.
 
-**Real market fares (Live mode).** Manually-scraped OTA CSVs (e.g. Goibibo) are ingested via
-`GoibiboCsvImporter` into `validated_fares` as `data_origin = IMPORTED`, matched to real routes
-and sources, with a deterministic `quote_hash` for dedup. In **Live** mode every dashboard
-metric, chart, top-route table, and booking-window summary is computed **directly from these
-real observations** (`/dashboard/*` endpoints); when a selection has no matching fares the API
-returns an honest empty/representative state rather than fake data. **Mock** mode remains a
-clearly-labelled demo fallback.
+### 2. RESILIENCE: Hybrid LIVE + IMPORTED Data Architecture
+- **Fail-Safe Operational Continuity**: Automated browser scrapers operate alongside structured data importers (`GoibiboCsvImporter`, `ReferenceDataService`).
+- **Graceful Upstream Handling**: When live scrapers encounter upstream rate limits or anti-bot defenses, the platform falls back to verified imported baseline observations rather than crashing or stalling index publication.
+- **Decoupled Architecture**: Statistical index generation (Branch A) and machine learning scoring (Branch B) run independently. An ML exception or missing feature set will never delay or prevent index publication.
 
-**FareGuard training** runs on the real accumulated fares (`FareTrainingService`) and refuses
-to emit metrics when there is insufficient real data (reporting `insufficient_data` with the
-real fare summary) instead of training a meaningless model — retrain as more CSVs are imported.
+### 3. INTELLIGENCE: Booking-Window & Economic Shock Awareness
+- **Standardized Advance-Purchase Buckets**: Eliminates airline yield-management bias by segmenting fares into canonical booking windows (`T+1`, `T+7`, `T+14`, `T+30`, `T+45`) rather than computing misleading single-point route medians.
+- **Corrupt Data vs. Genuine Market Shocks**: Physical-sanity violations (e.g. negative fares, malformed routes) are flagged as corrupt. Conversely, genuine market price shocks (e.g. festival surges, sudden route capacity crunches) are validated and preserved to ensure economic inflation metrics reflect reality.
+- **Explainable Anomaly Attribution**: Anomalies flagged by PriceGuard are accompanied by gated TreeSHAP feature attributions, explaining the variance (e.g., short lead time, carrier premium) in interpretable rupee terms.
 
-**Report generation** (`/exports`, backtest audit PDF) pulls the **real** MoSPI benchmark
-series, real per-route medians, and the actual dataset name/version/checksum into the dossier,
-generated on demand and listed under Downloads & Exports.
-
-> Scraped CSV/XLSX inputs are git-ignored; they are ingested via
-> `scripts/import_goibibo_csvs.py` and `scripts/ingest_mospi_annexure.py`.
+### 4. STATISTICAL INTEGRITY: Pure Index Formulation (Zero ML Imputation)
+- **Zero ML Imputation in Official APIx**: The official Airfare Price Index is calculated strictly from validated, observed market quotes using the chained Laspeyres / Jevons formulation—never from synthetic, predicted, or imputed numbers.
+- **Explicit Coverage Quality Metric ($Q$)**: Every published index point carries an auditable quality score:
+  $$Q = 0.40 C_r + 0.25 C_s + 0.20 F + 0.15 V$$
+  evaluating route coverage ($C_r$), source coverage ($C_s$), temporal freshness ($F$), and validation rate ($V$).
 
 ---
 
-## Monorepo layout
+## Crawl4AI Web Acquisition Engine
+
+AirPulse incorporates **Crawl4AI** as the primary crawling engine for its automated web acquisition prototype.
+
+- **Role & Scope**: Crawl4AI operates exclusively within the **Acquisition Layer**. It is responsible for orchestrating headless Playwright/Chromium instances to render dynamic, client-side JavaScript applications on airline and aggregator portals.
+- **Deterministic Extraction**: Crawl4AI is used for headless page execution and DOM extraction. Parsing extracted flight cards into structured fare quotes remains strictly **deterministic and DOM-based** (using specific CSS/text selectors, date/time parsers, and regex patterns). No generative or non-deterministic AI models are used to infer fare amounts or flight metadata.
+- **Extensible Collector Framework**: Crawl4AI is not the project USP. The collector layer is built on an extensible `BaseCollector` contract that supports interchangeable collection adapters:
+  - `Crawl4AICollector`: Headless Chromium navigation for complex JavaScript shells.
+  - `PlaywrightCollector`: Direct browser automation scripts.
+  - `ScrapyCollector`: High-throughput asynchronous crawler for static/lightweight endpoints.
+  - `StaticCollector`: Standard async HTTP client (HTTPX) for public APIs and JSON endpoints.
+  - `ReplayCollector` & `SyntheticCollector`: Offline reproducible replay and testing adapters.
+- **Problem Statement Clarification**: The SIH26056 problem statement requires automated web scraping of airline and OTA portals; it does not mandate Crawl4AI specifically. Crawl4AI was selected for this prototype to efficiently navigate modern dynamic single-page web applications.
+
+---
+
+## Ethical & Defensive Collection Standards
+
+AirPulse follows strict ethical harvesting principles suited for government and academic research:
+
+- **Bounded Collection**: Requests are strictly capped (default 5–15 observations per crawl, browser concurrency set to 1) to prevent any denial-of-service load on upstream servers.
+- **Throttling & Cooldowns**: Built-in rate limiters enforce minimum request intervals (e.g. 60s cooldowns) and an automatic 5-minute cooldown following any upstream failure.
+- **No Anti-Bot Evasion**: AirPulse does **not** bypass CAPTCHAs, circumvent cloud firewalls, rotate residential proxies, or forge browser fingerprints.
+- **Truthful Status Reporting**: When access challenges or restrictions occur, the pipeline records honest operational failure stages:
+  - `BLOCKED`: Upstream HTTP 403 response or explicit access-denied body text.
+  - `RATE_LIMITED`: Upstream HTTP 429 Too Many Requests response.
+  - `CAPTCHA_DETECTED`: Challenge page or verification prompt detected; execution terminates immediately.
+  - `NO_AVAILABILITY`: Source returns no matching scheduled flights.
+  - `POLICY_RESTRICTED`: Source disabled pending operator compliance review.
+- **Robots.txt & Compliance Review**: The engine inspects upstream `robots.txt` files and requires configured review notes (`<SOURCE>_REVIEW_NOTES`) before live collection can be initiated.
+
+---
+
+## Current Prototype Source Status
+
+In the spirit of complete scientific and engineering integrity, the current operational status of the prototype is documented below:
+
+- **HappyFares Prototype**: HappyFares is currently the first controlled, code-verified Crawl4AI prototype source in the codebase. It is tested and verified locally for the high-density DEL–BOM corridor (Economy, 1 adult).
+- **Realistic Portal Coverage**: AirPulse does **not** claim all airline and OTA portals are operational. Commercial travel portals frequently implement aggressive anti-bot challenges (e.g. Yatra challenge pages) or change frontend DOM structures without notice.
+- **Extensible Architecture**: The multi-source framework is fully implemented in `app/collectors/`, allowing new portal adapters to be activated as DOM selectors and access permissions are reviewed.
+- **Resilient Fallback**: Because live portals can be volatile, the platform incorporates verified historical datasets (e.g., real Goibibo OTA exports) to ensure Live Mode functions reliably during live demonstrations.
+- **Demo Mode**: Demo Mode remains fully available with isolated synthetic and replay datasets for platform inspection without triggering network traffic.
+
+---
+
+## Provenance Model & Data Origins
+
+Every record in AirPulse tracks its complete chain of custody through a standardized `data_origin` classification:
+
+| Origin | Definition | Usage & Restrictions |
+|---|---|---|
+| `LIVE` | Real fare quotes collected via automated live crawling engines (e.g. Crawl4AI, Playwright). | Eligible for Live Mode analytics and official APIx calculation. |
+| `IMPORTED` | Verified real-world fare observations imported from static files (e.g. OTA CSV exports, MoSPI press releases). | Eligible for Live Mode analytics and official APIx calculation as a reliable fallback. |
+| `REPLAY` | Historical recorded payloads replayed through the pipeline. | Used for deterministic testing and reproducible validation. |
+| `SYNTHETIC` | Mathematically simulated observations generated for load testing and empty-state development. | **Strictly prohibited** from entering Live Mode metrics or official APIx calculations. |
+| `MODELLED` | Algorithmic estimates generated by machine learning models (e.g. FareGuard expected fare). | Used solely for QA benchmarks and anomaly residuals; never enters the price index. |
+
+### Operational Modes
+- **Live Mode**: Uses strictly `LIVE` observations and genuine `IMPORTED` historical data. If data is unavailable for a selected route or time window, the platform displays an honest empty state (`—`) rather than fabricating numbers.
+- **Demo Mode**: Employs clearly-labelled `SYNTHETIC` or `REPLAY` data for offline demonstration and testing. Visible badges (`MOCK DATA`) alert the user whenever simulated data is in view.
+
+---
+
+## Machine Learning Quality Assurance
+
+Machine learning in AirPulse functions as an **observational quality assurance system** around the index pipeline, never inside it.
+
+```
+                          [ Validated Fare Observation ]
+                                       │
+                                       ▼
+                             [ Feature Extraction ]
+                 (Route distance, lead days, seasonality, route historical median)
+                                       │
+                                       ▼
+                       [ FareGuard (XGBoost Regressor) ]
+                           Predicts Expected Fare (₹)
+                                       │
+                                       ▼
+                              Residual Calculation
+                         residual = actual_fare - expected_fare
+                                       │
+                                       ▼
+                     [ PriceGuard (Isolation Forest) ]
+                      Evaluates Multivariate Anomaly Score
+                                       │
+                                       ▼
+                            Percentile Ranking (0.0–1.0)
+                                       │
+                 ┌─────────────────────┴─────────────────────┐
+                 │                                           │
+         Percentile < 0.75                           Percentile ≥ 0.75
+                 │                                           │
+          Normal Variance                             Flagged Anomaly
+                 │                                           │
+                 ▼                                           ▼
+         Recorded in DB                              [ Gated TreeSHAP Explainer ]
+                                                     Computes Marginal Feature Drivers (₹)
+                                                             │
+                                                             ▼
+                                                     Analyst Alert Dashboard
+```
+
+- **FareGuard (XGBoost)**: Generates an expected-fare reference estimate based on observable market features (booking window lead days, carrier, distance, historical medians).
+  - **No Fake Predictions**: If features are missing or the model returns an invalid or non-positive result, the prediction is recorded as `NULL` / `MODEL_UNAVAILABLE` / `SKIPPED`. The platform **never** outputs fake ₹0 predictions or imputed values.
+- **PriceGuard (Isolation Forest)**: Detects multi-dimensional pricing anomalies by scoring actual fares against predicted baselines and route distributions.
+- **Gated TreeSHAP**: Evaluated only for anomalous observations (percentile $\ge 0.75$) to minimize compute overhead on constrained runtimes. Provides interpretable feature drivers (e.g., booking window penalty, weekend surcharge) in rupee terms.
+  - *Non-Causal Attribution*: SHAP values explain *why the model predicted ₹X*; they do not represent causal economic mechanisms.
+  - *Index Decoupling*: SHAP and ML models are QA tools and are **not required** for APIx index computation.
+
+---
+
+## Official APIx Airfare Price Index
+
+The **Airfare Price Index (APIx)** is a transparent, high-frequency measure of domestic airfare inflation designed for the Ministry of Statistics & Programme Implementation (MoSPI).
+
+### Mathematical Formulation
+APIx uses a matched-basket chained Laspeyres index methodology disaggregated by directional route $r$ and booking window $b$:
+
+$$APIx_t = 100 \times \frac{\sum_r \sum_b w(r,b) \cdot \left[ \frac{P(r,b,t)}{P(r,b,0)} \right]}{\sum_r \sum_b w(r,b)}$$
+
+Where:
+- $r$: Directional route corridor (e.g., `DEL → BOM`).
+- $b$: Standard advance booking window bucket (`T+1`, `T+7`, `T+14`, `T+30`, `T+45`).
+- $P(r,b,t)$: Representative price (median validated fare) for route $r$ and window $b$ on day $t$.
+- $P(r,b,0)$: Baseline period price for the identical route and booking-window cell.
+- $w(r,b)$: Statistical basket weight.
+
+> [!NOTE]
+> **Basket Weights Status:**
+> Route and booking-window weights in the prototype database are structured according to passenger volume methodologies but are marked as **prototype baseline weights** until official DGCA annual traffic weights are directly synchronized into the active basket.
+
+---
+
+## Smart India Hackathon (SIH 2026) Alignment
+
+This project directly addresses the deliverables outlined in **SIH Problem Statement SIH26056**:
+
+| SIH Deliverable Requirement | AirPulse Implementation | Status |
+|---|---|---|
+| **Automated Web Scraping** | Modular collection engine combining Crawl4AI (headless Chromium) and HTTP collectors with bounded rate limits and ethical access guards. | Implemented (HappyFares prototype operational; multi-source framework ready) |
+| **Cleaned & Deduplicated Database** | Strict physical sanity filters (₹500–₹500k bounds, valid IATA, O≠D), canonical normalization, and deterministic SHA-256 deduplication. | Fully Implemented & Enforced via DB Triggers |
+| **Airfare Price Index (APIx)** | Chained Laspeyres/Jevons price index segmented by route and booking window (`T+1` to `T+45`) with coverage quality metric ($Q$). | Fully Implemented (Calculated strictly from observed fares) |
+| **Analytical Web Dashboard** | Next.js 16 dashboard with 20+ specialized analytical views (index trends, yield curves, anomaly alerts, SHAP attributions, executive dossier generation). | Fully Implemented on Vercel |
+| **Official CPI Integration** | Ingestion adapter for MoSPI eSankhyiki All-India Combined CPI series for contextual macro-economic comparison. | Fully Implemented (Annexure-IV series ingested) |
+| **DGCA Route Weighting** | Route weighting framework structured according to DGCA passenger traffic volume methodology. | Framework Implemented (*Prototype baseline weights loaded; live DGCA sync pending*) |
+
+---
+
+## Cloud Deployment Architecture
+
+AirPulse is architected for containerized deployment across modern cloud platforms:
+
+```
+┌────────────────────────┐         ┌────────────────────────┐         ┌────────────────────────┐
+│     Vercel (Edge)      │  HTTPS  │     Render (Cloud)     │  async  │   Supabase (Cloud)     │
+│   Next.js 16 Frontend  │────────▶│    FastAPI Application │────────▶│  PostgreSQL 17 Database │
+│   Static + SSR Dashboard│         │    Docker Web Service  │         │  Auth / Realtime / S3  │
+└────────────────────────┘         └────────────────────────┘         └────────────────────────┘
+```
+
+- **Frontend (Vercel)**: Next.js 16 App Router application deployed on Vercel. Communicates with the backend exclusively via environment variables (`NEXT_PUBLIC_API_BASE_URL`). No backend IPs or secrets are hardcoded in frontend code.
+- **Backend (Render - Active Deployment Target)**: FastAPI application packaged as a Docker container running on Render (`airpulse-api/render.yaml`). Exposes REST API endpoints and manages background tasks.
+- **Data & Auth (Supabase)**: Managed PostgreSQL 17 database with native enums, JSONB, Row-Level Security (RLS), Supabase Auth (JWT), Realtime websockets, and private storage buckets.
+- **Background Tasks (Redis + Celery)**: Handles scheduled matrix collection and asynchronous data ingestion.
+- **Alternative / Previous Deployments**: AWS EC2 was used as an earlier host environment for Playwright workers and remains documented in `docs/` as an alternative self-hosted infrastructure option. Render is the primary cloud deployment target for the current prototype.
+- **Security Invariant**: No credentials, private URLs, database passwords, service-role keys, or JWT secrets are hardcoded in repository files.
+
+### Low-Memory Deployment Notes (Render 512MB Runtime)
+To run reliably on memory-constrained hosting tiers (e.g. Render Free 512MB RAM):
+1. **Lazy Loading**: Heavy scientific dependencies (`torch`, `xgboost`, `shap`, `playwright`, `crawl4ai`) are imported lazily inside specific worker tasks rather than at application boot time.
+2. **Strict Browser Concurrency**: Headless Chromium concurrency is strictly limited to 1 (`CRAWL4AI_BROWSER_CONCURRENCY=1`).
+3. **Bounded Result Sizes**: Search results per crawl are restricted to 5–15 observations.
+4. **Immediate Browser Cleanup**: Chromium processes, browser contexts, and temporary disk profiles are cleanly terminated immediately upon task completion.
+5. **No Synchronous Retraining**: Machine learning model training is never performed inside interactive web request lifecycles.
+6. **Decoupled Index Execution**: If ML execution is skipped due to memory limits, the statistical APIx index pipeline executes without interruption.
+
+---
+
+## Tech Stack
+
+### Backend — `airpulse-api`
+| Technology | Version | Role in Platform |
+|---|---|---|
+| **Python** | 3.11+ | Core backend runtime |
+| **FastAPI** | 0.111+ | High-performance asynchronous REST API framework |
+| **Pydantic** | v2 | Request/response validation and typed configuration |
+| **SQLAlchemy** | 2.x (async) | Asynchronous ORM and SQL expression layer |
+| **asyncpg** | 0.29+ | Asynchronous PostgreSQL driver (`postgresql+asyncpg`) |
+| **Alembic** | 1.13+ | Database schema migrations (single source of truth) |
+| **Crawl4AI** | 0.9.3 | Headless Chromium web scraping engine for dynamic pages |
+| **Playwright** | 1.44+ | Headless browser automation driver |
+| **Celery** | 5.4+ | Distributed task queue for collection and ingestion jobs |
+| **Celery Beat** | — | Periodic scheduler for the route × booking-window search matrix |
+| **Redis** | 5.0+ | Celery message broker and result backend |
+| **XGBoost** | 2.0+ | **FareGuard** expected fare regression benchmark |
+| **scikit-learn** | 1.5+ | **PriceGuard** Isolation Forest anomaly detection |
+| **SHAP** | 0.45+ | Gated TreeSHAP feature attributions on anomalies |
+| **pandas / numpy / scipy** | latest | Statistical data processing and index aggregation math |
+| **HTTPX** | 0.27+ | Async HTTP client for static/API collection and health checks |
+
+### Frontend — `frontend`
+| Technology | Version | Role in Platform |
+|---|---|---|
+| **Next.js** | 16 (App Router) | React framework; SSR, layouts, dynamic routing |
+| **React** | 19 | Core UI component library |
+| **TypeScript** | 5 | End-to-end type safety with backend schema contracts |
+| **Tailwind CSS** | 4 | Utility-first styling with institutional design system |
+| **TanStack Query** | 5 | Asynchronous server-state management and caching |
+| **Apache ECharts** (`echarts-for-react`) | 6 | Interactive analytical charts (APIx trends, heatmaps, SHAP waterfalls) |
+| **@supabase/supabase-js** | latest | Client-side authentication and Realtime event subscriptions |
+| **lucide-react** | latest | Clean SVG icon set |
+
+### Infrastructure
+| Technology | Role in Platform |
+|---|---|
+| **Supabase PostgreSQL 17** | Canonical database (native enums, JSONB, TIMESTAMPTZ, NUMERIC money) |
+| **Supabase Auth** | JWT identity provider; `profiles` table provisioning |
+| **Supabase Realtime** | WebSocket broadcasts for live table updates |
+| **Supabase Storage** | Private object storage for raw payloads, reference datasets, and PDF dossiers |
+| **Render** | Docker web service host for FastAPI backend |
+| **Vercel** | Edge hosting platform for Next.js frontend |
+| **Docker / Compose** | Local container orchestration (API, worker, beat, Redis) |
+
+---
+
+## Monorepo Layout
 
 ```
 SIH56/
-├── airpulse-api/     # FastAPI backend (Python 3.11+) — the application/analytics layer
-├── frontend/         # Next.js 16 dashboard (TypeScript) — the analytics UI
-├── STARTUP_MANUAL.md # End-to-end startup & operations manual
-└── README.md         # You are here
+├── airpulse-api/               # FastAPI backend application (Python 3.11+)
+│   ├── alembic/                # Database schema migrations (Alembic = source of truth)
+│   ├── app/
+│   │   ├── api/                # REST route controllers (/api/v1)
+│   │   ├── auth/               # Supabase JWT verification & RBAC authorization
+│   │   ├── collectors/         # Modular collection adapters (Crawl4AI, Playwright, Scrapy, HTTP, Replay)
+│   │   │   ├── airline/        # Airline portal adapters
+│   │   │   └── sources/        # Source-specific extractors (e.g., happyfares.py)
+│   │   ├── core/               # Configuration, logging, exception handlers, utilities
+│   │   ├── db/                 # Database session, models, and repositories
+│   │   ├── ml/                 # FareGuard (XGBoost), PriceGuard (Isolation Forest), SHAP explainer
+│   │   ├── schemas/            # Pydantic validation schemas
+│   │   ├── services/           # Ingestion, normalization, validation, dedup, live processing, APIx engine
+│   │   └── workers/            # Celery application, collection tasks, and periodic Beat scheduler
+│   ├── docs/                   # Technical deep-dives & architecture specifications
+│   ├── models/                 # Pre-trained serialized model artifacts (.joblib)
+│   ├── scripts/                # Database seeders, test scripts, ingestion runners
+│   ├── tests/                  # Unit and integration test suites (pytest)
+│   ├── Dockerfile              # Production Dockerfile with Chromium & Crawl4AI setup
+│   ├── render.yaml             # Cloud deployment blueprint for Render
+│   └── requirements.txt        # Python dependency manifest
+├── frontend/                   # Next.js 16 analytical dashboard (TypeScript, Tailwind CSS)
+│   ├── src/
+│   │   ├── app/                # App Router pages, layouts, and API proxy routes
+│   │   ├── components/         # Reusable UI components, analytical charts (ECharts), data tables
+│   │   └── lib/                # API clients, auth hooks, data mappers, client-side PDF exporter
+│   └── package.json            # Frontend dependency manifest
+├── docs/                       # Project-level deployment and architectural documentation
+├── STARTUP_MANUAL.md           # End-to-end local development & production setup manual
+└── README.md                   # Main system documentation
 ```
 
 ---
 
-## System Architecture
+## Getting Started
 
-AirPulse follows a **decoupled, layered architecture** where Supabase provides managed
-infrastructure and FastAPI owns all application and statistical logic. The frontend reads
-business data through FastAPI (not directly from the database), and uses Supabase only for
-authentication and realtime notifications.
-
-```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                          PRESENTATION LAYER                                    │
-│   Next.js 16 Dashboard (React 19, TypeScript, Tailwind, ECharts, TanStack)     │
-│   Landing → Login/Signup → Protected Dashboard (20+ analyst views)             │
-└───────────────┬──────────────────────────────────────────┬───────────────────┘
-                │ REST (Authorization: Bearer <JWT>)         │ Supabase Realtime
-                │                                            │ (WebSocket, operational
-                ▼                                            │  table change events)
-┌──────────────────────────────────────────────┐            │
-│                APPLICATION LAYER               │            │
-│  FastAPI (async) — the single source of truth  │◄───────────┘
-│  • JWT validation (Supabase HS256)             │
-│  • RBAC: viewer / analyst / admin              │
-│  • Services: ingestion, normalize, validate,   │
-│    dedup, index engine, shock detector,        │
-│    provenance, backtest, methodology, audit    │
-│  • ML QA: FareGuard, PriceGuard, SHAP          │
-└───────────────┬───────────────────────────────┘
-                │ SQLAlchemy 2.x async + asyncpg
-                ▼
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                        INFRASTRUCTURE LAYER (Supabase)                          │
-│  PostgreSQL 17 (canonical store)  │  Auth (JWT)  │  Realtime  │  Storage        │
-│  • Native enums, NUMERIC money    │  identity    │  8 ops     │  raw payloads,  │
-│  • RLS on sensitive tables        │  + profiles  │  tables    │  datasets,      │
-│  • Alembic = schema source truth  │  trigger     │  published │  reports, models│
-└──────────────────────────────────────────────────────────────────────────────┘
-                ▲
-                │ SQLAlchemy async (service role — bypasses RLS)
-┌───────────────┴───────────────────────────────┐
-│               BACKGROUND LAYER                 │
-│  Celery Worker  — collection & pipeline jobs   │
-│  Celery Beat    — scheduler (matrix search)    │
-│  Redis          — broker + result backend      │
-│        │                                       │
-│        ▼                                       │
-│  Collectors: Airline (Playwright) · OTA (HTTP) │
-│  · Government (MoSPI/DGCA) · Replay · Synthetic │
-└────────────────────────────────────────────────┘
-```
-
-### Component responsibilities
-
-| Component | Responsibility |
-|-----------|----------------|
-| **Next.js frontend** | Analyst UI, auth session, realtime cache invalidation. Never scrapes; reads business data via FastAPI. |
-| **FastAPI** | All application/analytics logic, JWT validation, RBAC, REST API, ML orchestration. Canonical source of truth for the UI. |
-| **Supabase PostgreSQL** | The canonical data store. Accessed directly by FastAPI/Celery via SQLAlchemy async — not through the Supabase REST client. |
-| **Supabase Auth** | User identity. Issues JWTs; a signup trigger auto-creates a `profiles` row (default role `viewer`). |
-| **Supabase Realtime** | Broadcasts changes on 8 operational tables so the dashboard refreshes live (FastAPI remains authoritative). |
-| **Supabase Storage** | Private buckets for large raw payloads, imported datasets, reference files, reports, and model artifacts (backend signs URLs). |
-| **Celery Worker + Beat** | Background collection and the multi-stage processing pipeline, on a scheduled search matrix. |
-| **Redis** | Celery broker + result backend and rate-limit coordination. |
-| **Collectors** | Pluggable sources: live airline (Playwright), OTA (HTTP), government (MoSPI/DGCA), replay, synthetic. |
-
-### Architectural invariants
-
-- **Supabase is infrastructure; FastAPI is the application.**
-- **Alembic** is the single source of truth for the database schema (no ad-hoc dashboard edits).
-- The official APIx is computed **only** from validated observed fares — never from ML predictions.
-- Branch A (statistics/APIx) and Branch B (ML QA) are **decoupled**: if ML errors, APIx still computes.
-- Raw records in `raw_fares` are **immutable** (enforced by a DB trigger).
-
----
-
-## Tech Stack (detailed)
-
-### Backend — `airpulse-api`
-
-| Technology | Version | Why it's used |
-|-----------|---------|---------------|
-| **Python** | 3.11+ | Core backend language. |
-| **FastAPI** | 0.111+ | Async REST framework; automatic OpenAPI/Swagger docs; Pydantic-native. |
-| **Pydantic** | v2 | Request/response validation and typed settings (`BaseSettings`). |
-| **SQLAlchemy** | 2.x (async) | ORM + core; the primary application data layer. |
-| **asyncpg** | 0.29+ | High-performance async PostgreSQL driver (`postgresql+asyncpg`). |
-| **Alembic** | 1.13+ | Versioned schema migrations — the single source of truth. |
-| **psycopg2-binary** | 2.9+ | Sync driver used by Alembic migrations. |
-| **Celery** | 5.4+ | Distributed task queue for collection and the processing pipeline. |
-| **Celery Beat** | — | Scheduler for the periodic route × booking-window search matrix. |
-| **Redis** | 5.0+ | Celery broker/result backend and rate-limit coordination. |
-| **XGBoost** | 2.0+ | **FareGuard** — expected-fare regression benchmark. |
-| **scikit-learn** | 1.5+ | **PriceGuard** — Isolation Forest anomaly detection. |
-| **SHAP** | 0.45+ | Gated TreeSHAP attribution for flagged anomalies (explainability). |
-| **pandas / numpy / scipy** | latest | Data wrangling, statistics, and the APIx aggregation math. |
-| **HTTPX** | 0.27+ | Async HTTP client for OTA/API collectors and health checks. |
-| **BeautifulSoup4 / lxml** | latest | HTML parsing for scraped responses. |
-| **Playwright** | 1.44+ *(optional)* | Headless-browser collection for dynamic airline portals. |
-| **python-jose** | 3.x | Supabase JWT (HS256) signature/claims verification. |
-| **pytest / pytest-asyncio** | latest | Test suite (schema, RLS, immutability, auth, idempotency). |
-
-### Frontend — `frontend`
-
-| Technology | Version | Why it's used |
-|-----------|---------|---------------|
-| **Next.js** | 16 (App Router) | React framework; file-based routing, layouts, route protection. |
-| **React** | 19 | UI library. |
-| **TypeScript** | 5 | End-to-end type safety with the backend contract. |
-| **Tailwind CSS** | 4 | Utility-first styling; the government/fintech design system. |
-| **TanStack Query** | 5 | Server-state management, caching, and realtime-driven invalidation. |
-| **@supabase/supabase-js** | latest | Browser auth (email/password) + Realtime subscriptions. |
-| **Apache ECharts** (`echarts-for-react`) | 6 | Interactive analytics charts (APIx trend, heatmaps, waterfalls, SHAP). |
-| **lucide-react** | latest | Consistent SVG icon set. |
-
-### Infrastructure & data
-
-| Technology | Role |
-|-----------|------|
-| **Supabase PostgreSQL 17** | Canonical data store (native enums, JSONB, TIMESTAMPTZ, NUMERIC money). |
-| **Supabase Auth** | JWT identity provider; `profiles` auto-provisioning trigger. |
-| **Supabase Realtime** | Postgres change broadcast on operational tables. |
-| **Supabase Storage** | Private buckets: `raw-responses`, `imported-datasets`, `reference-datasets`, `backtest-reports`, `model-artifacts`, `generated-exports`. |
-| **Docker / docker-compose** | Local orchestration (API, worker, beat, Redis). |
-
----
-
-## System Workflow
-
-### End-to-end data flow (collection → published index)
-
-```
-1. SCHEDULE      Celery Beat emits a search matrix:
-                 Route (directional) × Booking window (T+1,7,15,30,45) × Source
-                        │
-2. COLLECT       Collectors fetch quotes (live airline / OTA / replay / synthetic).
-                 Each response is SHA-256 hashed and written to raw_fares — IMMUTABLE.
-                        │
-3. PARSE         Vendor-specific payload → intermediate parsed fields.
-                        │
-4. NORMALIZE     Canonical product: UTC times, booking-window days, standardized net fare.
-                        │
-5. VALIDATE      Schema + physical sanity (IATA codes, currency, ₹500–₹500,000, O≠D).
-                 ├── Rejected → validation log (kept, not deleted)
-                 └── Accepted ▼
-6. DEDUPLICATE   Deterministic quote hash → duplicates marked is_duplicate (never dropped).
-                        │
-                 ┌──────┴───────────────────────────┐
-                 ▼ BRANCH A (statistics)             ▼ BRANCH B (ML QA — decoupled)
-7a. FEATURES →   route relatives, DGCA weights,      7b. FareGuard (XGBoost) expected fare
-    matched basket                                       → residuals → PriceGuard (IsoForest)
-                 │                                        → gated SHAP (percentile ≥ 0.75)
-8a. APIx ENGINE  Laspeyres matched-basket index +        │
-    coverage quality score Q                          8b. Anomalies + alerts (reviewed by
-                 │                                         analysts; unusual ≠ invalid)
-                 └──────────────┬───────────────────────┘
-                                ▼
-9. PERSIST       airfare_index + index_components (full provenance); anomalies; alerts.
-                                │
-10. REALTIME     Operational-table changes broadcast via Supabase Realtime.
-                                │
-11. DASHBOARD    Next.js invalidates the matching TanStack Query keys and refetches the
-                 authoritative result from FastAPI — live, no page reload.
-```
-
-### APIx formula (matched-basket Laspeyres)
-
-```
-              Σ_r Σ_b  w(r,b) · [ P(r,b,t) / P(r,b,0) ]
-APIx_t = 100 × ───────────────────────────────────────
-                        Σ_r Σ_b  w(r,b)
-```
-where `r` = directional route, `b` = booking window, `P` = representative (median validated)
-fare, `w` = DGCA-derived route weight. Every published value carries a coverage quality
-score `Q = 0.40·Cr + 0.25·Cs + 0.20·F + 0.15·V`.
-
-### Request/auth workflow
-
-```
-Browser signs in (Supabase Auth)  →  receives JWT
-   → frontend sends `Authorization: Bearer <JWT>` to FastAPI
-   → FastAPI verifies signature/exp/aud/issuer, resolves role from `profiles` (DB, not token)
-   → RBAC guard (viewer/analyst/admin) authorizes the endpoint
-   → SQLAlchemy async query against Supabase PostgreSQL
-   → response returned to the frontend
-```
-
-### Live scraping test workflow
-
-```
-Analyst triggers a live test for a source
-   → the scraper performs a REAL network fetch (no fallback to fake data)
-   → each stage is tracked; on failure the exact ScrapeFailureStage is recorded
-     (DNS / CONNECTION / TIMEOUT / HTTP_ERROR / BLOCKED / CAPTCHA_DETECTED /
-      EMPTY_RESPONSE / SELECTOR_NOT_FOUND / PARSE_ERROR / NO_AVAILABILITY / ...)
-   → passes ONLY if real records are collected, parsed, validated, and stored with provenance
-```
-
----
-
-## Current implementation status (dataset-driven)
-
-> This section reflects **what the deployed system does today**, so the flow above is not
-> misread as fully-automated live scraping.
-
-**What is real and working now**
-
-- **Fare data is ingested from real scraped CSV exports** (e.g. Goibibo listings) rather than
-  a fully-automated headless-browser crawler. CSVs are imported via
-  `scripts/import_goibibo_csvs.py` → `GoibiboCsvImporter`, which parses the OTA's raw
-  column layout, normalizes fares, matches real routes/sources, dedups by `quote_hash`, and
-  writes `validated_fares` rows tagged `data_origin = IMPORTED`.
-- **Official reference data is real**: the MoSPI CPI (General) Annexure is ingested via
-  `scripts/ingest_mospi_annexure.py` → `ReferenceDataService.ingest_official_file` with
-  immutable versioning, SHA-256 checksum, schema fingerprint, Supabase-Storage original, and
-  `benchmark_fares` series.
-- **Live mode is genuinely data-driven**: every `/dashboard/*` aggregation (summary,
-  index-trend, top-route-movements, booking-window-summary), the sidebar monitoring badges,
-  and the Market/Alerts/Shocks pages compute from the real `validated_fares`/`benchmark_fares`
-  rows. When a selection has no matching data, the API/UI shows an **honest empty state** —
-  never fabricated numbers. **Mock mode** is a clearly-labelled demo fallback.
-- **Reports/PDF** pull the real MoSPI benchmark series, real per-route medians, and the actual
-  dataset name/version/checksum into the dossier.
-- **FareGuard training** runs on the real accumulated fares and reports `insufficient_data`
-  (with the real fare summary) instead of emitting fake metrics when data is too small.
-
-**Effective current data flow**
-
-```
-Manual scrape (analyst exports OTA listing CSV / downloads MoSPI Annexure)
-        │
-        ▼
-Import script  →  parse + normalize + checksum  →  validated_fares (IMPORTED)
-                                                     benchmark_fares (mospi_cpi_general)
-        │
-        ▼
-FastAPI /dashboard/* + /exports compute REAL aggregates  →  Live-mode UI + PDF dossier
-```
-
-**Deferred to future implementation**
-
-- **Fully-automated Playwright collectors** for airline/OTA portals on scheduled Celery Beat
-  runs (the collectors and `ScrapeFailureStage` tracking exist; production selector
-  maintenance + anti-throttle scheduling are not yet enabled on the free hosting tier).
-- **Documented MoSPI CPI API auto-polling** (`api.mospi.gov.in/api/cpi/getCPIData`): the
-  adapter can call it, but it requires validated parameter sets and is not auto-polled yet —
-  official press-release files are ingested by upload instead.
-- **Multi-snapshot per-window fare curves**: current imports are single-snapshot, so per
-  booking-window (T+1…T+45) term structures and 7d/30d change deltas are shown as `—` in Live
-  until repeated scrapes accumulate history.
-- **PriceGuard shock/anomaly detection at scale + APIx daily index generation**: these need a
-  larger longitudinal fare history than a few manual snapshots provide; Live currently shows
-  the honest empty/zero state for detected shocks until enough data accrues.
-- **DGCA route-weight sync** for fully weighted Laspeyres APIx (reference plumbing exists;
-  automated sync pending).
-
----
-
-## Quick start
-
-> Full, detailed instructions (env vars, migrations, seeding, ML training, Celery,
-> live scraping, realtime) are in **[STARTUP_MANUAL.md](./STARTUP_MANUAL.md)**.
+> For comprehensive environment setup, migration, and seeding instructions, refer to **[STARTUP_MANUAL.md](./STARTUP_MANUAL.md)**.
 
 ### Prerequisites
-- Node.js `v20+`, Python `3.11+`, Redis, and a Supabase project (or local PostgreSQL).
-- *(Optional)* Playwright + Chromium to enable live airline scraping.
+- **Python**: `3.11+`
+- **Node.js**: `v20+`
+- **Database**: Managed Supabase PostgreSQL 17 instance (or local PostgreSQL 16+)
+- **Cache/Broker**: Redis (for Celery workers)
 
-### 1. Backend (`airpulse-api`)
+---
+
+### 1. Backend Setup (`airpulse-api`)
+
 ```bash
 cd airpulse-api
-python -m venv venv && .\venv\Scripts\Activate.ps1   # Windows PowerShell
-# source venv/bin/activate                            # macOS/Linux
+
+# Create and activate virtual environment
+python -m venv venv
+# Windows (PowerShell):
+.\venv\Scripts\Activate.ps1
+# macOS/Linux:
+# source venv/bin/activate
+
+# Install dependencies
 pip install -r requirements.txt
 
-cp .env.example .env        # then fill DB password, service role key, JWT secret
+# Configure environment variables
+cp .env.example .env
+# Edit .env to set your database credentials, JWT secret, and Supabase keys
 
-alembic upgrade head        # apply schema (Alembic = source of truth)
-python scripts/seed_supabase.py   # airports, directional routes, 2026 sources
+# Apply schema migrations
+alembic upgrade head
 
+# Seed foundational data (airports, routes, sources)
+python scripts/seed_supabase.py
+
+# Launch development server
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
-- API: `http://localhost:8000/api/v1` · Docs: `http://localhost:8000/docs`
+- API Base URL: `http://localhost:8000/api/v1`
+- OpenAPI Documentation: `http://localhost:8000/docs`
 - Diagnostics: `GET /api/v1/system/supabase-diagnostics`
 
-*(Optional) workers:*
+*(Optional) Start Celery background workers:*
 ```bash
 celery -A app.workers.celery_app worker --loglevel=info -P solo
 celery -A app.workers.celery_app beat --loglevel=info
 ```
 
-### 2. Frontend (`frontend`)
+---
+
+### 2. Frontend Setup (`frontend`)
+
 ```bash
 cd frontend
+
+# Install Node dependencies
 npm install
-cp .env.example .env.local   # set NEXT_PUBLIC_API_BASE_URL + Supabase public vars
+
+# Configure environment
+cp .env.example .env.local
+# Edit .env.local:
+# NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+# NEXT_PUBLIC_SUPABASE_URL=https://<your-project>.supabase.co
+# NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-anon-key>
+
+# Start Next.js development server
 npm run dev
 ```
-Open **`http://localhost:3000`**.
+Open **`http://localhost:3000`** in your browser.
 
-### Navigation flow
+### Navigation Flow
 ```
-/  (landing)  →  /login  or  /signup  →  /overview  (protected dashboard)
+/ (Landing Page)  ──▶  /login or /signup  ──▶  /overview (Protected Analyst Dashboard)
 ```
-New accounts are provisioned with **viewer** clearance (via the Supabase signup trigger);
-an admin elevates roles to `analyst` / `admin`.
+New user registrations automatically receive `viewer` clearance via Supabase Auth database triggers. An administrator can elevate roles to `analyst` or `admin`.
 
 ---
 
-## Key principles
+### Docker Local Orchestration
 
-- The official APIx uses **validated observed fares**, never ML predictions.
-- A statistically unusual fare is **not** automatically invalid — it is investigated, not deleted.
-- **Scraping never runs in the frontend.** All collection is backend-only.
-- Live scraping performs **no anti-bot evasion, CAPTCHA solving, or auth bypass**; a
-  blocked/CAPTCHA state is recorded and the scrape stops.
-- Complete provenance is preserved from collection through index generation.
-
----
-
-## Documentation
-
-| Doc | Purpose |
-|-----|---------|
-| [airpulse-api/README.md](./airpulse-api/README.md) | Backend architecture, services, and API reference. |
-| [airpulse-api/SUPABASE.md](./airpulse-api/SUPABASE.md) | Supabase foundation: schema, RLS, Realtime, Storage, auth. |
-| [airpulse-api/docs/LIVE_SCRAPING_AND_REALTIME.md](./airpulse-api/docs/LIVE_SCRAPING_AND_REALTIME.md) | Live Playwright scraping (selector maintenance, failure stages) & Realtime. |
+To launch the complete local containerized stack:
+```bash
+cd airpulse-api
+docker compose up --build -d
+```
+Starts `api`, `worker`, `beat`, `postgres`, and `redis` containers.
 
 ---
 
-## Security notes
+## Documentation Index
 
-- Backend-only secrets (`SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET`, database
-  password) must never reach the browser, be committed, or be logged. Only
-  `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` are exposed to the frontend.
-- Row Level Security is enabled on sensitive tables; browser clients read operational
-  metadata only. Fare and analytics writes happen through the FastAPI service role.
-- `.env` files are git-ignored; commit only `.env.example` templates.
+| Documentation File | Description |
+|---|---|
+| [STARTUP_MANUAL.md](./STARTUP_MANUAL.md) | Comprehensive step-by-step setup guide for local dev, database seeding, and production deployment. |
+| [airpulse-api/README.md](./airpulse-api/README.md) | Detailed backend architecture, API endpoints, and ML service documentation. |
+| [airpulse-api/SUPABASE.md](./airpulse-api/SUPABASE.md) | Supabase schema design, Row-Level Security (RLS) policies, Realtime configuration, and Storage buckets. |
+| [airpulse-api/docs/LIVE_SCRAPING_AND_REALTIME.md](./airpulse-api/docs/LIVE_SCRAPING_AND_REALTIME.md) | Live Playwright / Crawl4AI scraping guide, failure stage diagnostics, and Realtime cache invalidation. |
+| [airpulse-api/docs/HAPPYFARES_CRAWL4AI_EC2.md](./airpulse-api/docs/HAPPYFARES_CRAWL4AI_EC2.md) | HappyFares Crawl4AI implementation details and diagnostic procedures. |
+| [docs/LIVE_DEPLOYMENT.md](./docs/LIVE_DEPLOYMENT.md) | Deployment runbook for Render backend and Vercel frontend. |
 
 ---
 
-*Built for the Smart India Hackathon (SIH26056) — airfare statistical intelligence for CPI augmentation.*
+## Security & Access Control
+
+- **Zero Secret Exposure**: Backend secrets (`SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET`, database passwords) must never be committed to Git or exposed to the client. Only public anonymous keys (`NEXT_PUBLIC_SUPABASE_ANON_KEY`) are loaded in the browser.
+- **Row-Level Security (RLS)**: Enforced across sensitive database tables. Client-side browser sessions read operational metadata only; all analytical fare writes and index calculations happen through the privileged backend service role.
+- **Authentication & RBAC**: Every protected API route enforces cryptographic JWT validation and checks database-persisted user roles (`viewer`, `analyst`, `admin`).
+- **Environment Isolation**: `.env` files are git-ignored; only sanitized `.env.example` templates are tracked.
+
+---
+
+*AirPulse — Developed for Smart India Hackathon (SIH26056). Airfare statistical intelligence and high-frequency price indexing for CPI augmentation.*
