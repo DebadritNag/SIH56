@@ -45,7 +45,7 @@ export default function LoginPage() {
   return (
     <AuthShell
       title="Sign in"
-      subtitle="Enter the AirPulse intelligence portal."
+      subtitle="Enter the VAYANTARA airfare intelligence portal."
       footer={
         <>
           Need access?{" "}

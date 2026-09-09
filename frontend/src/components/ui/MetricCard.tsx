@@ -14,6 +14,7 @@ interface MetricCardProps {
   subtitle?: string;
   footer?: React.ReactNode;
   className?: string;
+  variant?: 'default' | 'glass';
 }
 
 export const MetricCard: React.FC<MetricCardProps> = ({
@@ -24,19 +25,45 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   subtitle,
   footer,
   className,
+  variant = 'default',
 }) => {
+  const isGlass = variant === 'glass';
+
   return (
-    <div className={clsx('bg-white border border-[#E4E7EC] rounded-lg p-4 flex flex-col justify-between shadow-xs transition-shadow hover:shadow-sm', className)}>
+    <div
+      className={clsx(
+        isGlass
+          ? 'glass-card rounded-xl p-4 flex flex-col justify-between shadow-lg text-white border border-brand-cyan/20'
+          : 'bg-white border border-[#E4E7EC] rounded-lg p-4 flex flex-col justify-between shadow-xs transition-shadow hover:shadow-sm hover:border-slate-300',
+        className
+      )}
+    >
       <div className="flex items-start justify-between gap-2 mb-2">
-        <span className="text-xs font-semibold text-[#475467] tracking-wider uppercase">{title}</span>
+        <span
+          className={clsx(
+            'text-xs font-semibold tracking-wider uppercase',
+            isGlass ? 'text-brand-cyan' : 'text-[#475467]'
+          )}
+        >
+          {title}
+        </span>
         {badge && <div>{badge}</div>}
       </div>
 
       <div className="my-1">
-        <div className="text-2xl font-bold text-[#101828] tabular-nums tracking-tight">
+        <div
+          className={clsx(
+            'text-2xl font-bold tabular-nums tracking-tight font-display',
+            isGlass ? 'text-white text-glow' : 'text-[#101828]'
+          )}
+        >
           {value}
         </div>
-        {subtitle && <p className="text-xs text-[#667085] mt-0.5">{subtitle}</p>}
+        {subtitle && (
+          <p className={clsx('text-xs mt-0.5', isGlass ? 'text-slate-300' : 'text-[#667085]')}>
+            {subtitle}
+          </p>
+        )}
       </div>
 
       {change && (
@@ -56,7 +83,16 @@ export const MetricCard: React.FC<MetricCardProps> = ({
         </div>
       )}
 
-      {footer && <div className="mt-3 pt-2.5 border-t border-[#F1F5F9] text-xs text-[#475467]">{footer}</div>}
+      {footer && (
+        <div
+          className={clsx(
+            'mt-3 pt-2.5 border-t text-xs',
+            isGlass ? 'border-white/10 text-slate-300' : 'border-[#F1F5F9] text-[#475467]'
+          )}
+        >
+          {footer}
+        </div>
+      )}
     </div>
   );
 };

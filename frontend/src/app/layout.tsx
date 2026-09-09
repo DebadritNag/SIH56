@@ -1,10 +1,22 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Plus_Jakarta_Sans, Space_Grotesk, Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { QueryProvider } from "@/lib/providers/QueryProvider";
 import { AuthProvider } from "@/lib/providers/AuthProvider";
 import { DataModeProvider } from "@/lib/providers/DataModeProvider";
 import { NotificationProvider } from "@/components/notifications/NotificationProvider";
+
+const plusJakartaSans = Plus_Jakarta_Sans({
+  variable: "--font-plus-jakarta",
+  subsets: ["latin"],
+  display: "swap",
+});
+
+const spaceGrotesk = Space_Grotesk({
+  variable: "--font-space-grotesk",
+  subsets: ["latin"],
+  display: "swap",
+});
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -17,17 +29,17 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AirPulse — Real-Time Airfare Price Index for India (CPI Augmentation)",
-  description: "Official National Airfare Price Intelligence Platform for MoSPI and RBI economists. Automated web scraping of airline and OTA portals for Consumer Price Index augmentation.",
+  title: "VAYANTARA | Real-Time Airfare Intelligence & Price Index for India",
+  description: "Official National Airfare Price Intelligence Platform & High-Frequency Price Index for India. Turning airfare movement across routes, time, and booking windows into transparent economic signal.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${plusJakartaSans.variable} ${spaceGrotesk.variable} ${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full flex flex-col font-sans">
         <QueryProvider>
           <AuthProvider>
             <DataModeProvider>
@@ -39,3 +51,4 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     </html>
   );
 }
+

@@ -1,25 +1,98 @@
 @import "tailwindcss";
 
 :root {
+ /* ── Dashboard surfaces (light) ─────────────────────────── */
  --bg-canvas: #F5F7FA;
  --surface-primary: #FFFFFF;
  --surface-secondary: #F8FAFC;
  --surface-muted: #F1F5F9;
- --sidebar-bg: #081426;
- --sidebar-border: #132238;
+
+ /* ── Sidebar (always dark navy) ──────────────────────────── */
+ --sidebar-bg: #061325;
+ --sidebar-border: #0f2440;
  --sidebar-text: #94A3B8;
  --sidebar-text-active: #F8FAFC;
+
+ /* ── Dashboard text ──────────────────────────────────────── */
  --text-primary: #101828;
  --text-secondary: #475467;
  --text-muted: #667085;
+
+ /* ── Dashboard borders ───────────────────────────────────── */
  --border-subtle: #E4E7EC;
  --border-strong: #D0D5DD;
+
+ /* ── Accent palette ──────────────────────────────────────── */
  --accent-blue: #2563EB;
  --accent-sky: #0EA5E9;
  --accent-indigo: #4F46E5;
+
+ /* ── Status ──────────────────────────────────────────────── */
  --status-positive: #16A34A;
  --status-warning: #D97706;
  --status-critical: #DC2626;
+
+ /* ── VAYANTARA landing-page brand tokens ─────────────────── */
+ --vay-dark:    #030B17;   /* page canvas */
+ --vay-navy:    #061325;   /* card base */
+ --vay-card:    #081a30;   /* glass card */
+ --vay-cyan:    #00D2FF;   /* primary data accent */
+ --vay-sky:     #38BDF8;   /* secondary accent */
+ --vay-glow:    #0ea5e9;   /* glow color */
+ --vay-amber:   #F59E0B;   /* warm accent (chart bar) */
+ --vay-green:   #10B981;   /* positive/live status */
+}
+
+@theme {
+  --color-brand-dark: #030B17;
+  --color-brand-navy: #061325;
+  --color-brand-card: #081a30;
+  --color-brand-cyan: #00D2FF;
+  --color-brand-accent: #38BDF8;
+  --color-brand-glow: #0ea5e9;
+  --color-brand-green: #10B981;
+  --color-brand-amber: #F59E0B;
+
+  --font-sans: var(--font-plus-jakarta), var(--font-geist-sans), sans-serif;
+  --font-display: var(--font-space-grotesk), sans-serif;
+}
+
+/* ---------------------------------------------------------------------------
+   Stitch Glass & Glow Utilities
+   --------------------------------------------------------------------------- */
+.glass-panel {
+  background: linear-gradient(135deg, rgba(8, 26, 48, 0.75) 0%, rgba(4, 15, 29, 0.85) 100%);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(56, 189, 248, 0.16);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.6), inset 0 1px 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.glass-card {
+  background: linear-gradient(160deg, rgba(8, 25, 45, 0.8) 0%, rgba(3, 13, 24, 0.9) 100%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(56, 189, 248, 0.12);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-card:hover {
+  border-color: rgba(0, 210, 255, 0.4);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px -8px rgba(0, 210, 255, 0.15);
+}
+
+.glow-cyan-btn {
+  box-shadow: 0 0 20px -3px rgba(0, 210, 255, 0.5);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glow-cyan-btn:hover {
+  box-shadow: 0 0 28px 0px rgba(0, 210, 255, 0.7);
+}
+
+.text-glow {
+  text-shadow: 0 0 18px rgba(0, 210, 255, 0.35);
 }
 
 body {

@@ -2,7 +2,8 @@
 
 import React from "react";
 import Link from "next/link";
-import { Activity, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
+import { VayantaraLogo } from "@/components/ui/VayantaraLogo";
 
 /**
  * Split-screen auth shell: a dynamic navy brand panel (left) and the form (right).
@@ -20,27 +21,29 @@ export function AuthShell({
   footer?: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen grid lg:grid-cols-2 bg-[#050B18]">
+    <div className="min-h-screen grid lg:grid-cols-2 bg-[#030B17]">
       {/* Brand panel */}
       <div className="relative hidden overflow-hidden lg:block">
         <div className="ap-grid-bg absolute inset-0 opacity-50" aria-hidden />
         <div
-          className="absolute -left-20 top-1/3 h-[380px] w-[520px] rounded-full bg-sky-500/20 blur-[120px]"
+          className="absolute -left-20 top-1/3 h-[380px] w-[520px] rounded-full bg-brand-cyan/20 blur-[120px]"
           aria-hidden
         />
         <div className="relative flex h-full flex-col justify-between p-10">
-          <Link href="/" className="inline-flex items-center gap-2.5 cursor-pointer w-fit">
-            <div className="grid h-9 w-9 place-items-center rounded-lg bg-gradient-to-br from-sky-500 to-blue-700">
-              <Activity className="h-5 w-5 text-white" />
-            </div>
+          <Link href="/" className="inline-flex items-center gap-3 cursor-pointer w-fit">
+            <VayantaraLogo variant="standard" size="sm" />
             <div className="leading-tight">
-              <span className="block text-sm font-bold text-white">AirPulse</span>
-              <span className="block text-[10px] text-slate-400">Airfare Price Index · India</span>
+              <span className="block text-base font-bold tracking-[0.16em] text-white font-display uppercase">
+                VAYANTARA
+              </span>
+              <span className="block text-[10px] text-brand-cyan uppercase tracking-wider font-semibold">
+                Airfare Price Index · India
+              </span>
             </div>
           </Link>
 
           <div className="ap-fade-up max-w-md">
-            <h2 className="text-3xl font-bold leading-tight text-white">
+            <h2 className="text-3xl font-bold leading-tight text-white font-display">
               Real-time airfare intelligence for national statistics
             </h2>
             <p className="mt-4 text-sm leading-relaxed text-slate-300">
@@ -72,13 +75,13 @@ export function AuthShell({
         <div className="w-full max-w-sm">
           {/* mobile brand */}
           <Link href="/" className="mb-8 inline-flex items-center gap-2.5 lg:hidden cursor-pointer">
-            <div className="grid h-9 w-9 place-items-center rounded-lg bg-gradient-to-br from-sky-500 to-blue-700">
-              <Activity className="h-5 w-5 text-white" />
-            </div>
-            <span className="text-sm font-bold text-white">AirPulse</span>
+            <VayantaraLogo variant="standard" size="xs" />
+            <span className="text-sm font-bold tracking-[0.16em] text-white font-display uppercase">
+              VAYANTARA
+            </span>
           </Link>
 
-          <h1 className="text-2xl font-bold text-white">{title}</h1>
+          <h1 className="text-2xl font-bold text-white font-display">{title}</h1>
           <p className="mt-1.5 text-sm text-slate-400">{subtitle}</p>
 
           <div className="mt-8">{children}</div>

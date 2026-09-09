@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { clsx } from 'clsx';
 import { useDashboardSummary } from '@/lib/hooks/useDashboard';
+import { VayantaraLogo } from '@/components/ui/VayantaraLogo';
 import {
   BarChart3,
   TrendingUp,
@@ -108,7 +109,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Brand Header */}
       <div
         className={clsx(
-          'h-[60px] flex items-center border-b border-[#132238] shrink-0',
+          'h-[60px] flex items-center border-b border-[#0f2440] shrink-0',
           collapsed ? 'justify-center px-2 relative group' : 'justify-between px-4'
         )}
       >
@@ -116,19 +117,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="relative flex items-center justify-center w-full">
             <Link
               href="/overview"
-              title="AirPulse — National Airfare Intel"
+              title="VAYANTARA — Real-Time Airfare Intelligence"
               className="flex items-center justify-center group-hover:opacity-30 transition-opacity"
             >
-              <div className="w-8 h-8 rounded bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white font-black text-sm shrink-0 shadow-xs ring-1 ring-white/10">
-                AP
-              </div>
+              <VayantaraLogo variant="standard" size="xs" />
             </Link>
             {onToggleCollapse && (
               <button
                 onClick={onToggleCollapse}
                 aria-label="Expand sidebar"
                 title="Expand sidebar"
-                className="absolute inset-0 m-auto w-7 h-7 rounded bg-blue-600/90 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md hover:bg-blue-500 cursor-pointer"
+                className="absolute inset-0 m-auto w-7 h-7 rounded bg-brand-cyan/90 text-brand-dark flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md hover:bg-brand-cyan cursor-pointer"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -137,13 +136,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
         ) : (
           <>
             <Link href="/overview" className="flex items-center gap-2.5 overflow-hidden">
-              <div className="w-8 h-8 rounded bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white font-black text-sm shrink-0 shadow-xs ring-1 ring-white/10">
-                AP
-              </div>
+              <VayantaraLogo variant="standard" size="xs" />
               <div className="flex flex-col">
-                <span className="text-sm font-bold text-white tracking-wide">AirPulse</span>
-                <span className="text-[9px] text-[#94A3B8] uppercase tracking-wider font-medium">
-                  National Airfare Intel
+                <span className="text-sm font-bold text-white tracking-[0.12em] font-display uppercase">
+                  VAYANTARA
+                </span>
+                <span className="text-[9px] text-brand-cyan/80 uppercase tracking-wider font-semibold">
+                  Airfare Intel · India
                 </span>
               </div>
             </Link>
@@ -186,18 +185,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       ? 'justify-center w-10 h-10 mx-auto p-0'
                       : 'gap-2.5 px-2.5 py-1.5',
                     isActive
-                      ? 'bg-[#132238] text-white shadow-xs'
-                      : 'text-[#94A3B8] hover:text-[#F8FAFC] hover:bg-[#0D1E36]'
+                      ? 'bg-[#0b1e36] text-white shadow-xs border border-brand-cyan/25'
+                      : 'text-[#94A3B8] hover:text-[#F8FAFC] hover:bg-[#09182d]'
                   )}
                 >
-                  {/* Left Active Line Indicator */}
+                  {/* Left Active Line Indicator with Cyan Glow */}
                   {isActive && (
-                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-4 bg-blue-500 rounded-r" />
+                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-brand-cyan rounded-r shadow-[0_0_8px_#00D2FF]" />
                   )}
                   <Icon
                     className={clsx(
                       'w-4 h-4 shrink-0 transition-colors',
-                      isActive ? 'text-blue-400' : 'text-[#64748B] group-hover:text-[#94A3B8]'
+                      isActive ? 'text-brand-cyan' : 'text-[#64748B] group-hover:text-[#94A3B8]'
                     )}
                   />
                   {!collapsed && <span className="truncate">{item.label}</span>}

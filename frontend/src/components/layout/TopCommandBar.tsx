@@ -32,7 +32,7 @@ export const TopCommandBar: React.FC<TopCommandBarProps> = ({
     router.replace('/login');
   };
 
-  const userEmail = user?.email ?? 'analyst@airpulse.local';
+  const userEmail = user?.email ?? 'analyst@vayantra.gov.in';
   const userInitial = userEmail.charAt(0).toUpperCase();
 
   // Generate breadcrumbs from route
@@ -45,7 +45,7 @@ export const TopCommandBar: React.FC<TopCommandBarProps> = ({
     <header className="h-[60px] bg-white border-b border-[#E4E7EC] px-6 flex items-center justify-between sticky top-0 z-20 shadow-2xs">
       {/* Left Breadcrumb */}
       <div className="flex items-center gap-2 text-xs">
-        <span className="text-[#667085] font-medium">National Aviation Intelligence</span>
+        <span className="text-brand-cyan font-bold tracking-wider font-display uppercase">VAYANTARA</span>
         <span className="text-[#D0D5DD]">/</span>
         <span className="text-[#101828] font-semibold">{breadcrumb}</span>
       </div>
