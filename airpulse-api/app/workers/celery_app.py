@@ -7,6 +7,7 @@ celery_app = Celery(
     backend=settings.CELERY_RESULT_BACKEND,
     include=[
         'app.workers.collection_tasks',
+        'app.workers.reference_tasks',
         'app.workers.health_tasks',
         'app.workers.index_tasks',
     ],
