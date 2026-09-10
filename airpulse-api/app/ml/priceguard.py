@@ -121,7 +121,7 @@ class PriceGuardDetector:
             "anomaly_percentile": percentile,
             "severity": severity.value,
             "anomaly_type": anom_type.value,
-            "is_anomaly": is_anomaly,
+            "is_anomaly": bool(is_anomaly),
         }
 
     def save(self, directory: str) -> str:

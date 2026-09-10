@@ -38,6 +38,18 @@ async def list_alerts(
     )
 
 
+@router.get('/confirmed-shocks', response_model=APIResponse)
+async def confirmed_shocks(db: AsyncSession = Depends(get_db), current_user: UserContext = Depends(require_viewer)):
+    from app.services.live_store import rows
+    from app.services.confirmed_shocks import confirmed_live_shock
+    alerts = await rows(db, """SELECT a.id,a.alert_type,a.status,a.metadata,a.created_at,r.route_code
+        FROM alerts a LEFT JOIN routes r ON r.id=a.route_id
+        WHERE UPPER(a.alert_type)='PRICE_SHOCK' AND UPPER(a.status::text) IN ('OPEN','ACKNOWLEDGED')
+        ORDER BY a.created_at DESC""")
+    shocks = [shock for alert in alerts if (shock := confirmed_live_shock(alert)) is not None]
+    return APIResponse(success=True, data={'items':shocks, 'active_count':len(shocks)})
+
+
 @router.post("/{alert_id}/acknowledge", response_model=APIResponse)
 async def acknowledge_alert(
     alert_id: UUID,

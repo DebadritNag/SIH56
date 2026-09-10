@@ -34,7 +34,7 @@ const TABLE_INVALIDATIONS: Record<string, string[][]> = {
     ["top-route-movements"],
   ],
   scraping_test_runs: [["scraping-test"]],
-  alerts: [["alerts"], ["dashboard-summary"]],
+  alerts: [["alerts"], ["dashboard-summary"], ["price-shocks"]],
   anomalies: [["anomalies"], ["dashboard-summary"]],
   source_health_logs: [["sources"], ["source-health"], ["dashboard-summary"]],
   airfare_index: [["apix-latest"], ["apix-trend"], ["dashboard-summary"]],

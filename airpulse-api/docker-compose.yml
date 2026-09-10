@@ -128,6 +128,8 @@ services:
       - DEMO_MODE=${DEMO_MODE:-true}
       - APP_ENV=${APP_ENV:-production}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - ./models:/app/models:ro
     depends_on:
       - postgres
       - redis

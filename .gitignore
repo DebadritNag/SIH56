@@ -113,3 +113,14 @@ airpulse-api/tests/unit/*
 !airpulse-api/tests/unit/test_ingestion_progress.py
 
 !airpulse-api/docs/INGESTION_PROGRESS.md
+
+!airpulse-api/tests/unit/test_confirmed_shocks.py
+
+!airpulse-api/docs/UI_SHOCK_COUNT_FIX.md
+!airpulse-api/tests/unit/test_live_inference.py
+!airpulse-api/docs/LIVE_ML_INFERENCE.md
+airpulse-api/docs/UI_SHOCK_COUNT_FIX.md
+airpulse-api/tests/unit/test_live_inference.py
+.gitignore
+airpulse-api/tests/unit/test_live_inference.py
+airpulse-api/tests/unit/test_confirmed_shocks.py

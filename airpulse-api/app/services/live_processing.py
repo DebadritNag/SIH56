@@ -158,7 +158,7 @@ async def process_live_fares(db, run_id, pipeline_id):
     await stage('VALIDATE', len(accepted)+duplicates, message=f'{len(rejected)} rejected', metadata={'rejections':rejected})
     await stage('DEDUP', len(accepted), message=f'{duplicates} duplicate provenance records preserved')
 
-    feature_rows, feature_fares = [], []
+    feature_rows, feature_fares, fg_outcomes = [], [], []
     from app.ml.features import FeatureBuilder
     for fare in accepted:
         history = await rows(db, """SELECT normalized_total_fare FROM validated_fares
@@ -166,14 +166,16 @@ async def process_live_fares(db, run_id, pipeline_id):
               AND validation_status='VALID' AND NOT is_duplicate AND data_origin IN ('LIVE','IMPORTED')""",
             route=fare['route_id'], observed=fare['collected_at'], since=fare['collected_at']-timedelta(days=30))
         values = [float(r['normalized_total_fare']) for r in history]
-        if not values or not fare['distance_km']:
+        if not fare['distance_km'] or fare['distance_km'] <= 0:
+            fg_outcomes.append({'fare_id':str(fare['id']), 'prediction':None, 'status':'NOT_SCORED', 'reason':'INSUFFICIENT_FEATURES', 'detail':'Route distance unavailable'})
             continue
-        med, std = statistics.median(values), statistics.pstdev(values)
+        med, std = (statistics.median(values), statistics.pstdev(values)) if values else (float('nan'), float('nan'))
         # Missing external features remain missing for XGBoost; no fabricated fuel/demand.
         features = FeatureBuilder.build_features_for_fare(str(fare['id']), fare['departure_at'],
             fare['booking_window_days'], float(fare['distance_km']), fare['airline'], fare['cabin'],
             fuel_price=float('nan'), synthetic_demand_score=float('nan'), route_recent_median=med,
-            route_recent_std=std)
+            route_recent_std=std, source_reliability=float('nan'))
+        features['is_festival'] = float('nan')
         features['actual_fare'] = float(fare['total_fare'])
         feature_rows.append(features)
         feature_fares.append(fare)
@@ -181,45 +183,82 @@ async def process_live_fares(db, run_id, pipeline_id):
         await insert(db,'fare_features',fare_id=fare['id'],route_id=fare['route_id'],
             booking_window_days=fare['booking_window_days'],day_of_week=features['day_of_week'],
             is_weekend=bool(features['is_weekend']),season=features['season'],distance_km=float(fare['distance_km']),
-            route_recent_median=med,route_recent_std=std,route_volatility=features['route_recent_volatility'],
+            route_recent_median=clean_features['route_recent_median'],route_recent_std=clean_features['route_recent_std'],route_volatility=clean_features['route_recent_volatility'],
             feature_version='live-observed-v1',features=clean_features)
     await stage('FEATURES',len(feature_rows),message='Only prior observed fares used; missing external features retained as null')
 
     predicted, scored, explained = 0, 0, 0
-    scoring_outcomes = []
+    scoring_outcomes, pairs, anomalous = [], [], []
     from app.ml.model_registry import ModelRegistryService
+    from app.ml.live_inference import InferenceUnavailable, validate_features
     import asyncio
+    frame = pd.DataFrame(feature_rows)
+    fg = None
+
+    def failure(exc):
+        return getattr(exc, 'reason', 'INFERENCE_ERROR')
+
     try:
-        fg = ModelRegistryService.get_fareguard()
-        if not fg.is_trained or not feature_rows:
-            raise ValueError('MODEL_UNAVAILABLE or INSUFFICIENT_FEATURES')
-        frame = pd.DataFrame(feature_rows)
-        predictions = await asyncio.to_thread(fg.predict_batch, frame)
-        pairs = []
+        if not feature_rows:
+            raise InferenceUnavailable('INSUFFICIENT_FEATURES' if accepted else 'NOT_ELIGIBLE', 'No eligible feature vectors')
+        fg = await ModelRegistryService.get_active(db, 'fareguard')
+        valid_indices = []
         for i, fare in enumerate(feature_fares):
-            prediction = float(predictions[i])
-            if not math.isfinite(prediction) or prediction <= 0:
-                continue
-            residual = float(fare['total_fare'])-prediction
-            prediction_id = await insert(db,'fare_predictions',fare_id=fare['id'],model_version=fg.version,
-                predicted_fare=prediction,residual=residual,residual_pct=100*residual/prediction)
-            frame.loc[i,'predicted_fare'] = prediction
-            frame.loc[i,'residual'] = residual
-            frame.loc[i,'residual_pct'] = 100*residual/prediction
-            pairs.append((i,fare,prediction_id))
-            predicted += 1
-        await stage('FAREGUARD',predicted,'COMPLETED' if predicted == len(feature_rows) else 'SKIPPED',
-                    '' if predicted == len(feature_rows) else 'Model returned invalid/non-positive expectations; outputs withheld')
+            try:
+                validate_features(fg, frame.loc[[i]], 'fareguard')
+                valid_indices.append(i)
+            except InferenceUnavailable as exc:
+                fg_outcomes.append({'fare_id':str(fare['id']), 'prediction':None, 'status':'NOT_SCORED', 'reason':exc.reason})
+        if valid_indices:
+            predictions = await asyncio.to_thread(fg.predict_batch, frame.loc[valid_indices])
+            if len(predictions) != len(valid_indices):
+                raise InferenceUnavailable('FEATURE_SCHEMA_MISMATCH', 'Prediction batch length mismatch')
+            for i, value in zip(valid_indices, predictions):
+                fare = feature_fares[i]
+                prediction = float(value)
+                if not math.isfinite(prediction) or prediction <= 0:
+                    fg_outcomes.append({'fare_id':str(fare['id']), 'prediction':None, 'status':'NOT_SCORED', 'reason':'INVALID_PREDICTION'})
+                    continue
+                residual = float(fare['total_fare'])-prediction
+                pred_id = await insert(db,'fare_predictions',fare_id=fare['id'],model_version=fg.version,
+                    predicted_fare=prediction,residual=residual,residual_pct=100*residual/prediction)
+                frame.loc[i,'predicted_fare'], frame.loc[i,'residual'], frame.loc[i,'residual_pct'] = prediction, residual, 100*residual/prediction
+                pairs.append((i,fare,pred_id))
+                fg_outcomes.append({'fare_id':str(fare['id']), 'prediction':prediction, 'status':'SCORED', 'model_version':fg.version})
+                predicted += 1
+        fg_reason = None if predicted else (fg_outcomes[0]['reason'] if fg_outcomes else 'INSUFFICIENT_FEATURES')
+    except SQLAlchemyError:
+        raise
+    except Exception as exc:
+        fg_reason = failure(exc)
+        for fare in feature_fares:
+            if not any(o['fare_id']==str(fare['id']) for o in fg_outcomes):
+                fg_outcomes.append({'fare_id':str(fare['id']), 'prediction':None, 'status':'NOT_SCORED', 'reason':fg_reason})
+    await stage('FAREGUARD', predicted, 'COMPLETED' if predicted else 'SKIPPED',
+        message=f'{predicted} predictions generated' if predicted else fg_reason,
+        metadata={'outcomes':fg_outcomes, 'reason':fg_reason})
+
+    pg_reason = None
+    try:
         if not pairs:
-            raise ValueError('NO_VALID_FAREGUARD_PREDICTIONS')
-        pg = ModelRegistryService.get_priceguard()
-        if not pg.is_trained or pg.training_scores is None:
-            raise ValueError('PRICEGUARD_MODEL_UNAVAILABLE')
-        scores = await asyncio.to_thread(pg.score_batch,frame.loc[[i for i,_,_ in pairs]])
-        anomalous = []
-        for (i,fare,pred_id), score in zip(pairs,scores):
+            raise InferenceUnavailable('PREDICTION_UNAVAILABLE', 'PriceGuard requires a valid FareGuard prediction')
+        pg = await ModelRegistryService.get_active(db, 'priceguard')
+        eligible_pairs = []
+        for i,fare,pred_id in pairs:
+            try:
+                validate_features(pg, frame.loc[[i]], 'priceguard')
+                eligible_pairs.append((i,fare,pred_id))
+            except InferenceUnavailable as exc:
+                scoring_outcomes.append({'fare_id':str(fare['id']), 'status':'NOT_SCORED', 'reason':exc.reason})
+        scores = await asyncio.to_thread(pg.score_batch, frame.loc[[i for i,_,_ in eligible_pairs]]) if eligible_pairs else []
+        if len(scores) != len(eligible_pairs):
+            raise InferenceUnavailable('FEATURE_SCHEMA_MISMATCH', 'PriceGuard batch length mismatch')
+        for (i,fare,pred_id), score in zip(eligible_pairs,scores):
+            if not all(math.isfinite(float(score[k])) for k in ('isolation_score','anomaly_percentile')):
+                scoring_outcomes.append({'fare_id':str(fare['id']), 'status':'NOT_SCORED', 'reason':'INVALID_SCORE'})
+                continue
             scored += 1
-            scoring_outcomes.append({'fare_id':str(fare['id']),**score})
+            scoring_outcomes.append({'fare_id':str(fare['id']), 'status':'SCORED', 'model_version':pg.version, **score})
             if not score['is_anomaly']:
                 continue
             anom_id = await insert(db,'anomalies',fare_id=fare['id'],prediction_id=pred_id,
@@ -227,17 +266,32 @@ async def process_live_fares(db, run_id, pipeline_id):
                 anomaly_type=score['anomaly_type'],anomaly_score=score['isolation_score'],
                 anomaly_percentile=score['anomaly_percentile'],actual_fare=float(fare['total_fare']),
                 expected_fare=float(frame.loc[i,'predicted_fare']),residual=float(frame.loc[i,'residual']),
-                residual_pct=float(frame.loc[i,'residual_pct']),evidence={'data_origin':'LIVE','pipeline_run_id':str(pipeline_id)})
+                residual_pct=float(frame.loc[i,'residual_pct']),evidence={'data_origin':'LIVE','pipeline_run_id':str(pipeline_id),'model_version':pg.version})
             anomalous.append((anom_id,i,fare,score))
             await insert(db,'alerts',alert_type='FARE_ANOMALY',severity=score['severity'].upper(),status='OPEN',
                 title='Live fare requires analyst review',message='Statistically unusual valid fare; not automatically excluded from APIx.',
                 route_id=fare['route_id'],source_id=fare['source_id'],anomaly_id=anom_id,
                 metadata={'pipeline_run_id':str(pipeline_id)})
-        await stage('PRICEGUARD',scored,metadata={'scores':scoring_outcomes})
-        if anomalous:
-            explainer = ModelRegistryService.get_explainer()
+        if not scored:
+            pg_reason = scoring_outcomes[0]['reason'] if scoring_outcomes else 'INSUFFICIENT_FEATURES'
+    except SQLAlchemyError:
+        raise
+    except Exception as exc:
+        pg_reason = failure(exc)
+    scored_ids = {o['fare_id'] for o in scoring_outcomes}
+    for fare in accepted:
+        if str(fare['id']) not in scored_ids:
+            scoring_outcomes.append({'fare_id':str(fare['id']), 'status':'NOT_SCORED', 'reason':pg_reason or 'PREDICTION_UNAVAILABLE'})
+    await stage('PRICEGUARD',scored,'COMPLETED' if scored else 'SKIPPED',
+                message=f'{scored} observations scored' if scored else pg_reason,
+                metadata={'scores':scoring_outcomes, 'reason':pg_reason})
+
+    shap_reason = 'NOT_REQUIRED' if scored else 'PREDICTION_UNAVAILABLE' if not pairs else 'ANOMALY_SCORING_UNAVAILABLE'
+    if anomalous:
+        try:
+            explainer = await asyncio.to_thread(ModelRegistryService.get_explainer, fg)
             if explainer.explainer is None:
-                raise ValueError('SHAP_EXPLAINER_UNAVAILABLE')
+                raise InferenceUnavailable('MODEL_LOAD_ERROR', 'SHAP TreeExplainer unavailable')
             for anom_id,i,fare,score in anomalous:
                 explanation = await asyncio.to_thread(explainer.explain_fare,frame.loc[i],
                     float(fare['total_fare']),float(frame.loc[i,'predicted_fare']),score['anomaly_percentile'])
@@ -247,15 +301,13 @@ async def process_live_fares(db, run_id, pipeline_id):
                 await insert(db,'shap_explanations',anomaly_id=anom_id,model_version=fg.version,
                     base_value=explanation['base_value'],predicted_value=explanation['predicted_fare'],features=explanation['drivers'])
                 explained += 1
-        await stage('SHAP',explained, message='Only actual TreeExplainer outputs persisted')
-    except SQLAlchemyError:
-        # Persistence errors invalidate the transaction and must fail the job.
-        raise
-    except Exception as exc:
-        # Model errors must not manufacture outputs or abort the index branch.
-        for name in ('FAREGUARD','PRICEGUARD','SHAP'):
-            if not any(s['stage']==name for s in stages):
-                await stage(name,0,'SKIPPED',str(exc)[:300])
+            shap_reason = None
+        except SQLAlchemyError:
+            raise
+        except Exception as exc:
+            shap_reason = failure(exc)
+    await stage('SHAP',explained,'COMPLETED' if explained else 'SKIPPED',
+                message=shap_reason or 'Actual TreeExplainer outputs persisted',metadata={'reason':shap_reason})
 
     index = await calculate_live_index(db,pipeline_id) if accepted else {'status':'INSUFFICIENT_DATA','reason':'No new valid observations in this run'}
     await stage('APIX',1 if index['status']=='COMPLETED' else 0,

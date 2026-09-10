@@ -3,24 +3,14 @@
 import React from 'react';
 import { Zap } from 'lucide-react';
 import { formatINR } from '@/lib/formatters';
-import { useDataMode } from '@/lib/providers/DataModeProvider';
+import { usePriceShocks } from '@/lib/hooks/usePriceShocks';
 import { DataSourceMeta } from '@/components/data/DataBadge';
 import { EmptyShocksState } from '@/components/states/EmptyState';
 import { GenerateReportButton } from '@/components/data/GenerateReportButton';
 
-const SHOCKS = [
-  { id: 'SHOCK-2026-0902-A', route: 'DEL → BOM', window: 'T+1', surgePct: 42.8, medianFare: 11840, baselineFare: 8290, agreementCount: '4/4 Sources', carriers: 'IndiGo, Air India, Akasa', detectedAt: '15:10 IST Today', status: 'CONFIRMED' },
-  { id: 'SHOCK-2026-0902-B', route: 'CCU → GAU', window: 'T+7', surgePct: 36.4, medianFare: 7200, baselineFare: 5280, agreementCount: '3/3 Sources', carriers: 'IndiGo, SpiceJet', detectedAt: '12:45 IST Today', status: 'CONFIRMED' },
-  { id: 'SHOCK-2026-0901-C', route: 'DEL → BLR', window: 'T+1', surgePct: 29.5, medianFare: 12400, baselineFare: 9570, agreementCount: '4/4 Sources', carriers: 'Air India, IndiGo', detectedAt: '01 Sep 18:20', status: 'RESOLVED' },
-];
 
 export default function PriceShocksPage() {
-  const { mode } = useDataMode();
-  const isMock = mode === 'mock';
-  // Price shocks require synchronous multi-source surge verification. In Live mode
-  // only genuinely detected shocks are shown (none fabricated); Mock shows the demo set.
-  const shocks = isMock ? SHOCKS : [];
-  const activeCount = shocks.filter((s) => s.status === 'CONFIRMED').length;
+  const { isMock, shocks, activeCount, isPending, error, refetch } = usePriceShocks();
 
   return (
     <div className="space-y-5">
@@ -37,7 +27,7 @@ export default function PriceShocksPage() {
             A route surge is only certified as a Price Shock when synchronous elevated pricing is verified across multiple independent channels, eliminating scraping artifacts.
           </p>
           <div className="mt-1.5">
-            <DataSourceMeta isMock={isMock} source={isMock ? 'Demo dataset' : 'AirPulse PriceGuard (live)'} />
+            <DataSourceMeta isMock={isMock} source={isMock ? 'Demo dataset' : 'Confirmed price shock alerts (live)'} />
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -47,12 +37,12 @@ export default function PriceShocksPage() {
             title="AirPulse — Market Price Shock Summary"
           />
           <span className="px-2.5 py-1 bg-rose-50 text-rose-800 border border-rose-300 font-bold text-xs rounded">
-            {activeCount} Active Confirmed Shocks
+            {isPending ? 'Loading confirmed shocks…' : error ? 'Shock count unavailable' : `${activeCount} Active Confirmed Shocks`}
           </span>
         </div>
       </div>
 
-      {shocks.length === 0 ? (
+      {isPending ? <div role="status" className="h-32 animate-pulse rounded bg-slate-100">Loading confirmed price shocks…</div> : error ? <div role="alert" className="rounded border p-4">Unable to load confirmed shocks. <button className="text-blue-700 underline" onClick={() => void refetch()}>Retry</button></div> : shocks.length === 0 ? (
         <EmptyShocksState layout="card" />
       ) : (
       /* Shocks Table */

@@ -22,7 +22,7 @@ const COMMAND_ITEMS: CommandItem[] = [
   { id: '1', category: 'Routes', title: 'DEL → BOM (Delhi - Mumbai)', subtitle: 'Heavy corridor • Traffic Weight 14.2%', href: '/routes/del-bom', icon: MapPin },
   { id: '2', category: 'Routes', title: 'DEL → BLR (Delhi - Bengaluru)', subtitle: 'Business route • Traffic Weight 11.5%', href: '/routes/del-blr', icon: MapPin },
   { id: '3', category: 'Anomalies', title: 'Open Anomaly #ANM-1842', subtitle: 'DEL-BOM +57.7% deviation • Gated SHAP ready', href: '/anomalies/anm-1842', icon: AlertTriangle },
-  { id: '4', category: 'Testing', title: 'Run Live Web Scraping Verification', subtitle: 'Controlled single-request extraction probe', href: '/scraping-test', icon: Terminal },
+  { id: '4', category: 'Testing', title: 'Live Scraping', subtitle: 'Controlled single-request extraction probe', href: '/scraping-test', icon: Terminal },
   { id: '5', category: 'Operations', title: 'Data Ingestion Control Room', subtitle: 'View Batch Collection Run #1842', href: '/ingestion', icon: Activity },
   { id: '6', category: 'Index', title: 'Airfare Price Index (APIx) Breakdown', subtitle: 'Laspeyres basket decomposition & relatives', href: '/apix', icon: Activity },
   { id: '7', category: 'System', title: 'System Diagnostics & 12-Point Self-Test', subtitle: 'Verify Database, ML models, & Redis worker', href: '/system', icon: Terminal },

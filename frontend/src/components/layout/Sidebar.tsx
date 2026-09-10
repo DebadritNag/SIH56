@@ -1,4 +1,5 @@
 'use client';
+import { usePriceShocks } from '@/lib/hooks/usePriceShocks';
 
 import React from 'react';
 import Link from 'next/link';
@@ -94,9 +95,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   // Live/Mock-aware monitoring counts (real numbers from the backend in Live mode).
   const { summary } = useDashboardSummary();
+  const { activeCount, isPending: shocksLoading, error: shocksError } = usePriceShocks();
   const badgeByHref: Record<string, number | undefined> = {
     '/anomalies': summary?.open_anomalies,
-    '/shocks': summary?.critical_anomalies,
+    '/shocks': shocksLoading || shocksError ? undefined : activeCount,
   };
 
   return (

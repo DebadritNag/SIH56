@@ -1,9 +1,7 @@
+from __future__ import annotations
 import os
 from typing import Optional
 from app.config import settings
-from app.ml.explainability import ExplainabilityService
-from app.ml.fareguard import FareGuardModel
-from app.ml.priceguard import PriceGuardDetector
 
 
 class ModelRegistryService:
@@ -15,6 +13,7 @@ class ModelRegistryService:
 
     @classmethod
     def get_fareguard(cls) -> FareGuardModel:
+        from app.ml.fareguard import FareGuardModel
         if cls._fareguard is None:
             cls._fareguard = FareGuardModel(version=settings.MODEL_FAREGUARD_VERSION)
             model_path = os.path.join(settings.MODEL_DIR, f"{settings.MODEL_FAREGUARD_VERSION}.joblib")
@@ -24,6 +23,7 @@ class ModelRegistryService:
 
     @classmethod
     def get_priceguard(cls) -> PriceGuardDetector:
+        from app.ml.priceguard import PriceGuardDetector
         if cls._priceguard is None:
             cls._priceguard = PriceGuardDetector(
                 version=settings.MODEL_PRICEGUARD_VERSION,
@@ -35,8 +35,14 @@ class ModelRegistryService:
         return cls._priceguard
 
     @classmethod
-    def get_explainer(cls) -> ExplainabilityService:
-        if cls._explainer is None:
-            fareguard = cls.get_fareguard()
+    async def get_active(cls, db, kind):
+        from app.ml.live_inference import get_active_model
+        return await get_active_model(db, kind)
+
+    @classmethod
+    def get_explainer(cls, fareguard=None):
+        from app.ml.explainability import ExplainabilityService
+        fareguard = fareguard or cls.get_fareguard()
+        if cls._explainer is None or cls._explainer.fareguard is not fareguard:
             cls._explainer = ExplainabilityService(fareguard)
         return cls._explainer

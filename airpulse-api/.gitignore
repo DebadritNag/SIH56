@@ -115,3 +115,6 @@ tests/unit/*
 Thumbs.db
 
 !tests/unit/test_ingestion_progress.py
+
+!tests/unit/test_confirmed_shocks.py
+!tests/unit/test_live_inference.py
