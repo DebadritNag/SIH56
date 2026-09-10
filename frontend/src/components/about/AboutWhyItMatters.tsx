@@ -1,4 +1,5 @@
 import React from "react";
+import Image from "next/image";
 import { TrendingUp, Users, Building2, FileText } from "lucide-react";
 
 export function AboutWhyItMatters() {
@@ -55,42 +56,15 @@ export function AboutWhyItMatters() {
           </div>
 
           {/* Right Side: Graphic Representation with Wing / Skyline Overlay */}
-          <div className="lg:col-span-6 relative">
-            <div className="relative rounded-2xl overflow-hidden border border-slate-700/60 shadow-2xl group">
-              {/* Visual Wing over Sunset Backdrop */}
-              <div className="h-80 sm:h-96 w-full bg-gradient-to-tr from-[#020b18] via-[#0d2244] to-[#f59e0b]/40 relative flex items-end">
-                {/* Airplane Wing Silhouette vector representation */}
-                <svg
-                  className="absolute inset-0 w-full h-full object-cover"
-                  fill="none"
-                  preserveAspectRatio="xMidYMid slice"
-                  viewBox="0 0 600 350"
-                >
-                  <path d="M0,280 L280,180 L520,60 L600,0 L600,350 L0,350 Z" fill="#040b17" fillOpacity="0.8" />
-                  <path d="M120,350 L340,160 L450,110 L480,90 L400,280 Z" fill="#081b33" fillOpacity="0.9" />
-                  <circle cx="480" cy="80" fill="#f59e0b" fillOpacity="0.2" filter="blur(40px)" r="140" />
-                </svg>
-
-                {/* Quote Overlay Box */}
-                <div className="relative z-10 p-6 sm:p-8 bg-gradient-to-t from-[#050c18] via-[#050c18]/90 to-transparent w-full">
-                  <div className="text-cyan-400 text-3xl font-serif leading-none mb-2">“</div>
-                  <blockquote className="text-slate-100 text-sm sm:text-base italic font-medium leading-relaxed mb-4">
-                    Air travel prices are more than just fares — they are signals of how India moves, works and grows.
-                  </blockquote>
-                  <div className="h-0.5 w-12 bg-cyan-400 mb-3" />
-                  <div className="text-[9px] uppercase tracking-[0.25em] text-slate-400 font-bold flex flex-wrap gap-x-3">
-                    <span>People</span>
-                    <span>•</span>
-                    <span>Connect</span>
-                    <span>•</span>
-                    <span>Mobility</span>
-                    <span>•</span>
-                    <span>Opportunity</span>
-                    <span>•</span>
-                    <span>Progress</span>
-                  </div>
-                </div>
-              </div>
+          <div className="lg:col-span-6 flex items-center justify-center">
+            <div className="relative w-full max-w-xl mx-auto rounded-2xl overflow-hidden border border-slate-700/80 shadow-2xl shadow-cyan-950/40 bg-[#091528]/80 group">
+              <Image
+                src="/3rd-pic.png"
+                alt="Air travel prices are signals of how India moves, works and grows"
+                width={1448}
+                height={1086}
+                className="w-full h-auto object-contain rounded-2xl transition-transform duration-500 group-hover:scale-[1.02]"
+              />
             </div>
           </div>
         </div>

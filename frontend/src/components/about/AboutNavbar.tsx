@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Search, Menu, X } from "lucide-react";
 
@@ -25,15 +26,18 @@ export function AboutNavbar() {
     <header className="sticky top-0 z-50 bg-[#050c18]/95 backdrop-blur-md border-b border-slate-800/80">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-3 group">
-          <div className="w-9 h-9 relative flex items-center justify-center shrink-0">
-            <svg className="w-full h-full drop-shadow transition-transform duration-200 group-hover:scale-105" fill="none" viewBox="0 0 36 36">
-              <path d="M6 18L18 6L30 18L18 30L6 18Z" fill="none" stroke="#00b4d8" strokeLinejoin="round" strokeWidth="2.5" />
-              <path d="M12 18L18 12L24 18L18 24L12 18Z" fill="#0077b6" opacity="0.8" />
-              <path d="M18 4L22 14L32 18L22 22L18 32L14 22L4 18L14 14L18 4Z" fill="#38bdf8" fillOpacity="0.35" />
-            </svg>
+        <Link href="/" className="flex items-center group shrink-0" title="VAYANTARA Home">
+          <div className="relative flex items-center justify-center py-1">
+            <Image
+              src="/top left.png"
+              alt="VAYANTARA"
+              width={180}
+              height={60}
+              priority
+              unoptimized
+              className="w-[150px] sm:w-[175px] h-auto object-contain filter brightness-[1.22] contrast-[1.15] saturate-[1.15] drop-shadow-[0_0_1px_rgba(255,255,255,0.35)] transition-transform duration-200 group-hover:scale-[1.02]"
+            />
           </div>
-          <span className="text-white tracking-[0.2em] font-extrabold text-xl">VAYANTARA</span>
         </Link>
 
         {/* Desktop Navigation Links */}

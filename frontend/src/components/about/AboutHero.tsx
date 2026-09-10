@@ -2,7 +2,8 @@
 
 import React from "react";
 import Link from "next/link";
-import { TrendingUp, ArrowRight, Play, Plane, Layers, BarChart3, ShieldCheck } from "lucide-react";
+import Image from "next/image";
+import { ArrowRight, Play, Plane, Layers, BarChart3, ShieldCheck } from "lucide-react";
 
 export function AboutHero() {
   return (
@@ -58,60 +59,26 @@ export function AboutHero() {
             </div>
           </div>
 
-          {/* Hero Right Column: Interactive KPI Sparkline Card & Visual Art */}
-          <div className="lg:col-span-5 relative">
-            {/* Floating Glowing Card */}
-            <div className="relative mx-auto max-w-md bg-[#091528]/90 border border-slate-700/70 rounded-xl p-6 shadow-2xl backdrop-blur-md">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
-                <span className="text-[11px] font-bold tracking-widest text-slate-300 uppercase">
-                  Airfare Index (APIx)
+          {/* Hero Right Column: Main Image */}
+          <div className="lg:col-span-5 relative flex items-center justify-center">
+            <div className="relative w-full rounded-2xl overflow-hidden border border-slate-700/80 shadow-2xl shadow-cyan-950/50 bg-[#091528]/90 group">
+              <Image
+                src="/About-back.png"
+                alt="VAYANTARA Airfare Intelligence Network"
+                width={1672}
+                height={941}
+                priority
+                className="w-full h-auto object-cover rounded-2xl transition-transform duration-500 group-hover:scale-[1.02]"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#050c18]/90 via-transparent to-transparent pointer-events-none" />
+              <div className="absolute bottom-3.5 left-4 right-4 flex items-center justify-between text-xs text-slate-200 font-medium">
+                <span className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse" />
+                  Airfare Price Index (APIx)
                 </span>
-                <span className="text-xs px-2.5 py-0.5 rounded font-semibold bg-emerald-950/80 text-emerald-400 border border-emerald-500/30">
-                  Live Signal
+                <span className="text-cyan-400 font-mono text-[11px] font-semibold bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-500/30">
+                  Live Signal · T+1
                 </span>
-              </div>
-
-              {/* Value Display */}
-              <div className="flex items-baseline gap-3 mb-2">
-                <span className="text-4xl sm:text-5xl font-extrabold text-white tracking-tight">
-                  108.43
-                </span>
-                <span className="inline-flex items-center text-xs font-bold text-emerald-400">
-                  <TrendingUp className="w-3.5 h-3.5 mr-0.5" />
-                  +4.2%
-                </span>
-              </div>
-
-              {/* Waveform / Sparkline SVG */}
-              <div className="py-2">
-                <svg className="w-full h-24 overflow-visible" fill="none" viewBox="0 0 300 90">
-                  <defs>
-                    <linearGradient id="heroCyanGlow" x1="0%" x2="0%" y1="0%" y2="100%">
-                      <stop offset="0%" stopColor="#00c8ff" stopOpacity="0.45" />
-                      <stop offset="100%" stopColor="#00c8ff" stopOpacity="0" />
-                    </linearGradient>
-                  </defs>
-                  <path
-                    d="M0,70 Q 25,65 50,55 T 100,60 T 150,40 T 200,48 T 250,22 T 300,12"
-                    fill="none"
-                    stroke="#00c8ff"
-                    strokeLinecap="round"
-                    strokeWidth="2.5"
-                  />
-                  <path
-                    d="M0,70 Q 25,65 50,55 T 100,60 T 150,40 T 200,48 T 250,22 T 300,12 L 300,90 L 0,90 Z"
-                    fill="url(#heroCyanGlow)"
-                  />
-                  {/* Data Nodes */}
-                  <circle cx="150" cy="40" fill="#38bdf8" r="3.5" stroke="#050c18" strokeWidth="2" />
-                  <circle cx="250" cy="22" fill="#38bdf8" r="3.5" stroke="#050c18" strokeWidth="2" />
-                  <circle cx="300" cy="12" fill="#00ffcc" r="4.5" stroke="#ffffff" strokeWidth="2" />
-                </svg>
-              </div>
-
-              <div className="flex items-center justify-between text-xs text-slate-400 border-t border-slate-800/80 pt-3 mt-1">
-                <span>Tracking <strong className="text-slate-200">1,000+ routes</strong> across India</span>
-                <span className="text-cyan-400 font-mono">Daily T+1</span>
               </div>
             </div>
 
