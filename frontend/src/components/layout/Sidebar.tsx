@@ -80,7 +80,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'ML Models (FareGuard)', href: '/models', icon: Cpu },
       { label: 'Index Backtesting', href: '/backtesting', icon: GitCompare },
       { label: 'Pipeline Monitor', href: '/pipeline', icon: Server },
-      { label: 'Scraping Verification', href: '/scraping-test', icon: Terminal },
+      { label: 'Live Scraping', href: '/scraping-test', icon: Terminal },
       { label: 'System Diagnostics', href: '/system', icon: Shield },
     ],
   },

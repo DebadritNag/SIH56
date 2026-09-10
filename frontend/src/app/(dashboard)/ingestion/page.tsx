@@ -1,5 +1,6 @@
 'use client';
 
+import type { IngestionProgress, TimingRun, EstimateConfig } from '@/lib/ingestion-estimate';
 import React from 'react';
 import { DownloadCloud, Play, CheckCircle2, RotateCw, Server, ArrowRight, Layers, Activity, ChevronRight, FileSpreadsheet, Info } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -8,14 +9,11 @@ import { useDashboardSummary } from '@/lib/hooks/useDashboard';
 import { useRuns } from '@/lib/hooks/useResources';
 import { GenerateReportButton } from '@/components/data/GenerateReportButton';
 import { useDataMode } from '@/lib/providers/DataModeProvider';
-import { DataSourceMeta } from '@/components/data/DataBadge';
 import { endpoints } from '@/lib/api/endpoints';
 import { getData } from '@/lib/api/client';
 import { notify } from '@/lib/notify';
 import { ConfirmActionDialog } from '@/components/notifications/ConfirmActionDialog';
 import { CollectionProgress } from '@/components/ui/CollectionProgress';
-
-import { DataFreshness } from '@/components/ui/DataFreshness';
 
 const PIPELINE_STAGES = [
   { name: 'INGEST', count: '26', status: 'completed', desc: 'Raw dataset observation persistence' },
@@ -115,10 +113,35 @@ export default function IngestionPage() {
 
   // Live: only real run history. Mock: demo runs.
   const realRuns: RunRow[] = ((runsPage as { items?: Record<string, unknown>[] } | undefined)?.items ?? []).map(mapRun);
-  const timings = ((runsPage as { items?: Record<string, unknown>[] } | undefined)?.items ?? [])
-    .filter(r => ['COMPLETED', 'PARTIAL'].includes(String(r.status).toUpperCase()) && Number(r.duration_ms) > 0 && String(r.run_type) !== 'LIVE_ACQUISITION')
-    .map(r => Number(r.duration_ms) / 1000).sort((a, b) => a - b);
-  const expectedSeconds = timings.length ? timings[Math.floor(timings.length / 2)] : undefined;
+  const [operationId,setOperationId] = React.useState<string | null>(null);
+  const [progress,setProgress] = React.useState<IngestionProgress | null>(null);
+  const timings = useQuery({queryKey:['ingestion-timing-history'], queryFn:()=>getData<{runs:TimingRun[];config:EstimateConfig}>('/ingestion/timing-history'), enabled:!isMock && !isTriggering});
+  const operation = useQuery({queryKey:['ingestion-progress',operationId], queryFn:()=>getData<IngestionProgress>(`/ingestion/progress/${operationId}`),enabled:!!operationId && isTriggering,refetchInterval:2000});
+  React.useEffect(()=>{
+    if(operation.data && operation.data.status!=='UNKNOWN') setProgress(current => current && ['COMPLETED','FAILED'].includes(current.status) ? current : operation.data!);
+  },[operation.data]);
+  React.useEffect(()=>{
+    if(!isTriggering || !progress || !['COMPLETED','FAILED'].includes(progress.status)) return;
+    let cancelled=false;
+    void (async()=>{
+      if(progress.status==='COMPLETED') {
+        while(!cancelled) {
+          try {
+            await queryClient.invalidateQueries({}, {throwOnError:true});
+            await refetchRuns({throwOnError:true});
+            break;
+          } catch {
+            notify.info('Ingestion completed; reconnecting to refresh stored data', {id:'coll-run'});
+            await new Promise(resolve=>setTimeout(resolve,5000));
+          }
+        }
+        if(cancelled) return;
+        notify.success('Ingestion completed', {id:'coll-run',description:'Stored data and history refreshed.'});
+      } else notify.error('Ingestion failed', {id:'coll-run',description:progress.error ?? 'Review the recorded run and retry.'});
+      if(!cancelled) setIsTriggering(false);
+    })();
+    return()=>{cancelled=true;};
+  },[progress?.status, isTriggering, queryClient, refetchRuns]);
   const runs: RunRow[] = isMock ? (RECENT_RUNS as RunRow[]) : (published ? realRuns : []);
 
   const selectedRun = (selectedRunId ? runs.find((r) => r.id === selectedRunId) : runs[0]) ?? runs[0];
@@ -143,58 +166,24 @@ export default function IngestionPage() {
   const healthySources = isMock ? 5 : (published ? summary?.healthy_sources ?? 0 : 0);
 
   const handleTriggerCollection = async () => {
-    setIsTriggering(true);
-    notify.loading('Executing automated downstream pipeline...', { id: 'coll-run' });
-    try {
-      if (isMock) {
-        await new Promise((r) => setTimeout(r, 600));
-        notify.success('Collection completed (demo)', { id: 'coll-run', description: 'Mock pipeline execution finished.' });
-      } else {
-        const res = await endpoints.triggerCollection() as {
-          status: string; quotes_validated?: number;
-          live_ingestion_jobs?: Array<{ collection_run_id: string }>;
-        };
-        await queryClient.invalidateQueries();
-        let failed = false;
-        for (const job of res.live_ingestion_jobs ?? []) {
-          let complete = false;
-          for (let attempt = 0; attempt < 120; attempt++) {
-            const run = await getData<{ metadata: { ingestion_state: string } }>(`/live/runs/${job.collection_run_id}`);
-            const state = run.metadata?.ingestion_state;
-            if (['COMPLETED', 'PARTIAL', 'FAILED'].includes(state)) {
-              failed ||= state === 'FAILED'; complete = true; break;
-            }
-            await new Promise(resolve => setTimeout(resolve, 2000));
-          }
-          if (!complete) {
-            notify.info('Processing continues in the background', { id: 'coll-run' });
-            await queryClient.invalidateQueries(); return;
-          }
-        }
-        await queryClient.invalidateQueries();
-        await refetchRuns();
-        if (res.status === 'NO_DATA') notify.info('No imported or staged live observations available', { id: 'coll-run' });
-        else if (failed) notify.error('Some live ingestion failed; available processed data remains visible', { id: 'coll-run' });
-        else notify.success('Available observations processed', {
-          id: 'coll-run', description: 'Dashboard queries refreshed. Stage results show which analyses have sufficient data.',
-        });
-      }
-    } catch (err) {
-      const status = (err as { status?: number })?.status;
-      if (status === 403 || status === 401) {
-        notify.info('Analyst clearance required', {
-          id: 'coll-run',
-          description: 'Triggering pipeline needs an analyst/admin role. Current data is ingested via Goibibo dataset.',
-        });
-      } else {
-        notify.error('Pipeline trigger failed', {
-          id: 'coll-run',
-          description: err instanceof Error ? err.message : 'Backend rejected the request.',
-        });
-      }
-    } finally {
-      setIsTriggering(false);
+    if(isTriggering) return;
+    if(isMock) {
       setShowRunConfirm(false);
+      notify.success('Collection completed (demo)', {id:'coll-run'});
+      return;
+    }
+    const id=crypto.randomUUID();
+    setOperationId(id);
+    setProgress({status:'QUEUED',completed_stages:0,total_stages:10,current_stage:'AWAITING_BACKEND'});
+    setIsTriggering(true);
+    notify.loading('Executing automated downstream pipeline...', {id:'coll-run'});
+    try {
+      const result=await endpoints.triggerCollection(id) as {progress?:IngestionProgress};
+      if(result.progress) setProgress(result.progress);
+    } catch(err) {
+      if([400,401,403,422].includes((err as {status?:number}).status ?? 0)) { setIsTriggering(false); setProgress(null); }
+      // A transport timeout does not establish whether the backend stopped.
+      notify.error('Unable to confirm ingestion status', {id:'coll-run',description:err instanceof Error?err.message:'Reconnecting to backend progress.'});
     }
   };
 
@@ -237,13 +226,6 @@ export default function IngestionPage() {
             Automated matrix collection scheduler, horizontal multi-stage transformation pipeline, and run audit logs.
           </p>
           <div className="mt-1.5 flex flex-wrap items-center gap-3">
-            <DataSourceMeta isMock={isMock} source={isMock ? 'Demo dataset' : 'Goibibo Domestic Flights Dataset & Live Pipeline'} />
-            <DataFreshness
-              timestamp={selectedRun?.started}
-              label="Latest pipeline activity"
-              isRealtime={true}
-              source="Goibibo"
-            />
             {!isMock && (
               <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
                 <CheckCircle2 className="w-3 h-3 text-emerald-600" />
@@ -492,7 +474,8 @@ export default function IngestionPage() {
         variant="default"
         entityName="BATCH-INGESTION"
         isLoading={isTriggering}
-        loadingContent={!isMock ? <CollectionProgress expectedSeconds={expectedSeconds} /> : undefined}
+        loadingContent={!isMock && progress ? <CollectionProgress key={operationId} progress={progress} history={timings.data?.runs} config={timings.data?.config} /> : undefined}
+        details={!isMock && progress ? <CollectionProgress key={operationId} progress={progress} history={timings.data?.runs} config={timings.data?.config} /> : undefined}
         onConfirm={handleTriggerCollection}
         onCancel={() => setShowRunConfirm(false)}
       />

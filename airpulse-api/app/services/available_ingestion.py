@@ -16,9 +16,9 @@ async def available_counts(db):
     return {str(origin): count for origin, count in result.all()}
 
 
-async def run_available_ingestion(db):
+async def run_available_ingestion(db, on_progress=None):
     # Durable live ingestion retains the original collection and raw evidence.
-    staged = await rows(db, """SELECT id FROM collection_runs
+    staged = await rows(db, """SELECT id,quotes_received FROM collection_runs
         WHERE run_type='LIVE_ACQUISITION' AND quotes_received>0
           AND metadata->>'ingestion_state'='READY_FOR_INGESTION'
         ORDER BY created_at""")
@@ -27,6 +27,8 @@ async def run_available_ingestion(db):
     queued = []
 
     counts = await available_counts(db)
+    if on_progress:
+        await on_progress({'observation_count': sum(counts.values()) + sum(r['quotes_received'] for r in staged), 'total_stages': (10 if sum(counts.values()) else 0) + 10*len(staged), 'current_stage': 'WAITING_FOR_PIPELINE_LOCK'})
     result = dict(status='NO_DATA', quotes_received=0, quotes_validated=0, stages=[])
     if sum(counts.values()):
         from app.services.dataset_orchestrator import DatasetIngestionOrchestrator
@@ -38,7 +40,7 @@ async def run_available_ingestion(db):
             result = await DatasetIngestionOrchestrator(processing).run_pipeline(
                 dataset_name='Available imported and live observations',
                 original_filename='existing-observations', data_origin='IMPORTED',
-                pipeline_mode='LIVE_PROCESSING', trigger_type='MANUAL', reprocess_existing_fares=True)
+                pipeline_mode='LIVE_PROCESSING', trigger_type='MANUAL', reprocess_existing_fares=True, on_progress=on_progress)
         if result.get('quotes_validated', 0) > 0:
             await db.execute(text("""UPDATE collection_runs
                 SET metadata=COALESCE(metadata, '{}'::jsonb) || CAST(:publication AS jsonb)

@@ -29,10 +29,7 @@ import {
   useRouteContributors,
   useSystemTrust,
 } from '@/lib/hooks/useDashboard';
-import { DataSourceMeta } from '@/components/data/DataBadge';
-import { LiveModeBadge, DataCompositionStrip } from '@/components/data/LiveModeBadge';
-import { useLiveModeContext } from '@/lib/hooks/useLiveModeContext';
-import { DataFreshness } from '@/components/ui/DataFreshness';
+
 import { GenerateReportButton } from '@/components/data/GenerateReportButton';
 import { formatPercent, formatINR } from '@/lib/formatters';
 import { DashboardFilters } from '@/types';
@@ -105,9 +102,6 @@ export default function OverviewPage() {
   const [contributorDirection, setContributorDirection] = useState<'up' | 'down'>('up');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastRefreshedTime, setLastRefreshedTime] = useState('17:52 IST');
-
-  // Live Mode context — mode badge, counts, run history.
-  const { ctx: liveCtx, isLoading: liveCtxLoading } = useLiveModeContext();
 
   // Keep state synchronized with URL back/forward navigation
   useEffect(() => {
@@ -223,30 +217,6 @@ export default function OverviewPage() {
           <p className="text-xs text-[#475467] mt-0.5">
             Real-time domestic airfare inflation, index velocity, and market pressure across India&apos;s monitored aviation network.
           </p>
-          <div className="flex flex-wrap items-center gap-3 mt-1.5">
-            <DataSourceMeta
-              isMock={meta.isMock}
-              source={meta.source}
-              lastUpdated={meta.lastUpdated}
-            />
-            <LiveModeBadge ctx={liveCtx} loading={liveCtxLoading} isMock={meta.isMock} />
-            {!meta.isMock && <div className="mt-3 grid gap-2 text-xs text-slate-600 sm:grid-cols-2">
-              <span>Latest observation: {liveCtx.latest_observed_at ?? 'Unavailable'}</span>
-              <span>Latest ingestion timestamp: {liveCtx.latest_ingested_at ?? 'Unavailable'}</span>
-              <span>Latest APIx calculation: {liveCtx.latest_apix_computed_at ?? 'Unavailable'}</span>
-              <span>Latest live collection: {liveCtx.latest_live_collection_id ?? 'None'} · {liveCtx.latest_live_collection_status ?? 'No run'}</span>
-              <span>Latest dataset import: {liveCtx.latest_dataset_import_id ?? 'None'}</span>
-              <span>Latest ingestion run: {liveCtx.latest_ingestion_run_id ?? 'None'}</span>
-              <span>Latest pipeline run: {liveCtx.latest_pipeline_run_id ?? 'None'}</span>
-            </div>}
-            {!meta.isMock && <DataCompositionStrip ctx={liveCtx} />}
-            <DataFreshness
-              timestamp={meta.lastUpdated}
-              label="DATA UPDATED"
-              isRealtime={true}
-              source={meta.source}
-            />
-          </div>
         </div>
         <div className="flex items-center gap-2 text-xs">
           <GenerateReportButton

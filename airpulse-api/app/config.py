@@ -81,6 +81,9 @@ class Settings(BaseSettings):
     PUBLIC_READ: bool = True
 
     # Redis & Celery
+    INGESTION_ESTIMATE_BASE_SECONDS: float = Field(30, ge=0)
+    INGESTION_ESTIMATE_PER_OBSERVATION_SECONDS: float = Field(0.5, ge=0)
+    INGESTION_ESTIMATE_MIN_HISTORY: int = Field(3, ge=3, le=30)
     REDIS_URL: str = "redis://localhost:6379/0"
     CELERY_BROKER_URL: str = "redis://localhost:6379/0"
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/1"

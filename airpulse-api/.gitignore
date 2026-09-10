@@ -113,3 +113,5 @@ tests/unit/*
 *.swp
 .DS_Store
 Thumbs.db
+
+!tests/unit/test_ingestion_progress.py

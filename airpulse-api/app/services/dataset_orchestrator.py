@@ -142,6 +142,7 @@ class DatasetIngestionOrchestrator:
         is_replay: bool = False,
         existing_collection_run_id: Optional[UUID] = None,
         reprocess_existing_fares: bool = False,
+        on_progress=None,
     ) -> Dict[str, Any]:
         """Executes the complete downstream pipeline from raw ingestion to APIx."""
         pipeline_start = utc_now()
@@ -248,6 +249,13 @@ class DatasetIngestionOrchestrator:
         await self.session.commit()
 
         stages_telemetry: List[Dict[str, Any]] = []
+        async def report_progress(name):
+            if on_progress:
+                await on_progress({'current_stage': name, 'completed_stages': len(stages_telemetry),
+                    'completed_stage_names': [s['step_name'] for s in stages_telemetry],
+                    'pipeline_run_id': str(pipe_id), 'started_at': pipeline_start.isoformat(),
+                    'processed_observations': stages_telemetry[-1]['records_output'] if stages_telemetry else 0})
+
 
         async def record_stage(
             order: int,
@@ -291,11 +299,13 @@ class DatasetIngestionOrchestrator:
                 "finished_at": finish_t.isoformat(),
                 "message": message,
             })
+            await report_progress(name)
             return step
 
         # ==================================================================
         # STAGE 1: INGEST / RAW STORE
         # ==================================================================
+        await report_progress('INGEST')
         s1_start = utc_now()
         raw_fares_list: List[RawFare] = []
         raw_rows_data: List[Dict[str, Any]] = []
@@ -344,6 +354,7 @@ class DatasetIngestionOrchestrator:
         # ==================================================================
         # STAGE 2: NORMALIZE (Canonical Booking Window Engine)
         # ==================================================================
+        await report_progress('NORMALIZE')
         s2_start = utc_now()
         normalized_records: List[Dict[str, Any]] = []
 
@@ -433,6 +444,7 @@ class DatasetIngestionOrchestrator:
         # ==================================================================
         # STAGE 3: VALIDATE
         # ==================================================================
+        await report_progress('VALIDATE')
         s3_start = utc_now()
         valid_records: List[Dict[str, Any]] = []
         rejected_records: List[Dict[str, Any]] = []
@@ -459,6 +471,7 @@ class DatasetIngestionOrchestrator:
         # ==================================================================
         # STAGE 4: DEDUP & PERSIST VALIDATED FARES
         # ==================================================================
+        await report_progress('DEDUP')
         s4_start = utc_now()
         validated_entities: List[ValidatedFare] = []
         seen_fingerprints: set[str] = set()
@@ -533,6 +546,7 @@ class DatasetIngestionOrchestrator:
         # ==================================================================
         # STAGE 5: FEATURE ENGINEERING
         # ==================================================================
+        await report_progress('FEATURES')
         s5_start = utc_now()
         feature_rows: List[Dict[str, Any]] = []
 
@@ -613,6 +627,7 @@ class DatasetIngestionOrchestrator:
         # ==================================================================
         # STAGE 6: FAREGUARD (XGBoost Prediction - Never ₹0 fallback)
         # ==================================================================
+        await report_progress('FAREGUARD')
         s6_start = utc_now()
         fareguard = ModelRegistryService.get_fareguard()
         predictions_map: Dict[UUID, FarePrediction] = {}
@@ -683,6 +698,7 @@ class DatasetIngestionOrchestrator:
         # ==================================================================
         # STAGE 7: PRICEGUARD (Isolation Forest & Statistical Anomalies)
         # ==================================================================
+        await report_progress('PRICEGUARD')
         s7_start = utc_now()
         anomalies_detected = 0
 
@@ -726,6 +742,7 @@ class DatasetIngestionOrchestrator:
         # ==================================================================
         # STAGE 8: SHAP EXPLANATION (Gated on anomalies)
         # ==================================================================
+        await report_progress('SHAP')
         s8_start = utc_now()
         shap_count = 0
         shap_status = "SKIPPED"
@@ -745,6 +762,7 @@ class DatasetIngestionOrchestrator:
         # ==================================================================
         # STAGE 9: APIx ENGINE (Statistical Recomputation - Strictly on actual fares)
         # ==================================================================
+        await report_progress('APIX')
         s9_start = utc_now()
         # Evaluate eligibility for each validated fare
         await self.session.execute(
@@ -778,6 +796,7 @@ class DatasetIngestionOrchestrator:
         # ==================================================================
         # STAGE 10: ALERTS EVALUATION
         # ==================================================================
+        await report_progress('ALERTS')
         s10_start = utc_now()
         alerts_res = await self.session.execute(select(Alert).where(Alert.status == "OPEN"))
         active_alerts = len(list(alerts_res.scalars().all()))

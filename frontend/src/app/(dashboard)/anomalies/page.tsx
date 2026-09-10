@@ -16,7 +16,6 @@ import { LiveModeBadge, DataCompositionStrip } from '@/components/data/LiveModeB
 import { useLiveModeContext } from '@/lib/hooks/useLiveModeContext';
 import { useDataMode } from '@/lib/providers/DataModeProvider';
 import { CircleReloadingAnimation } from '@/components/ui/CircleReloadingAnimation';
-import { DataFreshness } from '@/components/ui/DataFreshness';
 
 export default function AnomaliesPage() {
   const [selectedAnomaly, setSelectedAnomaly] = useState<AnomalyItem | null>(null);
@@ -78,12 +77,6 @@ export default function AnomaliesPage() {
             Evaluate statistical anomalies identified by Isolation Forest &amp; FareGuard. Unusual fares are never automatically discarded—investigate cross-source agreement, SHAP drivers, and record audited decisions.
           </p>
           <div className="mt-1.5 flex flex-wrap items-center gap-3">
-            <DataFreshness
-              timestamp={anomalies[0]?.timestamp}
-              label="Latest PriceGuard evaluation"
-              isRealtime={true}
-              source="PriceGuard v1"
-            />
             <LiveModeBadge ctx={liveCtx} loading={liveCtxLoading} isMock={isMock} />
             {!isMock && <DataCompositionStrip ctx={liveCtx} />}
           </div>

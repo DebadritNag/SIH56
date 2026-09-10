@@ -223,8 +223,47 @@ async def get_collection_run_detail(
     return APIResponse(success=True, data=run_detail)
 
 
+@router.get("/progress/{operation_id}", response_model=APIResponse)
+async def ingestion_progress(operation_id: UUID, db: AsyncSession = Depends(get_db), current_user: UserContext = Depends(require_viewer)):
+    from app.services.ingestion_progress import snapshot
+    from app.services.live_store import rows
+    progress = await snapshot(operation_id, current_user.user_id)
+    if progress and progress.get('live_ingestion_jobs') and progress['status'] == 'RUNNING':
+        states = await rows(db, "SELECT metadata->>'ingestion_state' AS state,quotes_validated FROM collection_runs WHERE id=ANY(CAST(:ids AS uuid[]))", ids=[j['collection_run_id'] for j in progress['live_ingestion_jobs']])
+        terminal = [s for s in states if s['state'] in ('COMPLETED','PARTIAL')]
+        progress['completed_stages'] = progress.get('base_completed_stages', 0) + 10*len(terminal)
+        progress['processed_observations'] = progress.get('base_processed_observations', 0) + sum(s.get('quotes_validated') or 0 for s in terminal)
+        if len(states) == len(progress['live_ingestion_jobs']) and all(s['state'] in ('COMPLETED','PARTIAL','FAILED') for s in states):
+            progress['status'] = 'FAILED' if any(s['state']=='FAILED' for s in states) else 'COMPLETED'
+            progress['completed_stages'] = progress['total_stages'] if progress['status']=='COMPLETED' else progress['completed_stages']
+            progress['current_stage'] = 'FINISHED'
+            if progress['status']=='FAILED': progress['error']='A live ingestion job failed. Open its run history for details and retry.'
+            await snapshot(operation_id, current_user.user_id, progress)
+    return APIResponse(success=True, data=progress or {'status':'UNKNOWN'})
+
+
+@router.get("/timing-history", response_model=APIResponse)
+async def ingestion_timing_history(db: AsyncSession = Depends(get_db), current_user: UserContext = Depends(require_viewer)):
+    from app.config import settings
+    from app.services.live_store import rows
+    history = await rows(db, """SELECT p.id, p.records_input AS observation_count,
+        EXTRACT(EPOCH FROM (p.finished_at-p.started_at)) AS duration_seconds,
+        p.started_at FROM pipeline_runs p
+        WHERE p.status='COMPLETED' AND p.pipeline_type='import_automated_pipeline'
+        AND p.finished_at>p.started_at ORDER BY p.started_at DESC LIMIT 30""")
+    steps = await rows(db, """SELECT pipeline_run_id,step_name,duration_ms FROM pipeline_steps
+        WHERE pipeline_run_id=ANY(CAST(:ids AS uuid[])) AND status='COMPLETED' AND duration_ms>0""", ids=[str(r['id']) for r in history]) if history else []
+    for run in history:
+        run['stage_seconds'] = {s['step_name']:float(s['duration_ms'])/1000 for s in steps if s['pipeline_run_id']==run['id']}
+    return APIResponse(success=True, data={'runs':history, 'config':{
+        'base_seconds':settings.INGESTION_ESTIMATE_BASE_SECONDS,
+        'per_observation_seconds':settings.INGESTION_ESTIMATE_PER_OBSERVATION_SECONDS,
+        'min_history':settings.INGESTION_ESTIMATE_MIN_HISTORY}})
+
+
 @router.post("/collect", response_model=APIResponse)
 async def trigger_manual_collection(
+    operation_id: Optional[UUID] = None,
     db: AsyncSession = Depends(get_db),
     current_user: UserContext = Depends(require_analyst),
 ):
@@ -235,7 +274,28 @@ async def trigger_manual_collection(
     from app.services.available_ingestion import run_available_ingestion
     from sqlalchemy import text
 
-    result = await run_available_ingestion(db)
+    from app.services.ingestion_progress import snapshot
+    from app.core.utils import utc_now
+    progress = {'status':'RUNNING', 'observation_count':None, 'current_stage':'PREPARING',
+                'completed_stages':0, 'completed_stage_names':[], 'total_stages':10, 'started_at':utc_now().isoformat()}
+    async def publish(update):
+        progress.update(update)
+        if operation_id:
+            await snapshot(operation_id, current_user.user_id, progress)
+    await publish({})
+    try:
+        result = await run_available_ingestion(db, on_progress=publish)
+    except Exception:
+        await publish({'status':'FAILED', 'error':'Ingestion failed; check API logs and retry after resolving the error.'})
+        raise
+    pending = bool(result.get('live_ingestion_jobs'))
+    await publish({'status':'RUNNING' if pending else 'FAILED' if result['status']=='FAILED' else 'COMPLETED',
+        'base_completed_stages':progress['completed_stages'], 'base_processed_observations':result.get('quotes_validated',0),
+        'pipeline_outcome':result['status'], 'live_ingestion_jobs':result.get('live_ingestion_jobs', []),
+        'current_stage':'LIVE_INGESTION' if pending else 'FINISHED',
+        'completed_stages':progress['completed_stages'] if pending or result['status']=='FAILED' else progress['total_stages'],
+        'processed_observations':result.get('quotes_validated',0)})
+    result['progress'] = progress
 
     actor_uuid = None
     raw_uid = getattr(current_user, "user_id", None)

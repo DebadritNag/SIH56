@@ -254,7 +254,7 @@ export const endpoints = {
     getData<BackendSystemDiagnostics>("/system/supabase-diagnostics", undefined, signal),
 
   // Mutations
-  triggerCollection: () => postData<unknown>("/ingestion/collect"),
+  triggerCollection: (operationId?: string) => postData<unknown>(`/ingestion/collect${operationId ? `?operation_id=${operationId}` : ""}`),
   triggerReplay: (runId?: string) => postData<unknown>("/ingestion/replay", { run_id: runId }),
 
   // Live scraping verification (real network fetch, per-filter)

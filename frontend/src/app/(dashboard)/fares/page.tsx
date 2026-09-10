@@ -12,13 +12,6 @@ import { GenerateReportButton } from '@/components/data/GenerateReportButton';
 import { clsx } from 'clsx';
 import { useDataMode } from '@/lib/providers/DataModeProvider';
 import { useFares } from '@/lib/hooks/useResources';
-import { DataSourceMeta } from '@/components/data/DataBadge';
-import { LiveModeBadge, DataCompositionStrip } from '@/components/data/LiveModeBadge';
-import { useLiveModeContext } from '@/lib/hooks/useLiveModeContext';
-
-
-
-import { DataFreshness } from '@/components/ui/DataFreshness';
 import { formatTimestamp } from '@/lib/utils/timestamps';
 
 function bwLabel(days?: number | null): string {
@@ -274,7 +267,6 @@ export default function FaresPage() {
   const isMock = mode === 'mock';
   const [selectedFare, setSelectedFare] = useState<FareObservation | null>(null);
   const [showExportModal, setShowExportModal] = useState(false);
-  const { ctx: liveCtx, isLoading: liveCtxLoading } = useLiveModeContext();
 
   // Live: real validated fares from the backend (all imported observations).
   const { data: farePage, isLoading: isFaresLoading, isFetching: isFaresFetching } = useFares({ page_size: 200 });
@@ -339,19 +331,7 @@ export default function FaresPage() {
           <p className="text-xs text-[#475467] mt-0.5">
             Query individual collected quotes. Every observed fare is tied to an immutable raw payload SHA-256 hash, collector version, and full transformation audit trail.
           </p>
-          <div className="mt-1.5">
-            <div className="flex flex-wrap items-center gap-3 mt-1.5">
-              <DataSourceMeta isMock={isMock} source={isMock ? 'Demo dataset' : 'AirPulse validated fares (live)'} />
-              <LiveModeBadge ctx={liveCtx} loading={liveCtxLoading} isMock={isMock} />
-              {!isMock && <DataCompositionStrip ctx={liveCtx} />}
-              <DataFreshness
-                timestamp={liveFares[0]?.collected_at}
-                label="Latest observation processed"
-                isRealtime={true}
-                source="Goibibo"
-              />
-            </div>
-          </div>
+
         </div>
         <div className="flex items-center gap-2">
           <button

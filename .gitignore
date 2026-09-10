@@ -109,3 +109,7 @@ airpulse-api/tests/unit/*
 !airpulse-api/docs/EC2_CONFIGURATION.md
 
 !airpulse-api/docs/LIVE_CORRIDORS.md
+
+!airpulse-api/tests/unit/test_ingestion_progress.py
+
+!airpulse-api/docs/INGESTION_PROGRESS.md
