@@ -181,3 +181,26 @@ body {
   .ap-fade-up, .ap-fade-in { opacity: 1 !important; transform: none !important; }
 }
 
+/* ---------------------------------------------------------------------------
+   About page decorative utilities
+   --------------------------------------------------------------------------- */
+.glow-cyan {
+  box-shadow: 0 0 25px -5px rgba(6, 182, 212, 0.35);
+}
+
+.grid-lines-bg {
+  background-size: 30px 30px;
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+}
+
+.grid-radial-mask {
+  mask-image: radial-gradient(circle at center, black 40%, transparent 80%);
+  -webkit-mask-image: radial-gradient(circle at center, black 40%, transparent 80%);
+}
+
+.subtle-perspective {
+  perspective: 800px;
+}
+

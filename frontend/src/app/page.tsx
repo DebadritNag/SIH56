@@ -102,9 +102,9 @@ export default function LandingPage() {
                 Home
                 <span className="absolute bottom-0 left-0 w-full h-[2.5px] bg-brand-cyan rounded-full shadow-[0_0_8px_#00D2FF]" />
               </Link>
-              <a className="text-slate-300 hover:text-white transition-colors duration-150" href="#about">
+              <Link className="text-slate-300 hover:text-white transition-colors duration-150" href="/about">
                 About
-              </a>
+              </Link>
               <a className="text-slate-300 hover:text-white transition-colors duration-150" href="#features">
                 Features
               </a>
