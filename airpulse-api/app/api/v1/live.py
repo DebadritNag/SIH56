@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.collectors.corridors import LIVE_CORRIDORS, validate_corridor
 from app.core.security import UserContext, require_analyst, require_viewer
 from app.db.session import get_db
 from app.services.live_acquisition import enqueue_collection, enqueue_ingestion, get_live_run
@@ -29,11 +30,10 @@ class LiveRequest(BaseModel):
     @model_validator(mode='after')
     def valid_search(self):
         days = (self.departure_date - datetime.now(ZoneInfo('Asia/Kolkata')).date()).days
-        if self.origin == self.destination or not 0 <= days <= 365:
-            raise ValueError('Choose different airports and a departure within the next 365 days')
+        if days < 0:
+            raise ValueError('Departure date must not be in the past (Asia/Kolkata).')
+        validate_corridor(self.origin, self.destination)
         if self.source == 'happyfares':
-            if {self.origin, self.destination} != {'DEL', 'BOM'}:
-                raise ValueError('HappyFares prototype currently supports DEL and BOM only')
             self.engine = 'CRAWL4AI'
         elif self.engine == 'CRAWL4AI':
             raise ValueError('Crawl4AI is configured for HappyFares only')
@@ -61,6 +61,7 @@ async def configuration(source: Literal['yatra', 'happyfares'] = 'yatra', user: 
         except MemoryError as exc:
             browser_available, browser_message = False, str(exc)
     return {'success': True, 'data': {
+        'corridors': LIVE_CORRIDORS,
         'source': source, 'enabled': source_enabled(source),
         'server_now': now.isoformat(),
         'cooldown_until': cooldown_until.isoformat() if cooldown_until else None,
@@ -96,7 +97,7 @@ async def collect(payload: LiveRequest, db: AsyncSession = Depends(get_db), user
 
 @router.get('/runs')
 async def recent(db: AsyncSession = Depends(get_db), user: UserContext = Depends(require_viewer)):
-    return {'success': True, 'data': await rows(db, """SELECT id,status,created_at,quotes_received,metadata
+    return {'success': True, 'data': await rows(db, """SELECT id,status,created_at,started_at,finished_at,quotes_received,metadata
         FROM collection_runs WHERE run_type='LIVE_ACQUISITION' ORDER BY created_at DESC LIMIT 30""")}
 
 

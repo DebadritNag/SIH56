@@ -83,12 +83,12 @@ async def test_staging_only_and_hard_cap():
     assert result['records_processed'] == 15
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize('count,http,body,expected', [(20,200,'Flights','SUCCESS'),(0,200,'Flights','PARSE_ERROR'),(5,403,'Flights','BLOCKED'),(5,429,'Flights','RATE_LIMITED'),(5,200,'captcha','CAPTCHA_DETECTED'),(0,500,'Server error','HTTP_ERROR')])
+@pytest.mark.parametrize('count,http,body,expected', [(20,200,'Flights','SUCCESS'),(0,200,'Flights','PARSE_ERROR'),(5,403,'Flights','BLOCKED'),(5,429,'Flights','RATE_LIMITED'),(5,200,'captcha','CAPTCHA_DETECTED'),(0,500,'Server error','HTTP_ERROR'),(0,200,'No flights found','NO_AVAILABILITY')])
 async def test_crawler_hooks_and_cleanup(count, http, body, expected):
     import sys
     from types import SimpleNamespace
     class Cards:
-        async def count(self): return max(count, 1)
+        async def count(self): return 0 if body == 'No flights found' else max(count, 1)
         async def evaluate_all(self, expression):
             return [CARD.replace('SG-162', f'SG-{index+100}') for index in range(count)] if count else ['invalid card']
         def nth(self, index):
@@ -188,3 +188,58 @@ def test_source_cooldown_deadline_and_expiry():
     assert source_cooldown({'last_failure_at': now - timedelta(minutes=2)}, now) == now + timedelta(minutes=3)
     assert source_cooldown({'last_failure_at': now - timedelta(minutes=5)}, now) is None
     assert source_cooldown({'last_failure_at': now - timedelta(minutes=6)}, now) is None
+
+
+@pytest.mark.parametrize('origin,destination', [('DEL','BOM'),('DEL','CCU'),('BOM','BLR')])
+@pytest.mark.parametrize('departure', [date(2026,9,17), date(2027,1,2), date(2028,2,29)])
+def test_corridor_navigation_and_observed_context(origin, destination, departure):
+    from urllib.parse import parse_qs, urlparse
+    from app.collectors.sources.happyfares import search_url
+    from app.api.v1.live import LiveRequest
+    from datetime import datetime, timezone
+    fake_now = datetime(2026,9,10,tzinfo=timezone.utc)
+    with patch('app.api.v1.live.datetime') as clock:
+        clock.now.return_value = fake_now
+        payload = LiveRequest(source='happyfares', origin=origin, destination=destination, departure_date=departure)
+    assert payload.model_dump(mode='json')['departure_date'] == departure.isoformat()
+    url = search_url(origin, destination, payload.departure_date)
+    query = parse_qs(urlparse(url).path.split('/flights/')[1], keep_blank_values=True)
+    assert query['origin'] == [origin] and query['destination'] == [destination]
+    assert query['onward'] == [departure.strftime('%d-%m-%Y')]
+    assert query['adult'] == ['1'] and query['class'] == ['ECONOMY']
+    req = SearchRequest(origin=origin, destination=destination, departure_date=departure, booking_window_days=(departure-fake_now.date()).days)
+    card = CARD.replace('(BOM)', f'({destination})').replace('(DEL)', f'({origin})').replace('Tue, 08 Sep 2026', departure.strftime('%a, %d %b %Y'))
+    row = parse_card(card, req, fake_now.isoformat(), url)
+    assert (row['origin'], row['destination'], row['departure_date']) == (origin,destination,str(departure))
+    assert row['advance_purchase_days'] == (departure-fake_now.date()).days == row['booking_window_days']
+    assert row['booking_window_bucket'].startswith('T+')
+    assert parse_card(card.replace(f'({destination})','(NMI)'), req, fake_now.isoformat(), url) is None
+    assert parse_card(card.replace(departure.strftime('%a, %d %b %Y'), 'Tue, 08 Sep 2026'), req, fake_now.isoformat(), url) is None
+
+
+@pytest.mark.parametrize('origin,destination,departure', [('DEL','DEL','2099-01-01'),('BOM','DEL','2099-01-01'),('DEL','HYD','2099-01-01'),('DEL','BOM','2000-01-01'),('DEL','BOM','2027-02-29')])
+def test_invalid_live_search(origin,destination,departure):
+    from app.api.v1.live import LiveRequest
+    from pydantic import ValidationError
+    with pytest.raises(ValidationError):
+        LiveRequest(source='happyfares',origin=origin,destination=destination,departure_date=departure)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('origin,destination', [('DEL','BOM'),('DEL','CCU'),('BOM','BLR')])
+async def test_requested_corridor_reaches_queue_and_history(origin,destination):
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+    from types import SimpleNamespace
+    from app.api.v1.live import LiveRequest, collect
+    from app.services.live_acquisition import get_live_run
+    departure = datetime.now(ZoneInfo('Asia/Kolkata')).date()+timedelta(days=30)
+    req = LiveRequest(source='happyfares',origin=origin,destination=destination,departure_date=departure)
+    enqueue = AsyncMock(return_value={'collection_run_id':str(uuid4())})
+    with patch('app.api.v1.live.source_enabled',return_value=True), patch('app.api.v1.live.enqueue_collection',enqueue):
+        await collect(req,AsyncMock(),SimpleNamespace(user_id=str(uuid4())))
+    sent=enqueue.await_args.args[1]
+    assert (sent['origin'],sent['destination'],sent['departure_date'],sent['booking_window_days']) == (origin,destination,str(departure),30)
+    with patch('app.services.live_acquisition.rows',AsyncMock(side_effect=[[{'metadata':{'request':sent}}],[],[],[]])):
+        result=await get_live_run(AsyncMock(),uuid4())
+    assert result['metadata']['request']==sent

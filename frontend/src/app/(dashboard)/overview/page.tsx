@@ -144,18 +144,21 @@ export default function OverviewPage() {
     summary: dashboardSummary,
     meta,
     isFetching: isSummaryFetching,
+    isPending: isSummaryPending,
     refetch: refetchSummary,
   } = useDashboardSummary(filters);
 
   const {
     trend: trendData,
     isFetching: isTrendFetching,
+    isPending: isTrendPending,
     refetch: refetchTrend,
   } = useNationalTrend(filters);
 
   const {
     contributors: contributorSets,
     isFetching: isContribFetching,
+    isPending: isContribPending,
     refetch: refetchContrib,
   } = useRouteContributors(filters);
 
@@ -199,6 +202,8 @@ export default function OverviewPage() {
     filters.sourceIds.length > 0 ||
     filters.dateRange.preset !== '30D' ||
     Boolean(filters.compareMode);
+
+  if (!meta.isMock && isSummaryPending) return <div role="status" aria-label="Loading live overview" className="space-y-5"><h1 className="text-2xl font-semibold">Airfare Intelligence Overview</h1><p className="text-sm text-slate-500">Loading observed market data…</p><div className="grid gap-4 sm:grid-cols-3">{[1, 2, 3].map(i => <div key={i} className="h-32 animate-pulse rounded-lg bg-slate-200 motion-reduce:animate-none" />)}</div><div className="h-72 animate-pulse rounded-lg bg-slate-200 motion-reduce:animate-none" /></div>;
 
   return (
     <div className="space-y-5">
@@ -381,7 +386,7 @@ export default function OverviewPage() {
               </span>
             </div>
           </div>
-          <NationalIndexChart data={trendData} compareMode={filters.compareMode} />
+          {!meta.isMock && isTrendPending ? <div role="status" aria-label="Loading index trend" className="h-64 animate-pulse rounded bg-slate-100 motion-reduce:animate-none" /> : <NationalIndexChart data={trendData} compareMode={filters.compareMode} />}
         </div>
 
         {/* Top APIx Contributors */}
@@ -418,7 +423,7 @@ export default function OverviewPage() {
               Index point impact based on route fare shift and DGCA passenger traffic weights:
             </p>
 
-            <WaterfallContributionChart contributors={contributors} />
+            {!meta.isMock && isContribPending ? <div role="status" aria-label="Loading route contributions" className="h-64 animate-pulse rounded bg-slate-100 motion-reduce:animate-none" /> : <WaterfallContributionChart contributors={contributors} />}
           </div>
 
           <div className="mt-3 pt-3 border-t border-[#F1F5F9] flex items-center justify-between text-xs">

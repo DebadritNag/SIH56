@@ -6,14 +6,14 @@ from zoneinfo import ZoneInfo
 
 from app.scraping.happyfares_browser import CARD, search_url as legacy_search_url
 from urllib.parse import quote
+from app.collectors.corridors import validate_corridor
+from app.core.utils import bucket_from_lead_days
 
 
 def search_url(origin, destination, departure):
     # Labels and BType were present in the public URL captured by the working UI.
-    # This first adapter is verified only for the requested DEL/BOM prototype.
-    names = {'DEL': 'new delhi', 'BOM': 'mumbai'}
-    if origin not in names or destination not in names:
-        raise ValueError('HappyFares Crawl4AI currently supports DEL and BOM only')
+    validate_corridor(origin, destination)
+    names = {'DEL': 'new delhi', 'BOM': 'mumbai', 'CCU': 'kolkata', 'BLR': 'bengaluru'}
     url = legacy_search_url(origin, destination, departure)
     return url.replace('&student=', f'&originName={quote(names[origin])}&destinationName={quote(names[destination])}&BType=&student=')
 
@@ -60,6 +60,7 @@ def parse_card(text, request, observed_at, url):
         return None
     checksum = hashlib.sha256(text.encode()).hexdigest()
     observed = datetime.fromisoformat(observed_at.replace('Z', '+00:00'))
+    advance_days = (dates[0]-observed.astimezone(ZoneInfo('Asia/Kolkata')).date()).days
     return dict(source='HappyFares', source_url=url, observed_at=observed_at,
         origin=codes[0], destination=codes[1], departure_date=str(dates[0]),
         arrival_date=str(dates[1]) if len(dates) == 2 else None,
@@ -67,7 +68,8 @@ def parse_card(text, request, observed_at, url):
         departure_time=times[0] if len(times) == 2 else None, arrival_time=times[1] if len(times) == 2 else None,
         **components, mandatory_fees=None, gross_total=total, currency='INR',
         cabin_class='economy', is_non_stop=None if stops is None else not stops,
-        booking_window_days=(dates[0]-observed.astimezone(ZoneInfo('Asia/Kolkata')).date()).days,
+        booking_window_days=advance_days, advance_purchase_days=advance_days,
+        booking_window_bucket=bucket_from_lead_days(advance_days),
         acquisition_method='CRAWL4AI', data_origin='LIVE', raw_evidence=text, response_hash=checksum,
         provenance=dict(source='HappyFares', engine='CRAWL4AI', acquisition_method='CRAWL4AI',
             observed_at=observed_at, requested_url=url, response_hash=checksum, raw_card_text=text,

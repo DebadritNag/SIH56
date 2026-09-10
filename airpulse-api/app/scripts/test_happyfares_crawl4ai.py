@@ -1,4 +1,5 @@
 """Queue one real HappyFares diagnostic through Celery, leaving evidence staged."""
+import argparse
 import asyncio
 import json
 from datetime import datetime, timedelta
@@ -10,10 +11,18 @@ from app.services.live_acquisition import enqueue_collection, get_live_run
 
 
 async def main():
-    departure = datetime.now(ZoneInfo('Asia/Kolkata')).date() + timedelta(days=7)
+    from app.api.v1.live import LiveRequest
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--origin', default='DEL')
+    parser.add_argument('--destination', default='BOM')
+    parser.add_argument('--departure', default=str(datetime.now(ZoneInfo('Asia/Kolkata')).date()+timedelta(days=7)))
+    args = parser.parse_args()
+    request = LiveRequest(source='happyfares', origin=args.origin, destination=args.destination, departure_date=args.departure, max_results=5)
+    departure = request.departure_date
+    days = (departure-datetime.now(ZoneInfo('Asia/Kolkata')).date()).days
     async with AsyncSessionLocal() as db:
-        job = await enqueue_collection(db, dict(source='happyfares', origin='DEL', destination='BOM',
-            departure_date=str(departure), booking_window_days=7, passengers=1, cabin='economy',
+        job = await enqueue_collection(db, dict(source='happyfares', origin=request.origin, destination=request.destination,
+            departure_date=str(departure), booking_window_days=days, passengers=1, cabin='economy',
             currency='INR', max_results=5, engine='CRAWL4AI'))
     print(json.dumps({'run_id':job['collection_run_id'], 'status':'QUEUED', 'source':'HappyFares', 'engine':'CRAWL4AI'}), flush=True)
     for _ in range(100):

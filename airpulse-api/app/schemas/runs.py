@@ -12,7 +12,7 @@ class SearchRequest(BaseModel):
     origin: str = Field(..., min_length=3, max_length=3, description="3-letter IATA code, e.g. DEL")
     destination: str = Field(..., min_length=3, max_length=3, description="3-letter IATA code, e.g. BOM")
     departure_date: date
-    booking_window_days: int = Field(..., ge=0, le=365)
+    booking_window_days: int = Field(..., ge=0)
     passengers: int = Field(1, ge=1, le=9)
     cabin: CabinClass = CabinClass.ECONOMY
     currency: str = "INR"
