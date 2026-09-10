@@ -4,8 +4,8 @@ import { TrendingUp, Users, Building2, FileText } from "lucide-react";
 
 export function AboutWhyItMatters() {
   return (
-    <section className="py-20 bg-[#050c18] text-white border-b border-slate-800">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section className="py-20 bg-[#050c18] text-white border-b border-slate-800 w-full">
+      <div className="w-full max-w-[96vw] lg:max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-12">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
           {/* Left Side: Content & 4 Features */}
           <div className="lg:col-span-6 space-y-6">

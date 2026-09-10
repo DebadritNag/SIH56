@@ -3,8 +3,8 @@ import Image from "next/image";
 
 export function AboutCpiConnection() {
   return (
-    <section className="py-20 bg-[#f0f7fd] border-b border-sky-100 text-slate-800">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section className="py-20 bg-[#f0f7fd] border-b border-sky-100 text-slate-800 w-full">
+      <div className="w-full max-w-[96vw] lg:max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-12">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
           {/* Left: Description */}
           <div className="lg:col-span-5 space-y-4">

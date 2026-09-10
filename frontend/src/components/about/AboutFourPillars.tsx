@@ -3,8 +3,8 @@ import { ShieldCheck, Layers, Cpu, FileCheck } from "lucide-react";
 
 export function AboutFourPillars() {
   return (
-    <section className="py-20 bg-[#050c18] text-white border-b border-slate-800">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section className="py-20 bg-[#050c18] text-white border-b border-slate-800 w-full">
+      <div className="w-full max-w-[96vw] lg:max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-12">
         <div className="text-center sm:text-left mb-12">
           <span className="text-xs uppercase tracking-[0.25em] font-bold text-cyan-400 block mb-2">
             Our Four Pillars

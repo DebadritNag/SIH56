@@ -23,66 +23,78 @@ export function AboutNavbar() {
   };
 
   return (
-    <header className="sticky top-0 z-50 bg-[#050c18]/95 backdrop-blur-md border-b border-slate-800/80">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-        {/* Logo */}
-        <Link href="/" className="flex items-center group shrink-0" title="VAYANTARA Home">
+    <header
+      className="w-full border-b border-white/10 backdrop-blur-md sticky top-0 z-50 transition-colors duration-200"
+      style={{
+        background: "linear-gradient(180deg, rgba(6, 21, 34, 0.98) 0%, rgba(4, 17, 29, 0.96) 100%)",
+      }}
+    >
+      <div className="w-full max-w-[96vw] mx-auto px-4 sm:px-6 lg:px-12 py-3.5 sm:py-4 flex items-center justify-between gap-6">
+        {/* Logo - Anchoring Top-Left */}
+        <Link href="/" className="flex items-center group cursor-pointer shrink-0" title="VAYANTARA Home">
           <div className="relative flex items-center justify-center py-1">
+            {/* Subtle localized radial glow behind the logo */}
+            <div
+              aria-hidden="true"
+              className="absolute inset-0 -inset-x-5 -inset-y-3 rounded-full pointer-events-none"
+              style={{
+                background:
+                  "radial-gradient(ellipse at 28% 50%, rgba(0, 190, 255, 0.22) 0%, rgba(2, 132, 199, 0.10) 45%, transparent 72%)",
+              }}
+            />
             <Image
               src="/top left.png"
               alt="VAYANTARA"
-              width={180}
-              height={60}
+              width={220}
+              height={64}
               priority
               unoptimized
-              className="w-[150px] sm:w-[175px] h-auto object-contain filter brightness-[1.22] contrast-[1.15] saturate-[1.15] drop-shadow-[0_0_1px_rgba(255,255,255,0.35)] transition-transform duration-200 group-hover:scale-[1.02]"
+              className="w-[170px] sm:w-[195px] lg:w-[220px] h-auto object-contain relative z-10 filter brightness-[1.22] contrast-[1.15] saturate-[1.15] drop-shadow-[0_0_1px_rgba(255,255,255,0.35)] transition-transform duration-200 group-hover:scale-[1.02]"
             />
           </div>
         </Link>
 
-        {/* Desktop Navigation Links */}
-        <nav className="hidden md:flex items-center space-x-7 text-xs tracking-wider uppercase font-medium text-slate-300">
-          <Link className="hover:text-white transition-colors" href="/">
+        {/* Desktop Navigation Links - Centered */}
+        <nav className="hidden md:flex items-center space-x-7 lg:space-x-8 text-xs font-medium tracking-wide">
+          <Link className="text-slate-300 hover:text-white transition-colors duration-150" href="/">
             Home
           </Link>
-          <Link className="text-[#00c2ff] font-semibold border-b-2 border-[#00c2ff] pb-1" href="/about">
+          <Link className="text-white relative py-1.5 font-semibold" href="/about">
             About
+            <span className="absolute bottom-0 left-0 w-full h-[2.5px] bg-brand-cyan rounded-full shadow-[0_0_8px_#00D2FF]" />
           </Link>
-          <Link className="hover:text-white transition-colors" href="/#features">
+          <Link className="text-slate-300 hover:text-white transition-colors duration-150" href="/#features">
             Features
           </Link>
-          <Link className="hover:text-white transition-colors" href="/methodology">
+          <Link className="text-slate-300 hover:text-white transition-colors duration-150" href="/methodology">
             Data &amp; Methodology
           </Link>
-          <Link className="hover:text-white transition-colors" href="/overview">
+          <Link className="text-slate-300 hover:text-white transition-colors duration-150" href="/overview">
             Dashboard
           </Link>
-          <Link className="hover:text-white transition-colors" href="/downloads">
+          <Link className="text-slate-300 hover:text-white transition-colors duration-150" href="/downloads">
             Reports
           </Link>
-          <Link className="hover:text-white transition-colors" href="/#resources">
+          <Link className="text-slate-300 hover:text-white transition-colors duration-150" href="/#resources">
             Resources
           </Link>
         </nav>
 
-        {/* Right Action */}
-        <div className="flex items-center gap-4">
+        {/* Action Items - Grouped at Far Right */}
+        <div className="flex items-center space-x-4 shrink-0">
           <button
             aria-label="Search routes and intelligence"
-            className="p-2 text-slate-300 hover:text-white transition-colors cursor-pointer"
+            className="p-2 text-slate-300 hover:text-brand-cyan transition-colors cursor-pointer"
             type="button"
             onClick={() => setSearchOpen(!searchOpen)}
           >
-            <Search className="w-5 h-5" />
+            <Search className="w-4 h-4" />
           </button>
           <Link
-            className="inline-flex items-center gap-2 bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-semibold px-4 py-2.5 rounded shadow transition-all duration-150 active:scale-95 cursor-pointer"
+            className="glow-cyan-btn inline-flex items-center justify-center px-5 py-2 text-xs font-semibold rounded-full bg-gradient-to-r from-brand-cyan to-sky-400 text-brand-dark hover:brightness-110 active:scale-95 transition-all cursor-pointer"
             href="/signup"
           >
-            <span>Get Access</span>
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path d="M14 5l7 7m0 0l-7 7m7-7H3" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" />
-            </svg>
+            Get Access <span className="ml-1.5 font-bold">→</span>
           </Link>
 
           {/* Mobile Menu Button */}
@@ -92,14 +104,14 @@ export function AboutNavbar() {
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label="Toggle navigation menu"
           >
-            {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
       </div>
 
       {/* Quick Search Dropdown */}
       {searchOpen && (
-        <div className="fixed top-20 inset-x-0 z-50 flex justify-center px-4 bg-[#050c18]/90 py-4 backdrop-blur-md border-b border-slate-800">
+        <div className="fixed top-20 inset-x-0 z-50 flex justify-center px-4 bg-[#050c18]/95 py-4 backdrop-blur-md border-b border-slate-800">
           <form onSubmit={handleSearchSubmit} className="w-full max-w-lg relative">
             <input
               type="text"

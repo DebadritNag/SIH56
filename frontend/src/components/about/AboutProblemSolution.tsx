@@ -3,8 +3,8 @@ import { ArrowRight, X } from "lucide-react";
 
 export function AboutProblemSolution() {
   return (
-    <section className="py-20 bg-white border-b border-slate-200 text-slate-800">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section className="py-20 bg-white border-b border-slate-200 text-slate-800 w-full">
+      <div className="w-full max-w-[96vw] lg:max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-12">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
           {/* Left: Problem Header & Subtitle */}
           <div className="lg:col-span-5 space-y-4">

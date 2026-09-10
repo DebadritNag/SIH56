@@ -4,8 +4,8 @@ import { Layers, ShieldCheck, Sparkles, TrendingUp } from "lucide-react";
 
 export function AboutWhatIs() {
   return (
-    <section className="py-20 bg-white border-b border-slate-200">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section className="py-20 bg-white border-b border-slate-200 w-full">
+      <div className="w-full max-w-[96vw] lg:max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-12">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
           {/* Left Side: Conceptual Narrative & Feature Grid */}
           <div className="lg:col-span-6 flex flex-col justify-between">
@@ -66,12 +66,12 @@ export function AboutWhatIs() {
             </div>
           </div>
 
-          {/* Right Side: 5-Stage Layered Diagram Image */}
-          <div className="lg:col-span-6 flex items-center justify-center">
-            <div className="relative w-full max-w-xl mx-auto rounded-2xl bg-white border border-slate-200/90 p-3 sm:p-5 shadow-lg hover:shadow-xl transition-shadow duration-300">
-              <span className="text-xs uppercase tracking-[0.25em] font-bold text-slate-500 mb-3 block text-center sm:text-left">
-                From Data to Economic Insight
-              </span>
+          {/* Right Side: 5-Stage Layered Diagram Clean Without Card Frame */}
+          <div className="lg:col-span-6 flex flex-col justify-center">
+            <span className="text-xs uppercase tracking-[0.25em] font-bold text-slate-500 mb-4 block text-center sm:text-left">
+              From Data to Economic Insight
+            </span>
+            <div className="relative w-full max-w-xl mx-auto flex items-center justify-center">
               <Image
                 src="/layered.png"
                 alt="VAYANTARA Data to Economic Insight Layered Architecture"
