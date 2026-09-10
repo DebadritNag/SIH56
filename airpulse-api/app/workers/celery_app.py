@@ -5,7 +5,11 @@ celery_app = Celery(
     "airpulse_worker",
     broker=settings.CELERY_BROKER_URL,
     backend=settings.CELERY_RESULT_BACKEND,
-    include=['app.workers.collection_tasks'],
+    include=[
+        'app.workers.collection_tasks',
+        'app.workers.health_tasks',
+        'app.workers.index_tasks',
+    ],
 )
 
 celery_app.conf.update(

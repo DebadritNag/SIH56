@@ -57,7 +57,7 @@ def process_collection_run_task(collection_run_id_str: str):
     return asyncio.run(_async_run())
 
 
-@celery_app.task(name="app.workers.reference_tasks.sync_all_government_references")
+@celery_app.task(name="app.workers.collection_tasks.sync_all_government_references")
 def sync_all_government_references():
     """Periodic task synchronizing official MoSPI eSankhyiki and DGCA reference data."""
     from app.services.reference_data_service import ReferenceDataService
