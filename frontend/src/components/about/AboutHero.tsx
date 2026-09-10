@@ -7,23 +7,23 @@ import { ArrowRight, Play, Plane, Layers, BarChart3, ShieldCheck } from "lucide-
 
 export function AboutHero() {
   return (
-    <section className="relative w-full min-h-[calc(100vh-80px)] min-h-[680px] flex flex-col justify-between text-white overflow-hidden">
-      {/* Full-Width Background Image - 100% Original Colors Without Dark Overlays */}
-      <div className="absolute inset-0 z-0 pointer-events-none">
+    <section className="relative w-full min-h-[calc(100vh-76px)] min-h-[640px] sm:min-h-[700px] lg:min-h-[780px] xl:min-h-[850px] flex flex-col justify-between text-white overflow-hidden bg-[#030b17]">
+      {/* Full-Width Background Image - Tuned to preserve India map, aircraft & runway lights */}
+      <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
         <Image
           src="/About-back.png"
           alt="VAYANTARA Airfare Intelligence Network"
           fill
           priority
           sizes="100vw"
-          className="object-cover object-center"
+          className="object-cover object-[center_32%] sm:object-[center_26%] lg:object-[center_24%] xl:object-[center_26%]"
         />
       </div>
 
-      {/* Main Content Area */}
-      <div className="w-full max-w-[96vw] lg:max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-12 pt-12 sm:pt-16 pb-8 relative z-10 flex-1 flex flex-col justify-between">
+      {/* Main Content Area - Shifted toward left edge (5-8vw) matching landing page */}
+      <div className="w-full px-4 sm:px-6 md:px-8 lg:px-[6vw] xl:px-[7vw] pt-10 sm:pt-14 pb-6 sm:pb-8 relative z-10 flex-1 flex flex-col justify-between">
         {/* Top Meta Tagline */}
-        <div className="flex justify-between items-start mb-8">
+        <div className="flex justify-between items-start mb-6 sm:mb-8">
           <span className="text-xs uppercase tracking-[0.25em] font-semibold text-cyan-400 drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
             About VAYANTARA
           </span>
@@ -35,17 +35,17 @@ export function AboutHero() {
           </div>
         </div>
 
-        {/* Hero Narrative Block - Positioned Naturally Over Cinematic Background */}
-        <div className="my-auto py-6 max-w-2xl">
-          <div className="p-6 sm:p-8 rounded-2xl backdrop-blur-[3px] bg-gradient-to-r from-[#030b17]/85 via-[#041224]/70 to-transparent border border-white/10 shadow-2xl">
-            <h1 className="text-4xl sm:text-5xl lg:text-[54px] font-extrabold tracking-tight leading-[1.15] drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)]">
+        {/* Hero Narrative Block - Positioned Far Left, No Heavy Box Covering Background */}
+        <div className="my-auto py-4 max-w-xl lg:max-w-[560px]">
+          <div className="p-0 sm:p-2">
+            <h1 className="text-4xl sm:text-5xl lg:text-[52px] font-extrabold tracking-tight leading-[1.14] drop-shadow-[0_3px_12px_rgba(0,0,0,0.95)]">
               From airfare movement to{" "}
-              <span className="text-[#00c8ff] inline-block drop-shadow-[0_0_20px_rgba(0,200,255,0.4)]">
+              <span className="text-[#00c8ff] inline-block drop-shadow-[0_0_24px_rgba(0,200,255,0.45)]">
                 economic intelligence.
               </span>
             </h1>
 
-            <p className="text-slate-200 text-base sm:text-lg leading-relaxed mt-5 font-normal drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
+            <p className="text-slate-100 text-base sm:text-lg leading-relaxed mt-5 font-normal drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]">
               VAYANTARA transforms dynamic airfare data into a transparent, high-frequency Airfare Price Index (APIx) to support better economic measurement and policy decisions for India.
             </p>
 
@@ -71,8 +71,8 @@ export function AboutHero() {
           </div>
         </div>
 
-        {/* Hero Bottom KPI Strip - Integrated Over Background */}
-        <div className="mt-8 pt-6 border-t border-white/15 backdrop-blur-[4px] bg-[#030b17]/50 rounded-xl p-4 sm:p-5 grid grid-cols-2 md:grid-cols-5 gap-6 items-center">
+        {/* Hero Bottom KPI Strip - Lightweight, Letting Airport Runway Lights Shine Through */}
+        <div className="mt-6 pt-5 border-t border-white/10 backdrop-blur-[2px] bg-[#030b17]/30 rounded-xl p-3.5 sm:p-5 grid grid-cols-2 md:grid-cols-5 gap-5 sm:gap-6 items-center">
           {/* Metric 1 */}
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-lg bg-blue-950/80 border border-blue-500/30 text-cyan-400 shrink-0">

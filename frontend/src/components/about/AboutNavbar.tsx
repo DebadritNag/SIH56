@@ -29,7 +29,7 @@ export function AboutNavbar() {
         background: "linear-gradient(180deg, rgba(6, 21, 34, 0.98) 0%, rgba(4, 17, 29, 0.96) 100%)",
       }}
     >
-      <div className="w-full max-w-[96vw] mx-auto px-4 sm:px-6 lg:px-12 py-3.5 sm:py-4 flex items-center justify-between gap-6">
+      <div className="w-full px-4 sm:px-6 md:px-8 lg:px-[6vw] xl:px-[7vw] py-3.5 sm:py-4 flex items-center justify-between gap-6">
         {/* Logo - Anchoring Top-Left */}
         <Link href="/" className="flex items-center group cursor-pointer shrink-0" title="VAYANTARA Home">
           <div className="relative flex items-center justify-center py-1">
@@ -50,6 +50,7 @@ export function AboutNavbar() {
               priority
               unoptimized
               className="w-[170px] sm:w-[195px] lg:w-[220px] h-auto object-contain relative z-10 filter brightness-[1.22] contrast-[1.15] saturate-[1.15] drop-shadow-[0_0_1px_rgba(255,255,255,0.35)] transition-transform duration-200 group-hover:scale-[1.02]"
+              style={{ height: "auto" }}
             />
           </div>
         </Link>

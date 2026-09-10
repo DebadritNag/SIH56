@@ -19,15 +19,16 @@ export function AboutCpiConnection() {
             </p>
           </div>
 
-          {/* Right: Flowchart Image */}
+          {/* Right: Flowchart Image - Clean Graphic Placed Directly on Section Background */}
           <div className="lg:col-span-7 flex items-center justify-center">
-            <div className="relative w-full max-w-2xl mx-auto rounded-2xl bg-white border border-sky-200/80 p-3 sm:p-5 shadow-sm hover:shadow-md transition-shadow duration-300">
+            <div className="relative w-full max-w-2xl mx-auto">
               <Image
                 src="/flow.png"
                 alt="Observed Airfare Data to CPI & Economic Analysis Flowchart"
                 width={1536}
                 height={1024}
-                className="w-full h-auto object-contain drop-shadow-sm"
+                className="w-full h-auto object-contain"
+                style={{ height: "auto" }}
               />
             </div>
           </div>

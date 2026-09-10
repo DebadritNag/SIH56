@@ -64,6 +64,7 @@ export function AboutWhyItMatters() {
                 width={1448}
                 height={1086}
                 className="w-full h-auto object-contain rounded-2xl transition-transform duration-500 group-hover:scale-[1.02]"
+                style={{ height: "auto" }}
               />
             </div>
           </div>
