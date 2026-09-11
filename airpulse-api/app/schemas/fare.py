@@ -2,7 +2,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 from uuid import UUID
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.core.enums import CabinClass, ValidationStatus
 
@@ -116,6 +116,50 @@ class ValidatedFareResponse(BaseModel):
     fareguard_prediction: Optional[float] = None
     priceguard_score: Optional[float] = None
     anomaly_status: Optional[str] = "NORMAL"
+    # Source identity — resolved from the sources table join so the frontend
+    # does not have to hardcode a label.  None when source is not registered.
+    source_name: Optional[str] = None          # e.g. "HappyFares", "Goibibo"
+    source_display_name: Optional[str] = None  # e.g. "HappyFares (prototype)"
+    acquisition_method: Optional[str] = None   # e.g. "CRAWL4AI", "HTTP", "CSV_IMPORT"
+
+    @model_validator(mode='before')
+    @classmethod
+    def _pull_source_attrs(cls, data: Any) -> Any:
+        """When populating from an ORM object that has the repo-attached
+        _source_name / _source_display_name / _acquisition_method attributes,
+        pull them into the data dict so Pydantic picks them up as top-level fields.
+
+        For plain dict inputs (tests, JSON deserialization) this is a no-op.
+        """
+        if not hasattr(data, '_source_name'):
+            # Dict / mapping path — nothing to do, Pydantic handles normally
+            return data
+
+        # ORM object path: the model_validator receives the ORM instance before
+        # Pydantic maps fields.  We return a plain dict that uses the *alias*
+        # names expected by the schema (e.g. 'airline_code' from alias 'airline').
+        obj = data
+        # Build a flat dict keyed by the Python field name.
+        # For aliased fields we must read the ORM attribute name, not the alias.
+        alias_map: dict[str, str] = {}
+        for fname, finfo in cls.model_fields.items():
+            alias = finfo.validation_alias
+            if isinstance(alias, str):
+                alias_map[fname] = alias  # fname -> orm_attr_name
+
+        d: dict[str, Any] = {}
+        for fname in cls.model_fields:
+            orm_attr = alias_map.get(fname, fname)
+            try:
+                d[fname] = getattr(obj, orm_attr, None)
+            except Exception:
+                d[fname] = None
+
+        # Override with the private repo-attached source attributes
+        d['source_name'] = getattr(obj, '_source_name', None)
+        d['source_display_name'] = getattr(obj, '_source_display_name', None)
+        d['acquisition_method'] = getattr(obj, '_acquisition_method', None)
+        return d
 
 
 class FareFilterParams(BaseModel):

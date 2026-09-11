@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node src/__tests__/price-shock-sync.test.mjs && node src/__tests__/market-signals-sync.test.mjs && node src/__tests__/trust-strip-consistency.test.mjs"
+    "test": "node src/__tests__/price-shock-sync.test.mjs && node src/__tests__/market-signals-sync.test.mjs && node src/__tests__/trust-strip-consistency.test.mjs && node src/__tests__/fare-explorer-consistency.test.mjs"
   },
   "dependencies": {
     "@hcaptcha/react-hcaptcha": "^2.2.0",

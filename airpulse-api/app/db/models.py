@@ -288,8 +288,21 @@ class ValidatedFare(Base):
 
     @property
     def anomaly_status(self) -> Optional[str]:
-        if self.anomaly and self.anomaly.severity:
-            return str(self.anomaly.severity).upper()
+        """Return a classification suitable for the frontend PriceGuard badge.
+
+        The frontend mapper treats 'OPEN', 'ANOMALOUS', and any non-NORMAL severity
+        string as anomalous.  We return the Anomaly.severity (HIGH/CRITICAL etc.)
+        when an anomaly exists so both the table badge and the drawer classification
+        read the same value from the same persisted record.
+
+        Returns:
+          - The anomaly severity string (e.g. 'HIGH', 'CRITICAL') when an anomaly row exists.
+          - 'NORMAL' when no anomaly row is associated.
+        """
+        if self.anomaly:
+            if self.anomaly.severity:
+                return str(self.anomaly.severity).upper()   # HIGH / MEDIUM / CRITICAL / LOW
+            return "OPEN"   # anomaly exists but severity not yet set
         return "NORMAL"
 
 

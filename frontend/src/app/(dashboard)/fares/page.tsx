@@ -15,7 +15,8 @@ import { useFares } from '@/lib/hooks/useResources';
 import { formatTimestamp } from '@/lib/utils/timestamps';
 
 function bwLabel(days?: number | null): string {
-  if (days == null) return 'T+0';
+  if (days == null) return 'T+?';
+  if (days === 0) return 'T+0';   // same-day observation
   if (days <= 2) return 'T+1';
   if (days <= 10) return 'T+7';
   if (days <= 20) return 'T+15';
@@ -31,13 +32,37 @@ function mapLiveFare(f: Record<string, unknown>): FareObservation {
   const origin = String(f.origin_code ?? f.origin ?? '');
   const dest = String(f.destination_code ?? f.destination ?? '');
   const dep = f.departure_at ? new Date(String(f.departure_at)) : null;
-  const bw = (f.booking_window_bucket as string) || bwLabel(f.booking_window_days as number | undefined);
-  const fgPred = typeof f.fareguard_prediction === 'number' ? f.fareguard_prediction : 0;
+
+  // Booking window: prefer persisted bucket from backend; compute from days as fallback.
+  const bwDays = f.booking_window_days as number | null | undefined;
+  const bw = (f.booking_window_bucket as string) || bwLabel(bwDays);
+
+  // FareGuard: use null-safe coercion; 0 is NOT a valid prediction — treat as unavailable.
+  const fgPred = typeof f.fareguard_prediction === 'number' && f.fareguard_prediction > 0
+    ? f.fareguard_prediction
+    : 0;
+
   const pgScore = typeof f.priceguard_score === 'number' ? f.priceguard_score : 0;
-  const rawAnom = String(f.anomaly_status ?? 'NORMAL').toUpperCase();
-  const isAnom = rawAnom === 'OPEN' || rawAnom === 'ANOMALOUS' || Boolean(f.is_anomaly);
+
+  // PriceGuard classification: anomaly_status from the backend now returns the
+  // Anomaly.severity value (HIGH/CRITICAL/MEDIUM/LOW) or "NORMAL" when no anomaly
+  // row exists.  Treat any non-NORMAL, non-empty status as anomalous so that
+  // a 99.2% percentile observation correctly shows ANOMALOUS in the table.
+  const rawAnom = String(f.anomaly_status ?? 'NORMAL').toUpperCase().trim();
+  const isAnom = rawAnom !== 'NORMAL' && rawAnom !== 'NOT_SCORED' && rawAnom !== '';
+
   const isImported = (f.data_origin as string) === 'IMPORTED';
-  const runId = String(f.collection_run_id ?? f.raw_fare_id ?? '810dacd0');
+  const runId = String(f.collection_run_id ?? f.raw_fare_id ?? '—');
+
+  // Source: read from the backend-joined fields; never hardcode.
+  // source_display_name > source_name > acquisition-based fallback.
+  const rawSourceDisplay = f.source_display_name as string | undefined;
+  const rawSourceName = f.source_name as string | undefined;
+  const acqMethod = f.acquisition_method as string | undefined;
+  const sourceLabel: string =
+    rawSourceDisplay ||
+    rawSourceName ||
+    (isImported ? 'Imported Dataset' : acqMethod ? `${acqMethod} Source` : 'Unknown Source');
 
   return {
     id: String(f.id),
@@ -47,7 +72,7 @@ function mapLiveFare(f: Record<string, unknown>): FareObservation {
     booking_window: bw,
     airline: String(f.airline_code ?? f.airline ?? 'UNKNOWN'),
     flight_number: String(f.flight_number ?? '—'),
-    source: 'Goibibo (OTA)',
+    source: sourceLabel,
     base_fare: base,
     taxes,
     fees: 0,
@@ -58,8 +83,15 @@ function mapLiveFare(f: Record<string, unknown>): FareObservation {
     provenance: {
       collection_run_id: runId,
       response_hash: String(f.quote_hash ?? '—'),
-      collector_version: isImported ? 'goibibo-csv-importer-v1.0.0' : 'ota-http-telemetry-v1.2.0',
-      parser_version: isImported ? 'goibibo-csv-importer-v1.0.0' : 'ota-parser-v2.1',
+      // Prefer actual collector/parser versions from backend if available
+      collector_version: String(
+        f.collector_version ??
+        (isImported ? 'goibibo-csv-importer-v1.0.0' : 'ota-http-telemetry-v1.2.0')
+      ),
+      parser_version: String(
+        f.parser_version ??
+        (isImported ? 'goibibo-csv-importer-v1.0.0' : 'ota-parser-v2.1')
+      ),
       fareguard_prediction: fgPred,
       priceguard_score: pgScore,
       index_eligible: true,

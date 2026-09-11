@@ -38,13 +38,26 @@ export const FareProvenanceDrawer: React.FC<FareProvenanceDrawerProps> = ({ fare
   const prov = (rawProv as Record<string, any>) || null;
 
   const isImported = (prov?.data_origin ?? fare.origin_type) === 'IMPORTED';
-  const sourceName = prov?.source_provider || fare.source || 'Goibibo (OTA)';
+  // Source: prefer the provenance endpoint's source_provider (joined from the sources table).
+  // Fall back to the table row's source (now derived from the backend join, not hardcoded).
+  // Never fall back to a hardcoded string like "Goibibo (OTA)".
+  const sourceName = prov?.source_provider || fare.source || 'Unknown Source';
   const originalRunId = prov?.collection_run_id || fare.provenance?.collection_run_id || '—';
   const runId = originalRunId;
   const displayFare = prov?.normalized_fare ? Number(prov.normalized_fare) : fare.total_fare;
   const routeDisplay = prov?.route ? prov.route.replace('-', ' → ') : fare.route;
   const bookingWindow = prov?.booking_window_bucket || fare.booking_window;
-  const actualLeadDays = prov?.actual_lead_days ?? (bookingWindow === 'T+1' ? 1 : 4);
+  // Use the persisted actual_lead_days from the provenance endpoint.
+  // Explicitly allow 0 (same-day departure) — do NOT fall back to 1 when the
+  // value is 0, because 0 means "observed and departed on the same day".
+  // The previous fallback `bookingWindow === 'T+1' ? 1 : 4` overwrote 0 with 1,
+  // causing the drawer to disagree with the table for same-day observations.
+  const actualLeadDays: number =
+    prov?.actual_lead_days != null
+      ? Number(prov.actual_lead_days)
+      : fare.provenance?.collection_run_id   // provenance not loaded yet
+      ? 0                                    // safe zero until loaded
+      : 0;
 
   // Use real backend lineage_steps if available, otherwise construct standard steps
   const lineageSteps = prov?.lineage_steps && Array.isArray(prov.lineage_steps)
