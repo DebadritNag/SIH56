@@ -158,7 +158,7 @@ async def test_live_pipeline_persistence_and_gating(artifacts, live_db, monkeypa
         explain_calls.append(True)
         return dict(base_value=4000, predicted_fare=5000, drivers=[])
     monkeypatch.setattr(ModelRegistryService, 'get_explainer', lambda model: SimpleNamespace(explainer=True, explain_fare=explain))
-    await pipeline.process_live_fares(None, raw['collection_run_id'], uuid4())
+    await pipeline.process_live_fares(AsyncMock(), raw['collection_run_id'], uuid4())
     stages = {v['step_name']:v for table,v in saved if table == 'pipeline_steps'}
     predictions = [v for table,v in saved if table == 'fare_predictions']
     if prediction == 5000:
@@ -210,7 +210,7 @@ async def test_live_pipeline_with_existing_fitted_models(live_db, monkeypatch):
         return inference.load_active(dict(version=data['version'], artifact_storage_path=str(path), feature_schema={'features':data['features']}), kind)
     monkeypatch.setattr(ModelRegistryService, 'get_active', active)
     raw, saved, index = live_db
-    result = await pipeline.process_live_fares(None, raw['collection_run_id'], uuid4())
+    result = await pipeline.process_live_fares(AsyncMock(), raw['collection_run_id'], uuid4())
     assert result['fareguard_scored'] == result['priceguard_scored'] == 1
     assert result['shap_count'] == 1
     predictions = [v for table,v in saved if table == 'fare_predictions']

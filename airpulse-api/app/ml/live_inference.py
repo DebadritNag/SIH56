@@ -24,7 +24,7 @@ async def active_record(db, kind):
     raise InferenceUnavailable('MODEL_UNAVAILABLE', f'No ACTIVE {kind} model in registry')
 
 
-def artifact_path(record):
+def configured_artifact_path(record):
     root = Path(__file__).resolve().parents[2]
     directory = Path(settings.MODEL_DIR)
     if not directory.is_absolute():
@@ -34,11 +34,22 @@ def artifact_path(record):
         raise InferenceUnavailable('MODEL_ARTIFACT_MISSING', 'Registry has no artifact path')
     # Registry artifacts were originally registered on Windows; Docker is Linux.
     normalized = Path(str(stored).replace('\\', '/'))
-    candidates = [directory / normalized.name, normalized if normalized.is_absolute() else root / normalized]
-    for candidate in candidates:
-        if candidate.is_file():
-            return candidate.resolve()
-    raise InferenceUnavailable('MODEL_ARTIFACT_MISSING', f'{normalized.name} is not accessible under MODEL_DIR or its registered path')
+    return (directory / normalized.name).resolve()
+
+
+def artifact_path(record):
+    path = configured_artifact_path(record)
+    try:
+        path.stat()
+        if not path.is_file():
+            raise InferenceUnavailable('MODEL_LOAD_ERROR', 'Artifact path is not a file')
+        with path.open('rb') as stream:
+            stream.read(1)
+    except FileNotFoundError as exc:
+        raise InferenceUnavailable('MODEL_ARTIFACT_MISSING', f'{path.name} is absent from MODEL_DIR') from exc
+    except PermissionError as exc:
+        raise InferenceUnavailable('MODEL_LOAD_ERROR', 'Artifact exists but is not readable by this process') from exc
+    return path
 
 
 _cache = {}

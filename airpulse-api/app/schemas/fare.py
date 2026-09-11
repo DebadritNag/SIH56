@@ -115,7 +115,22 @@ class ValidatedFareResponse(BaseModel):
     created_at: datetime
     fareguard_prediction: Optional[float] = None
     priceguard_score: Optional[float] = None
-    anomaly_status: Optional[str] = "NORMAL"
+    anomaly_status: Optional[str] = "NOT_SCORED"
+    observation_id: Optional[UUID] = None
+    collection_run_id: Optional[UUID] = None
+    ingestion_run_id: Optional[UUID] = None
+    pipeline_run_id: Optional[UUID] = None
+    payload_sha256: Optional[str] = None
+    collector_version: Optional[str] = None
+    parser_version: Optional[str] = None
+    source_provider: Optional[str] = None
+    observed_at: Optional[datetime] = None
+    departure_date: Optional[date] = None
+    fareguard_status: Optional[str] = None
+    fareguard_reason: Optional[str] = None
+    priceguard_status: Optional[str] = None
+    priceguard_reason: Optional[str] = None
+    audit: Optional[Dict[str, Any]] = None
     # Source identity — resolved from the sources table join so the frontend
     # does not have to hardcode a label.  None when source is not registered.
     source_name: Optional[str] = None          # e.g. "HappyFares", "Goibibo"

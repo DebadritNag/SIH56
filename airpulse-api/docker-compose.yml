@@ -60,6 +60,7 @@ services:
       - "127.0.0.1:8000:10000"
     environment:
       - PORT=10000
+      - MODEL_DIR=/app/models
       # DB: host .env overrides these; fallback = local postgres for dev
       - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://postgres:postgrespassword@postgres:5432/postgres}
       - DATABASE_URL_SYNC=${DATABASE_URL_SYNC:-postgresql://postgres:postgrespassword@postgres:5432/postgres}
@@ -109,6 +110,7 @@ services:
     env_file:
       - .env
     environment:
+      - MODEL_DIR=/app/models
       - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://postgres:postgrespassword@postgres:5432/postgres}
       - DATABASE_URL_SYNC=${DATABASE_URL_SYNC:-postgresql://postgres:postgrespassword@postgres:5432/postgres}
       - DATABASE_POOL_URL=${DATABASE_POOL_URL:-postgresql+asyncpg://postgres:postgrespassword@postgres:5432/postgres}

@@ -143,6 +143,8 @@ export interface FareObservation {
   route: string;
   departure_date: string;
   booking_window: string;
+  actual_lead_days?: number | null;
+  audit?: Record<string, any> | null;
   airline: string;
   flight_number: string;
   source: string;
@@ -151,15 +153,15 @@ export interface FareObservation {
   fees: number;
   total_fare: number;
   validation_status: 'VALID' | 'REJECTED' | 'FLAGGED';
-  anomaly_status: 'NORMAL' | 'ANOMALOUS';
+  anomaly_status: 'NORMAL' | 'ANOMALOUS' | 'NOT_SCORED' | 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
   origin_type: DataOrigin;
   provenance: {
     collection_run_id: string;
     response_hash: string;
     collector_version: string;
     parser_version: string;
-    fareguard_prediction: number;
-    priceguard_score: number;
+    fareguard_prediction: number | null;
+    priceguard_score: number | null;
     index_eligible: boolean;
     pipeline_steps: { step: string; timestamp: string; status: string }[];
   };

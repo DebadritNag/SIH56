@@ -73,32 +73,9 @@ class FareRepository:
         items_res = await self.session.execute(query)
         items = list(items_res.scalars().all())
 
-        # Attach source identity fields so ValidatedFareResponse can include them
-        # without requiring a second query per row on the API layer.
-        # Collect unique source IDs first, then bulk-fetch once.
-        source_ids = {item.source_id for item in items if item.source_id is not None}
-        source_map: dict = {}
-        if source_ids:
-            src_res = await self.session.execute(
-                select(Source).where(Source.id.in_(source_ids))
-            )
-            for src in src_res.scalars().all():
-                source_map[src.id] = src
-
-        for item in items:
-            src = source_map.get(item.source_id) if item.source_id else None
-            # Dynamically set these so Pydantic from_attributes picks them up.
-            item._source_name = src.name if src else None
-            item._source_display_name = src.display_name if src else None
-            # Prefer collection_method from Source; fall back based on data_origin.
-            if src:
-                item._acquisition_method = src.collection_method or (
-                    "CSV_IMPORT" if item.data_origin == "IMPORTED" else "HTTP"
-                )
-            else:
-                item._acquisition_method = "CSV_IMPORT" if item.data_origin == "IMPORTED" else None
-
-        return items, total
+        from app.services.canonical_fare_view import load_fare_views
+        views = await load_fare_views(self.session, [item.id for item in items])
+        return [views[str(item.id)] for item in items if str(item.id) in views], total
 
     async def record_eligibility(self, eligibility: FareIndexEligibility) -> FareIndexEligibility:
         self.session.add(eligibility)

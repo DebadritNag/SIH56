@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { windowDescription } from '@/lib/canonical-fare';
 import {
   X,
   ShieldCheck,
@@ -35,7 +36,7 @@ export const FareProvenanceDrawer: React.FC<FareProvenanceDrawerProps> = ({ fare
   if (!fare) return null;
 
   // Type-cast provenance payload
-  const prov = (rawProv as Record<string, any>) || null;
+  const prov = (rawProv as Record<string, any>) || fare.audit || null;
 
   const isImported = (prov?.data_origin ?? fare.origin_type) === 'IMPORTED';
   // Source: prefer the provenance endpoint's source_provider (joined from the sources table).
@@ -47,22 +48,12 @@ export const FareProvenanceDrawer: React.FC<FareProvenanceDrawerProps> = ({ fare
   const displayFare = prov?.normalized_fare ? Number(prov.normalized_fare) : fare.total_fare;
   const routeDisplay = prov?.route ? prov.route.replace('-', ' → ') : fare.route;
   const bookingWindow = prov?.booking_window_bucket || fare.booking_window;
-  // Use the persisted actual_lead_days from the provenance endpoint.
-  // Explicitly allow 0 (same-day departure) — do NOT fall back to 1 when the
-  // value is 0, because 0 means "observed and departed on the same day".
-  // The previous fallback `bookingWindow === 'T+1' ? 1 : 4` overwrote 0 with 1,
-  // causing the drawer to disagree with the table for same-day observations.
-  const actualLeadDays: number =
-    prov?.actual_lead_days != null
-      ? Number(prov.actual_lead_days)
-      : fare.provenance?.collection_run_id   // provenance not loaded yet
-      ? 0                                    // safe zero until loaded
-      : 0;
+  const actualLeadDays = prov?.actual_lead_days ?? fare.actual_lead_days ?? null;
 
   // Use real backend lineage_steps if available, otherwise construct standard steps
   const lineageSteps = prov?.lineage_steps && Array.isArray(prov.lineage_steps)
     ? prov.lineage_steps
-    : [
+    : mode === 'real' ? [] : [
         {
           order: 1,
           title: isImported ? '1. Raw Observation Ingested' : '1. Raw Observation Collected',
@@ -119,11 +110,11 @@ export const FareProvenanceDrawer: React.FC<FareProvenanceDrawerProps> = ({ fare
           timestamp: prov?.timestamps?.predicted_at,
           detail: prov?.fareguard_prediction?.predicted_fare
             ? `Expected fare benchmark computed: ${formatINR(prov.fareguard_prediction.predicted_fare)} (residual: ${prov.fareguard_prediction.residual > 0 ? '+' : ''}${prov.fareguard_prediction.residual?.toFixed(1)}, ${(prov.fareguard_prediction.residual_pct ?? 0).toFixed(1)}%)`
-            : fare.provenance?.fareguard_prediction > 0
-            ? `Expected fare benchmark computed: ${formatINR(fare.provenance.fareguard_prediction)}`
+            : (fare.provenance?.fareguard_prediction ?? 0) > 0
+            ? `Expected fare benchmark computed: ${formatINR(fare.provenance.fareguard_prediction!)}`
             : 'Expected fare benchmark unavailable (Model not registered or insufficient features)',
-          status: prov?.fareguard_prediction?.status || (fare.provenance?.fareguard_prediction > 0 ? 'SCORED' : 'MODEL_UNAVAILABLE'),
-          verified: (prov?.fareguard_prediction?.status === 'SCORED') || fare.provenance?.fareguard_prediction > 0,
+          status: prov?.fareguard_prediction?.status || ((fare.provenance?.fareguard_prediction ?? 0) > 0 ? 'SCORED' : 'MODEL_UNAVAILABLE'),
+          verified: (prov?.fareguard_prediction?.status === 'SCORED') || (fare.provenance?.fareguard_prediction ?? 0) > 0,
         },
         {
           order: 8,
@@ -176,7 +167,7 @@ export const FareProvenanceDrawer: React.FC<FareProvenanceDrawerProps> = ({ fare
               <span>Departure: {fare.departure_date}</span>
               <span>•</span>
               <span className="font-semibold text-slate-700">
-                {bookingWindow} ({actualLeadDays} lead day{actualLeadDays === 1 ? '' : 's'})
+                {windowDescription(bookingWindow, actualLeadDays)}
               </span>
             </div>
           </div>
@@ -201,9 +192,9 @@ export const FareProvenanceDrawer: React.FC<FareProvenanceDrawerProps> = ({ fare
               <span className="font-mono font-bold text-blue-700">#{runId}</span>
             </div>
             {mode === 'real' && <>
-              <div className="flex justify-between"><span>Ingestion Run:</span><span className="font-mono">{prov?.ingestion_run_id ?? 'Not recorded'}</span></div>
-              <div className="flex justify-between"><span>Pipeline Run:</span><span className="font-mono">{prov?.pipeline_run_id ?? 'Not recorded'}</span></div>
-              <div className="flex justify-between"><span>Acquisition:</span><span>{prov?.acquisition_method ?? 'Not recorded'}</span></div>
+              <div className="flex justify-between"><span>Ingestion Run:</span><span className="font-mono">{prov?.ingestion_run_id ?? (isLoading ? 'Loading…' : 'Not recorded')}</span></div>
+              <div className="flex justify-between"><span>Pipeline Run:</span><span className="font-mono">{prov?.pipeline_run_id ?? (isLoading ? 'Loading…' : 'Not recorded')}</span></div>
+              <div className="flex justify-between"><span>Acquisition:</span><span>{prov?.acquisition_method ?? (isLoading ? 'Loading…' : 'Not recorded')}</span></div>
             </>}
             <div className="flex justify-between items-center">
               <span className="text-[#667085]">Source Provider:</span>
@@ -216,7 +207,7 @@ export const FareProvenanceDrawer: React.FC<FareProvenanceDrawerProps> = ({ fare
             <div className="flex justify-between items-center">
               <span className="text-[#667085]">Payload SHA-256:</span>
               <code className="text-[10px] bg-white border border-[#D0D5DD] text-[#101828] px-1.5 py-0.5 rounded font-mono truncate max-w-[260px]">
-                {prov?.quote_hash || fare.provenance?.response_hash}
+                {prov?.payload_sha256 || fare.provenance?.response_hash}
               </code>
             </div>
           </div>
@@ -244,7 +235,7 @@ export const FareProvenanceDrawer: React.FC<FareProvenanceDrawerProps> = ({ fare
 
                 const formattedTime = step.timestamp
                   ? formatTimestamp(step.timestamp, { format: 'timeOnly' })
-                  : 'Timestamp recorded';
+                  : 'Timestamp not recorded';
 
                 return (
                   <div key={idx} className="relative group">
@@ -279,6 +270,7 @@ export const FareProvenanceDrawer: React.FC<FareProvenanceDrawerProps> = ({ fare
                         <span className="text-[11px] text-[#94A3B8] font-mono">{formattedTime}</span>
                       </div>
                       <p className="text-[11px] text-[#475467] mt-0.5 font-mono leading-relaxed">
+                        {step.status === 'NOT_SCORED' ? 'NOT_SCORED · ' : ''}
                         {step.detail}
                       </p>
                     </div>

@@ -65,7 +65,13 @@ def normalize_quote(raw):
 async def calculate_live_index(db, pipeline_id, as_of=None):
     baskets = await rows(db, 'SELECT * FROM index_baskets WHERE active=true ORDER BY created_at DESC LIMIT 1')
     if not baskets or not baskets[0]['base_period_start'] or not baskets[0]['base_period_end']:
-        return {'status': 'INSUFFICIENT_DATA', 'reason': 'No configured observed base period'}
+        history = await rows(db, """SELECT count(DISTINCT (collected_at AT TIME ZONE 'Asia/Kolkata')::date) AS days
+            FROM validated_fares WHERE data_origin IN ('LIVE','IMPORTED')
+            AND validation_status='VALID' AND NOT is_duplicate""")
+        days = int(history[0]['days']) if history else 0
+        return {'status': 'INSUFFICIENT_DATA', 'readiness': 'BUILDING_BASE_HISTORY',
+                'genuine_observation_days': days,
+                'reason': f'BUILDING_BASE_HISTORY: {days} genuine observation days; no observed base period configured. Analyst configuration still required.'}
     basket = baskets[0]
     weights = await rows(db, '''SELECT * FROM index_basket_routes WHERE basket_id=:id AND weight>0
         AND (effective_from IS NULL OR effective_from<=CURRENT_DATE)
@@ -157,6 +163,13 @@ async def process_live_fares(db, run_id, pipeline_id):
     await stage('NORMALIZE', len(accepted)+duplicates, started=started)
     await stage('VALIDATE', len(accepted)+duplicates, message=f'{len(rejected)} rejected', metadata={'rejections':rejected})
     await stage('DEDUP', len(accepted), message=f'{duplicates} duplicate provenance records preserved')
+
+    # Preserve per-observation downstream membership on the existing run relation.
+    import json
+    await db.execute(text("""UPDATE pipeline_runs SET metadata=coalesce(metadata,'{}'::jsonb)
+        || CAST(:lineage AS jsonb) WHERE id=:id"""),
+        {'id': pipeline_id, 'lineage': json.dumps({'ingestion_run_id': str(pipeline_id),
+            'processed_fare_ids': [str(fare['id']) for fare in accepted]})})
 
     feature_rows, feature_fares, fg_outcomes = [], [], []
     from app.ml.features import FeatureBuilder

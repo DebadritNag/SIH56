@@ -4,7 +4,7 @@ import json
 import math
 
 from app.db.session import AsyncSessionLocal, engine
-from app.ml.live_inference import active_record, artifact_path, load_active, validate_features
+from app.ml.live_inference import active_record, artifact_path, configured_artifact_path, load_active, validate_features
 from app.services.live_store import rows
 
 
@@ -18,12 +18,14 @@ async def diagnose(db):
         try:
             record = await active_record(db, kind)
             result.update(active_model_found=True, version=record['version'], feature_schema=record['feature_schema'])
+            result['artifact'] = str(configured_artifact_path(record))
+            result['feature_schema_test'] = 'NOT_TESTED'
             path = artifact_path(record)
             result.update(artifact_exists=True, artifact=str(path))
             model = await asyncio.to_thread(load_active, record, kind)
             models[kind] = model
             features = model.FEATURE_COLS if kind == 'fareguard' else model.ANOMALY_FEATURE_COLS
-            result.update(load_test='PASS', expected_feature_count=len(features))
+            result.update(load_test='PASS', feature_schema_test='PASS', expected_feature_count=len(features))
         except Exception as exc:
             result['reason'] = getattr(exc, 'reason', 'DIAGNOSTIC_ERROR')
             result['error_type'] = type(exc).__name__

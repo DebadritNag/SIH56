@@ -14,91 +14,7 @@ import { useDataMode } from '@/lib/providers/DataModeProvider';
 import { useFares } from '@/lib/hooks/useResources';
 import { formatTimestamp } from '@/lib/utils/timestamps';
 
-function bwLabel(days?: number | null): string {
-  if (days == null) return 'T+?';
-  if (days === 0) return 'T+0';   // same-day observation
-  if (days <= 2) return 'T+1';
-  if (days <= 10) return 'T+7';
-  if (days <= 20) return 'T+15';
-  if (days <= 35) return 'T+30';
-  return 'T+45';
-}
-
-/** Map a raw backend validated fare into the table's FareObservation shape. */
-function mapLiveFare(f: Record<string, unknown>): FareObservation {
-  const base = Number(f.base_fare ?? f.total_fare ?? 0);
-  const total = Number(f.total_fare ?? 0);
-  const taxes = Number(f.taxes ?? 0) + Number(f.mandatory_fees ?? 0);
-  const origin = String(f.origin_code ?? f.origin ?? '');
-  const dest = String(f.destination_code ?? f.destination ?? '');
-  const dep = f.departure_at ? new Date(String(f.departure_at)) : null;
-
-  // Booking window: prefer persisted bucket from backend; compute from days as fallback.
-  const bwDays = f.booking_window_days as number | null | undefined;
-  const bw = (f.booking_window_bucket as string) || bwLabel(bwDays);
-
-  // FareGuard: use null-safe coercion; 0 is NOT a valid prediction — treat as unavailable.
-  const fgPred = typeof f.fareguard_prediction === 'number' && f.fareguard_prediction > 0
-    ? f.fareguard_prediction
-    : 0;
-
-  const pgScore = typeof f.priceguard_score === 'number' ? f.priceguard_score : 0;
-
-  // PriceGuard classification: anomaly_status from the backend now returns the
-  // Anomaly.severity value (HIGH/CRITICAL/MEDIUM/LOW) or "NORMAL" when no anomaly
-  // row exists.  Treat any non-NORMAL, non-empty status as anomalous so that
-  // a 99.2% percentile observation correctly shows ANOMALOUS in the table.
-  const rawAnom = String(f.anomaly_status ?? 'NORMAL').toUpperCase().trim();
-  const isAnom = rawAnom !== 'NORMAL' && rawAnom !== 'NOT_SCORED' && rawAnom !== '';
-
-  const isImported = (f.data_origin as string) === 'IMPORTED';
-  const runId = String(f.collection_run_id ?? f.raw_fare_id ?? '—');
-
-  // Source: read from the backend-joined fields; never hardcode.
-  // source_display_name > source_name > acquisition-based fallback.
-  const rawSourceDisplay = f.source_display_name as string | undefined;
-  const rawSourceName = f.source_name as string | undefined;
-  const acqMethod = f.acquisition_method as string | undefined;
-  const sourceLabel: string =
-    rawSourceDisplay ||
-    rawSourceName ||
-    (isImported ? 'Imported Dataset' : acqMethod ? `${acqMethod} Source` : 'Unknown Source');
-
-  return {
-    id: String(f.id),
-    collected_at: f.collected_at ? String(f.collected_at) : '—',
-    route: `${origin} → ${dest}`,
-    departure_date: dep ? dep.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
-    booking_window: bw,
-    airline: String(f.airline_code ?? f.airline ?? 'UNKNOWN'),
-    flight_number: String(f.flight_number ?? '—'),
-    source: sourceLabel,
-    base_fare: base,
-    taxes,
-    fees: 0,
-    total_fare: total,
-    validation_status: (String(f.validation_status ?? 'VALID')) as FareObservation['validation_status'],
-    anomaly_status: isAnom ? 'ANOMALOUS' : 'NORMAL',
-    origin_type: (String(f.data_origin ?? 'IMPORTED')) as FareObservation['origin_type'],
-    provenance: {
-      collection_run_id: runId,
-      response_hash: String(f.quote_hash ?? '—'),
-      // Prefer actual collector/parser versions from backend if available
-      collector_version: String(
-        f.collector_version ??
-        (isImported ? 'goibibo-csv-importer-v1.0.0' : 'ota-http-telemetry-v1.2.0')
-      ),
-      parser_version: String(
-        f.parser_version ??
-        (isImported ? 'goibibo-csv-importer-v1.0.0' : 'ota-parser-v2.1')
-      ),
-      fareguard_prediction: fgPred,
-      priceguard_score: pgScore,
-      index_eligible: true,
-      pipeline_steps: [],
-    },
-  };
-}
+import { mapLiveFare, windowDescription } from '@/lib/canonical-fare';
 
 const ALL_MOCK_FARES: FareObservation[] = [
   {
@@ -535,7 +451,7 @@ export default function FaresPage() {
                     </td>
                     <td className="p-3 font-bold text-[#101828]">{fare.route}</td>
                     <td className="p-3 text-[#475467]">{fare.departure_date}</td>
-                    <td className="p-3 font-semibold text-blue-700">{fare.booking_window}</td>
+                    <td className="p-3 font-semibold text-blue-700">{mode === 'real' ? windowDescription(fare.booking_window, fare.actual_lead_days) : fare.booking_window}</td>
                     <td className="p-3 text-[#101828]">
                       <span className="font-semibold">{fare.airline}</span>
                       <span className="text-[#667085] ml-1 font-mono">({fare.flight_number})</span>
@@ -543,20 +459,20 @@ export default function FaresPage() {
                     <td className="p-3 text-[#475467]">{fare.source}</td>
                     <td className="p-3 text-right tabular-nums font-bold text-[#101828]">{formatINR(fare.total_fare)}</td>
                     <td className="p-3 text-right tabular-nums text-slate-700 font-mono">
-                      {fare.provenance?.fareguard_prediction > 0 ? (
+                      {fare.provenance?.fareguard_prediction != null && fare.provenance.fareguard_prediction > 0 ? (
                         <span className="font-semibold text-slate-900">{formatINR(fare.provenance.fareguard_prediction)}</span>
                       ) : (
                         <span className="text-slate-400">—</span>
                       )}
                     </td>
                     <td className="p-3 text-center">
-                      {fare.anomaly_status === 'ANOMALOUS' ? (
+                      {!['NORMAL', 'NOT_SCORED'].includes(fare.anomaly_status) ? (
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-rose-100 text-rose-800 border border-rose-200">
-                          ANOMALY
+                          {fare.anomaly_status}
                         </span>
                       ) : (
                         <span className="text-[10px] font-semibold px-2 py-0.5 rounded uppercase bg-slate-100 text-slate-700 border border-slate-200">
-                          NORMAL
+                          {fare.anomaly_status}
                         </span>
                       )}
                     </td>
