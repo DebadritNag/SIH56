@@ -108,18 +108,6 @@ export default function LandingPage() {
               <a className="text-slate-300 hover:text-white transition-colors duration-150" href="#features">
                 Features
               </a>
-              <Link className="text-slate-300 hover:text-white transition-colors duration-150" href="/methodology">
-                Data &amp; Methodology
-              </Link>
-              <Link className="text-slate-300 hover:text-white transition-colors duration-150" href="/overview">
-                Dashboard
-              </Link>
-              <Link className="text-slate-300 hover:text-white transition-colors duration-150" href="/downloads">
-                Reports
-              </Link>
-              <a className="text-slate-300 hover:text-white transition-colors duration-150" href="#resources">
-                Resources
-              </a>
             </nav>
 
             {/* Action Items (Search & Get Access) */}
