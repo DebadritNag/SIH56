@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { AboutNavbar } from "@/components/about/AboutNavbar";
+import { PublicNavbar } from "@/components/public/PublicNavbar";
 import { AboutHero } from "@/components/about/AboutHero";
 import { AboutWhatIs } from "@/components/about/AboutWhatIs";
 import { AboutWhyItMatters } from "@/components/about/AboutWhyItMatters";
@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 export default function AboutPage() {
   return (
     <div className="bg-[#f8fafc] text-slate-800 font-sans antialiased overflow-x-hidden min-h-screen selection:bg-cyan-500 selection:text-black">
-      <AboutNavbar />
+      <PublicNavbar active="about" />
       <main>
         <AboutHero />
         <AboutWhatIs />

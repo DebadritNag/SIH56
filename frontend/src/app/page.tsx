@@ -26,7 +26,6 @@ import {
 } from "lucide-react";
 
 import { CountUp } from "@/components/landing/CountUp";
-import { VayantaraLogo } from "@/components/ui/VayantaraLogo";
 import { useAuth } from "@/lib/providers/AuthProvider";
 import { PublicNavbar } from "@/components/public/PublicNavbar";
 
