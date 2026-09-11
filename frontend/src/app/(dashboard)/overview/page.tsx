@@ -441,6 +441,7 @@ export default function OverviewPage() {
               </div>
               <p className="text-[11px] text-[#667085]">
                 Price relative movement filtered to selected city-pairs and advance booking windows
+                {!meta.isMock && <span className="ml-1 text-amber-600 font-medium">(Historical baseline · live per-route scope on Route Intelligence)</span>}
               </p>
             </div>
             <Link
@@ -552,33 +553,58 @@ export default function OverviewPage() {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-[#94A3B8]">Statistical Trust Score:</span>
-            <span className="text-xs font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-800 px-2 py-0.5 rounded font-mono">
-              {(dashboardSummary.coverage_quality_score * 100).toFixed(1)} / 100 (HIGH QUALITY)
+            <span className={`text-xs font-bold px-2 py-0.5 rounded font-mono border ${
+              dashboardSummary.coverage_quality_score == null || dashboardSummary.coverage_quality_score === 0
+                ? 'text-slate-400 bg-slate-800/60 border-slate-700'
+                : dashboardSummary.coverage_quality_score >= 0.90
+                ? 'text-emerald-400 bg-emerald-950/60 border-emerald-800'
+                : dashboardSummary.coverage_quality_score >= 0.70
+                ? 'text-amber-400 bg-amber-950/60 border-amber-800'
+                : 'text-rose-400 bg-rose-950/60 border-rose-800'
+            }`}>
+              {dashboardSummary.coverage_quality_score == null || dashboardSummary.coverage_quality_score === 0
+                ? 'Unavailable'
+                : `${(dashboardSummary.coverage_quality_score * 100).toFixed(1)} / 100 (${
+                    dashboardSummary.coverage_quality_score >= 0.90 ? 'HIGH QUALITY'
+                    : dashboardSummary.coverage_quality_score >= 0.70 ? 'ACCEPTABLE'
+                    : 'LOW QUALITY'
+                  })`}
             </span>
           </div>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
+          {/* Route Basket Coverage */}
           <div>
             <span className="text-[10px] text-[#94A3B8] uppercase block">Route Basket Coverage</span>
             <span className="text-base font-bold text-white tabular-nums">
-              {trustMetrics.route_coverage_pct}%
+              {trustMetrics.route_coverage_pct == null
+                ? '—'
+                : `${trustMetrics.route_coverage_pct}%`}
             </span>
             <span className="text-[10px] text-emerald-400 block mt-0.5">
-              {dashboardSummary.active_routes} routes
+              {dashboardSummary.active_routes > 0
+                ? `${dashboardSummary.active_routes} configured routes`
+                : 'No route data'}
             </span>
           </div>
 
+          {/* Source Coverage */}
           <div>
             <span className="text-[10px] text-[#94A3B8] uppercase block">Source Coverage</span>
             <span className="text-base font-bold text-white tabular-nums">
-              {trustMetrics.source_coverage_pct}%
+              {trustMetrics.source_coverage_pct == null
+                ? '—'
+                : `${trustMetrics.source_coverage_pct}%`}
             </span>
             <span className="text-[10px] text-emerald-400 block mt-0.5">
-              {dashboardSummary.healthy_sources} active
+              {dashboardSummary.healthy_sources > 0
+                ? `${dashboardSummary.healthy_sources} / ${dashboardSummary.total_sources} sources active`
+                : 'No source data'}
             </span>
           </div>
 
+          {/* Booking Window Coverage — derived from filter selection */}
           <div>
             <span className="text-[10px] text-[#94A3B8] uppercase block">Booking Window Coverage</span>
             <span className="text-base font-bold text-white tabular-nums">
@@ -589,21 +615,31 @@ export default function OverviewPage() {
             </span>
           </div>
 
+          {/* Data Freshness */}
           <div>
             <span className="text-[10px] text-[#94A3B8] uppercase block">Data Freshness</span>
             <span className="text-base font-bold text-white tabular-nums">
-              {trustMetrics.freshness_pct}%
+              {trustMetrics.freshness_pct == null
+                ? '—'
+                : `${trustMetrics.freshness_pct}%`}
             </span>
-            <span className="text-[10px] text-emerald-400 block mt-0.5">&lt; 3 min latency</span>
+            <span className="text-[10px] text-emerald-400 block mt-0.5">
+              {trustMetrics.freshness_pct == null ? 'Unavailable' : '< 3 min latency'}
+            </span>
           </div>
 
+          {/* Validation Pass Rate */}
           <div>
             <span className="text-[10px] text-[#94A3B8] uppercase block">Validation Pass Rate</span>
             <span className="text-base font-bold text-white tabular-nums">
-              {trustMetrics.validation_success_pct}%
+              {trustMetrics.validation_success_pct == null
+                ? '—'
+                : `${trustMetrics.validation_success_pct}%`}
             </span>
             <span className="text-[10px] text-emerald-400 block mt-0.5">
-              {dashboardSummary.quotes_24h.toLocaleString()} quotes
+              {dashboardSummary.quotes_24h > 0
+                ? `${dashboardSummary.quotes_24h.toLocaleString()} quotes`
+                : 'Insufficient Data'}
             </span>
           </div>
         </div>

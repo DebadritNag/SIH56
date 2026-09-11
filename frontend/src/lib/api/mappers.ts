@@ -286,10 +286,20 @@ export function mapAnomaly(a: BackendAnomaly): AnomalyItem {
 }
 
 export function mapSystemTrust(d: BackendSystemDiagnostics): SystemTrustMetrics {
-  // The diagnostics endpoint focuses on infra health; coverage sub-scores are not all
-  // computed yet, so fall back to mock for the ones the backend does not provide.
+  // The /system/supabase-diagnostics endpoint returns infrastructure health fields
+  // (database latency, realtime, auth, fare counts) but does NOT yet compute
+  // coverage sub-scores.  We derive what we can and use null for the rest so the
+  // UI can show "Unavailable" instead of a misleading 0%.
+  //
+  // When the backend adds real coverage fields (source_coverage_pct etc.) the
+  // nullish-coalescing below will pick them up automatically without a code change.
+  const b = d as unknown as Record<string, number | null | undefined>;
+
   return {
-    source_coverage_pct: 0, route_coverage_pct: 0, booking_window_coverage_pct: 0, validation_success_pct: 0,
-    freshness_pct: 0,
+    route_coverage_pct:            b.route_coverage_pct            ?? (null as unknown as number),
+    source_coverage_pct:           b.source_coverage_pct           ?? (null as unknown as number),
+    booking_window_coverage_pct:   b.booking_window_coverage_pct   ?? (null as unknown as number),
+    freshness_pct:                 b.freshness_pct                 ?? (null as unknown as number),
+    validation_success_pct:        b.validation_success_pct        ?? (null as unknown as number),
   };
 }

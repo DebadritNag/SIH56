@@ -33,7 +33,7 @@ import {
   getFilteredMockRouteContributors,
 } from "@/lib/mock-data/dashboard";
 import { useDataMode } from "@/lib/providers/DataModeProvider";
-import { DashboardFilters, DashboardSummary } from "@/types";
+import { DashboardFilters, DashboardSummary, SystemTrustMetrics } from "@/types";
 
 export interface DataMeta {
   isMock: boolean;
@@ -231,9 +231,19 @@ export function useSystemTrust() {
     placeholderData: mode === "mock" ? { data: mockSystemTrustMetrics, isMock: true } : undefined,
   });
   const isMock = q.data?.isMock ?? (mode === "mock");
+  // In live mode: when the backend does not yet provide coverage sub-scores,
+  // mapSystemTrust returns null values.  We propagate them as-is (not 0) so the
+  // Overview strip can distinguish "genuinely 0%" from "data unavailable".
+  const UNAVAILABLE_TRUST: SystemTrustMetrics = {
+    source_coverage_pct: null as unknown as number,
+    route_coverage_pct: null as unknown as number,
+    booking_window_coverage_pct: null as unknown as number,
+    freshness_pct: null as unknown as number,
+    validation_success_pct: null as unknown as number,
+  };
   return {
     ...q,
-    trust: q.data?.data ?? (mode === "mock" ? mockSystemTrustMetrics : EMPTY_TRUST),
+    trust: q.data?.data ?? (mode === "mock" ? mockSystemTrustMetrics : UNAVAILABLE_TRUST),
     meta: {
       isMock,
       source: isMock ? MOCK_SOURCE : REAL_SOURCE,
