@@ -27,9 +27,11 @@ pandera[pandas]>=0.19.0,<1.0.0
 scipy>=1.13.0,<2.0.0
 
 # Machine Learning & Explainability
-# Existing ACTIVE Isolation Forest artifacts were fitted with this version.
+# Both artifacts (fareguard-xgb-v1, priceguard-if-v1) were saved with these exact
+# versions. Pin them so the Docker runtime matches the training environment and
+# the InconsistentVersionWarning does not block ACTIVE model loading on EC2.
 scikit-learn==1.6.1
-xgboost>=2.0.3,<3.0.0
+xgboost==3.2.0
 shap>=0.45.0,<1.0.0
 joblib>=1.4.0,<2.0.0
 
