@@ -22,7 +22,6 @@ import { MetricCard } from '@/components/ui/MetricCard';
 import { NationalIndexChart } from '@/components/charts/NationalIndexChart';
 import { WaterfallContributionChart } from '@/components/charts/WaterfallContributionChart';
 import { RoutePressureHeatmap } from '@/components/charts/RoutePressureHeatmap';
-import { mockMarketSignals } from '@/lib/mock-data/dashboard';
 import {
   useDashboardSummary,
   useNationalTrend,
@@ -30,6 +29,7 @@ import {
   useSystemTrust,
 } from '@/lib/hooks/useDashboard';
 import { usePriceShocks } from '@/lib/hooks/usePriceShocks';
+import { useAnomalies } from '@/lib/hooks/useResources';
 
 import { GenerateReportButton } from '@/components/data/GenerateReportButton';
 import { formatPercent, formatINR } from '@/lib/formatters';
@@ -166,6 +166,14 @@ export default function OverviewPage() {
     shocks: activeShocks,
     isPending: isShocksPending,
   } = usePriceShocks();
+
+  // Market Signals — same hook and query key as the Anomaly Center page.
+  // Replaces the previous (meta.isMock ? mockMarketSignals : []) pattern that
+  // left the card body empty in live mode while the badge remained hardcoded at 5.
+  const {
+    data: signalsData,
+    isPending: isSignalsPending,
+  } = useAnomalies({ status: 'OPEN', page_size: 5 });
 
   // Refresh handler (refetches without resetting filters)
   const handleManualRefresh = async () => {
@@ -457,38 +465,68 @@ export default function OverviewPage() {
                 <Zap className="w-4 h-4 text-amber-600" />
                 <h3 className="text-sm font-bold text-[#101828]">Real-Time Market Signals</h3>
               </div>
-              <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded border border-emerald-200 font-bold uppercase">
-                {filters.routeIds.length > 0 ? `${filters.routeIds.length} Monitored` : '5 Active Signals'}
-              </span>
+              {/* Badge derives from the same data as the card body — never out of sync */}
+              {!isSignalsPending && (
+                <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded border border-emerald-200 font-bold uppercase">
+                  {(signalsData?.items.length ?? 0) === 0
+                    ? '0 Active Signals'
+                    : `${signalsData!.items.length} Active Signal${signalsData!.items.length !== 1 ? 's' : ''}`}
+                </span>
+              )}
             </div>
             <p className="text-[11px] text-[#667085] mb-3">
               Automated heuristics detecting price surges, rate limit drops, and cross-source shocks:
             </p>
 
             <div className="space-y-2 max-h-[290px] overflow-y-auto pr-1">
-              {(meta.isMock ? mockMarketSignals : []).map((sig) => (
-                <div
-                  key={sig.id}
-                  className="p-2.5 rounded border border-[#E4E7EC] hover:bg-[#F8FAFC] transition-colors cursor-pointer text-xs"
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-[10px] font-mono text-[#94A3B8]">{sig.timestamp}</span>
-                    <span
-                      className={`text-[9px] font-bold px-1.5 py-0.2 rounded uppercase ${
-                        sig.severity === 'HIGH'
-                          ? 'bg-rose-100 text-rose-800'
-                          : sig.severity === 'SHOCK'
-                          ? 'bg-amber-100 text-amber-900 font-black'
-                          : 'bg-slate-100 text-slate-700'
-                      }`}
-                    >
-                      {sig.category}
-                    </span>
+              {isSignalsPending ? (
+                /* Loading skeleton — same height as a typical signal row */
+                [1, 2, 3].map((i) => (
+                  <div key={i} className="p-2.5 rounded border border-[#E4E7EC] animate-pulse motion-reduce:animate-none">
+                    <div className="h-3 bg-slate-200 rounded w-1/3 mb-2" />
+                    <div className="h-3 bg-slate-200 rounded w-2/3" />
                   </div>
-                  <div className="font-semibold text-[#101828] text-xs">{sig.title}</div>
-                  <p className="text-[11px] text-[#475467] mt-0.5 line-clamp-2">{sig.description}</p>
-                </div>
-              ))}
+                ))
+              ) : (signalsData?.items.length ?? 0) === 0 ? (
+                <p className="text-xs text-[#667085] py-4 text-center">No active market signals</p>
+              ) : (
+                signalsData!.items.map((sig) => {
+                  const severityClass =
+                    sig.severity === 'CRITICAL' || sig.severity === 'HIGH'
+                      ? 'bg-rose-100 text-rose-800'
+                      : sig.severity === 'MEDIUM'
+                      ? 'bg-amber-100 text-amber-900'
+                      : 'bg-slate-100 text-slate-700';
+                  return (
+                    <div
+                      key={sig.id}
+                      className="p-2.5 rounded border border-[#E4E7EC] hover:bg-[#F8FAFC] transition-colors cursor-pointer text-xs"
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] font-mono text-[#94A3B8]">
+                          {sig.timestamp
+                            ? new Date(sig.timestamp).toLocaleTimeString('en-IN', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                timeZone: 'Asia/Kolkata',
+                              }) + ' IST'
+                            : '—'}
+                        </span>
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${severityClass}`}>
+                          {sig.severity}
+                        </span>
+                      </div>
+                      <div className="font-semibold text-[#101828] text-xs">
+                        {sig.route} · {sig.booking_window}
+                      </div>
+                      <p className="text-[11px] text-[#475467] mt-0.5 line-clamp-2">
+                        {sig.airline} fare {sig.deviation_pct > 0 ? '+' : ''}{sig.deviation_pct.toFixed(1)}% vs expected
+                        {sig.actual_fare > 0 ? ` · ₹${sig.actual_fare.toLocaleString('en-IN')}` : ''}
+                      </p>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
 
