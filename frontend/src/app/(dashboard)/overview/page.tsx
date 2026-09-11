@@ -29,6 +29,7 @@ import {
   useRouteContributors,
   useSystemTrust,
 } from '@/lib/hooks/useDashboard';
+import { usePriceShocks } from '@/lib/hooks/usePriceShocks';
 
 import { GenerateReportButton } from '@/components/data/GenerateReportButton';
 import { formatPercent, formatINR } from '@/lib/formatters';
@@ -157,6 +158,14 @@ export default function OverviewPage() {
   } = useRouteContributors(filters);
 
   const { trust: trustMetrics } = useSystemTrust();
+
+  // Shocks — same query key as Sidebar and Price Shock Center page.
+  // This replaces the previous hardcoded "1 Active (BLR-DEL)" string.
+  const {
+    activeCount: shockActiveCount,
+    shocks: activeShocks,
+    isPending: isShocksPending,
+  } = usePriceShocks();
 
   // Refresh handler (refetches without resetting filters)
   const handleManualRefresh = async () => {
@@ -303,7 +312,11 @@ export default function OverviewPage() {
               <div className="flex items-center justify-between text-[11px]">
                 <span className="text-[#667085]">Price Shocks:</span>
                 <span className="font-bold text-rose-600">
-                  {filters.routeIds.includes('BOM-GOI') ? '0 Active' : '1 Active (BLR-DEL)'}
+                  {isShocksPending
+                    ? '…'
+                    : shockActiveCount === 0
+                    ? '0 Active'
+                    : `${shockActiveCount} Active${activeShocks[0]?.route ? ` (${activeShocks[0].route.replace(' → ', '-')})` : ''}`}
                 </span>
               </div>
             }

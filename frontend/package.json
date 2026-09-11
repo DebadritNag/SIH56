@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "node src/__tests__/price-shock-sync.test.mjs"
   },
   "dependencies": {
     "@hcaptcha/react-hcaptcha": "^2.2.0",
