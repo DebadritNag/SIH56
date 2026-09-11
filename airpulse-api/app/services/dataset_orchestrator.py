@@ -109,6 +109,63 @@ def _stops(cell: Any) -> int:
     return int(m.group(1)) if m else 0
 
 
+async def _safe_anomaly_cleanup(session, fare_ids: list) -> None:
+    """Delete pipeline-generated anomalies and their alerts safely, respecting FK constraints.
+
+    Must be called before AnomalyEngine inserts new anomaly rows for the same fares.
+
+    Order:
+      1. DELETE alerts that are OPEN and unacknowledged, whose anomaly_id points at
+         an OPEN anomaly for one of these fares.  Analyst-reviewed alerts (ACKNOWLEDGED /
+         RESOLVED, or acknowledged_at IS NOT NULL) are left intact.
+      2. RESOLVE any anomaly for these fares that is still referenced by a surviving
+         alert (i.e. an analyst-reviewed one).  Marking RESOLVED preserves the FK.
+      3. DELETE remaining OPEN unreferenced anomaly rows for these fares.
+      4. Commit so the deletions are visible to the subsequent AnomalyEngine run.
+
+    If fare_ids is empty the function is a no-op.
+    """
+    if not fare_ids:
+        return
+
+    # Step 1: alerts first — avoids ForeignKeyViolationError on anomaly deletion.
+    await session.execute(text("""
+        DELETE FROM alerts
+        WHERE anomaly_id IN (
+            SELECT id FROM anomalies
+            WHERE fare_id = ANY(:fids)
+              AND status = 'OPEN'
+        )
+        AND status = 'OPEN'
+        AND acknowledged_at IS NULL
+    """), {"fids": fare_ids})
+
+    # Step 2a: resolve anomalies that still have a surviving (analyst-reviewed) alert.
+    await session.execute(text("""
+        UPDATE anomalies
+        SET status = 'RESOLVED',
+            updated_at = NOW()
+        WHERE fare_id = ANY(:fids)
+          AND id IN (
+              SELECT DISTINCT anomaly_id FROM alerts
+              WHERE anomaly_id IS NOT NULL
+          )
+    """), {"fids": fare_ids})
+
+    # Step 2b: delete OPEN anomalies that have no alert referencing them.
+    await session.execute(text("""
+        DELETE FROM anomalies
+        WHERE fare_id = ANY(:fids)
+          AND status = 'OPEN'
+          AND id NOT IN (
+              SELECT DISTINCT anomaly_id FROM alerts
+              WHERE anomaly_id IS NOT NULL
+          )
+    """), {"fids": fare_ids})
+
+    await session.commit()
+
+
 class DatasetIngestionOrchestrator:
     """Orchestrates end-to-end automated processing of imported and replay airfare datasets.
     Maintains truthful provenance: data_origin='IMPORTED', pipeline_mode='LIVE_PROCESSING'.
@@ -632,9 +689,10 @@ class DatasetIngestionOrchestrator:
         fareguard = ModelRegistryService.get_fareguard()
         predictions_map: Dict[UUID, FarePrediction] = {}
         fg_scored_count = 0
+        fg_invalid_count = 0  # non-finite or <= 0 predictions — model quality issue, not a DB error
 
         # Clear prior predictions for idempotency.
-        # Must null the FK in anomalies first to avoid the constraint violation.
+        # Must null the FK in anomalies first to avoid constraint violation.
         await self.session.execute(
             text("UPDATE anomalies SET prediction_id = NULL WHERE prediction_id IN "
                  "(SELECT id FROM fare_predictions WHERE fare_id = ANY(:fids))"),
@@ -647,14 +705,13 @@ class DatasetIngestionOrchestrator:
 
         if feature_rows:
             df_feats = pd.DataFrame(feature_rows)
-            # Check if model has weights or use baseline estimation
             try:
                 preds = fareguard.predict_batch(df_feats)
                 for idx, vf in enumerate(validated_entities):
                     pred_val = float(preds[idx])
                     actual_val = float(vf.normalized_total_fare)
 
-                    # Only accept valid finite positive predictions
+                    # Only accept valid finite positive predictions.
                     if pred_val > 0 and np.isfinite(pred_val):
                         res_val = actual_val - pred_val
                         res_pct = (res_val / pred_val) * 100.0
@@ -670,13 +727,29 @@ class DatasetIngestionOrchestrator:
                         predictions_map[vf.id] = fp
                         fg_scored_count += 1
                     else:
-                        # NEVER persist ₹0 or invalid predictions
-                        logger.warning(f"Invalid FareGuard prediction {pred_val} for fare {vf.id}; expected_fare set to NULL")
+                        # Non-finite or non-positive prediction: model quality issue.
+                        # NEVER persist ₹0 or invalid predictions — expected_fare stays NULL.
+                        # Record structured diagnostic so the pipeline reports the reason
+                        # rather than propagating a silent warning or a DB failure.
+                        fg_invalid_count += 1
+                        logger.warning(
+                            "INVALID_NONPOSITIVE_PREDICTION fare_id=%s pred=%.4f "
+                            "reason=%s model=%s",
+                            vf.id,
+                            pred_val,
+                            "INVALID_NONPOSITIVE_PREDICTION",
+                            fareguard.version,
+                        )
                 await self.session.commit()
                 fg_status = "COMPLETED"
-                fg_msg = f"FareGuard XGBoost scored {fg_scored_count}/{len(validated_entities)} benchmark expected fares"
+                fg_msg = (
+                    f"FareGuard XGBoost scored {fg_scored_count}/{len(validated_entities)} "
+                    f"benchmark expected fares"
+                    + (f"; {fg_invalid_count} INVALID_NONPOSITIVE_PREDICTION (expected_fare=NULL)"
+                       if fg_invalid_count else "")
+                )
             except Exception as fg_err:
-                logger.error(f"FareGuard batch scoring error: {fg_err}")
+                logger.error("FareGuard batch scoring error: %s", fg_err)
                 fg_status = "COMPLETED"
                 fg_msg = f"FareGuard benchmark finished with advisory: {fg_err}"
         else:
@@ -690,9 +763,13 @@ class DatasetIngestionOrchestrator:
             status=fg_status,
             input_cnt=len(validated_entities),
             output_cnt=fg_scored_count,
-            failed_cnt=len(validated_entities) - fg_scored_count,
+            failed_cnt=fg_invalid_count,
             message=fg_msg,
-            meta={"model_version": fareguard.version, "scored_count": fg_scored_count},
+            meta={
+                "model_version": fareguard.version,
+                "scored_count": fg_scored_count,
+                "invalid_nonpositive_count": fg_invalid_count,
+            },
         )
 
         # ==================================================================
@@ -702,11 +779,9 @@ class DatasetIngestionOrchestrator:
         s7_start = utc_now()
         anomalies_detected = 0
 
-        # Clear prior anomalies for idempotency
-        await self.session.execute(
-            text("DELETE FROM anomalies WHERE fare_id = ANY(:fids)"),
-            {"fids": fare_ids},
-        )
+        # Safe idempotent cleanup: delete pipeline-generated alerts before anomalies
+        # to avoid ForeignKeyViolationError on alerts.anomaly_id.
+        await _safe_anomaly_cleanup(self.session, fare_ids)
 
         # Execute PriceGuard Anomaly Detection
         if fg_scored_count > 0:
