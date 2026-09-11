@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -19,7 +19,6 @@ import {
   Lock,
   MapPin,
   Radio,
-  Search,
   ShieldCheck,
   Sparkles,
   TrendingUp,
