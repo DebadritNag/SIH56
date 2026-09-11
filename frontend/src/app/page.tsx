@@ -44,22 +44,11 @@ const NAV_TICKER = [
 export default function LandingPage() {
   const router = useRouter();
   const { session, loading } = useAuth();
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
 
   // If already signed in, skip the landing page.
   useEffect(() => {
     if (!loading && session) router.replace("/overview");
   }, [loading, session, router]);
-
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      router.push(`/overview?route=${encodeURIComponent(searchQuery.trim().toUpperCase())}`);
-    } else {
-      router.push("/overview");
-    }
-  };
 
   return (
     <div className="bg-[#030B17] text-slate-100 font-sans antialiased selection:bg-brand-cyan selection:text-black overflow-x-hidden min-h-screen relative flex flex-col justify-between">
@@ -105,21 +94,10 @@ export default function LandingPage() {
               <Link className="text-slate-300 hover:text-white transition-colors duration-150" href="/about">
                 About
               </Link>
-              <a className="text-slate-300 hover:text-white transition-colors duration-150" href="#features">
-                Features
-              </a>
             </nav>
 
-            {/* Action Items (Search & Get Access) */}
-            <div className="flex items-center space-x-4">
-              <button
-                aria-label="Search routes and intelligence"
-                className="p-2 text-slate-300 hover:text-brand-cyan transition-colors cursor-pointer"
-                type="button"
-                onClick={() => setSearchOpen(!searchOpen)}
-              >
-                <Search className="w-4 h-4" />
-              </button>
+            {/* Action Items (Get Access) */}
+            <div className="flex items-center">
               <Link
                 className="glow-cyan-btn inline-flex items-center justify-center px-5 py-2 text-xs font-semibold rounded-full bg-gradient-to-r from-brand-cyan to-sky-400 text-brand-dark hover:brightness-110 active:scale-95 transition-all cursor-pointer"
                 href="/signup"
@@ -130,39 +108,6 @@ export default function LandingPage() {
           </div>
         </header>
         {/* END: HeaderNav */}
-
-        {/* Quick Search Popover */}
-        {searchOpen && (
-          <div className="fixed top-20 inset-x-0 z-50 flex justify-center px-4">
-            <form
-              onSubmit={handleSearchSubmit}
-              className="w-full max-w-lg glass-panel p-3 rounded-xl flex items-center gap-2 shadow-2xl border border-brand-cyan/30"
-            >
-              <Search className="w-4 h-4 text-brand-cyan ml-2" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search route (e.g. DEL-BOM), city-pair, or index..."
-                className="flex-1 bg-transparent border-none text-white text-xs placeholder:text-slate-400 focus:outline-none"
-                autoFocus
-              />
-              <button
-                type="submit"
-                className="px-3 py-1.5 rounded-lg bg-brand-cyan text-brand-dark text-xs font-bold hover:brightness-110"
-              >
-                Go
-              </button>
-              <button
-                type="button"
-                onClick={() => setSearchOpen(false)}
-                className="text-xs text-slate-400 hover:text-white px-1"
-              >
-                ✕
-              </button>
-            </form>
-          </div>
-        )}
 
         {/* BEGIN: HeroSection (Section-Restricted Background & Luminous Center Lighting) */}
         <section className="relative overflow-hidden pt-8 pb-12 sm:pt-10 sm:pb-16 lg:pt-12 lg:pb-16 min-h-[580px] lg:min-h-[660px] flex flex-col justify-center">
