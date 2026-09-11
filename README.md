@@ -1,59 +1,126 @@
-# AirPulse — Real-Time Airfare Price Index for India
+# VAYANTARA — Airfare Intelligence for Economic Measurement
 
-> **Real-time Airfare Price Index for India using ethical automated collection, statistical indexing, explainable ML, provenance, and resilient hybrid data ingestion.**
-
----
-
-## 1. Project Title + One-line Pitch
-
-**AirPulse**  
-*Real-time Airfare Price Index for India using ethical automated collection, statistical indexing, explainable ML, provenance, and resilient hybrid data ingestion.*
-
-AirPulse is an institutional-grade airfare statistical intelligence and inflation-monitoring platform designed for the Ministry of Statistics & Programme Implementation (**MoSPI**), the Reserve Bank of India (**RBI**), and economic researchers. It automates the collection of domestic airfare quotes across airline and Online Travel Aggregator (OTA) portals, preserves cryptographic provenance, enforces strict physical-sanity validation, and computes a transparent, high-frequency **Airfare Price Index (APIx)** to augment the national Consumer Price Index (CPI).
+> **Institutional prototype for real-time domestic airfare indexation, market surveillance, and macroeconomic measurement in India.**  
+> *(Formerly developed under the project name **AirPulse**, now officially renamed **VAYANTARA**.)*
 
 ---
 
-## 2. Problem Statement
+## 1. Executive Summary & Project Identity
+
+**VAYANTARA** (originally developed under the project code name **AirPulse**) is the unified real-time airfare intelligence, market surveillance, and price indexation platform for India.
+
+> [!NOTE]
+> **Project Renaming Notice:**  
+> **AirPulse and VAYANTARA are the same platform.** The project was originally conceived and built under the code name **AirPulse** and has been formally renamed to **VAYANTARA**.  
+> While the public identity, analytical interface, and documentation reflect **VAYANTARA**, certain technical artifacts—such as the backend service directory (`airpulse-api/`), internal Docker container tags, worker names, and export filenames—retain the legacy `airpulse` identifier for codebase stability and backward compatibility.
+
+```
+┌───────────────────────────────────────────────────────────────────────────────────────────┐
+│                                         VAYANTARA                                         │
+│                      Airfare Intelligence for Economic Measurement                        │
+│                         (Formerly Developed as Project AirPulse)                          │
+├───────────────────────────────────────────────────────────────────────────────────────────┤
+│  • Public Mission & Overview Portal (/about)                                              │
+│  • Real-Time Automated Web Acquisition (Crawl4AI & Playwright Chromium)                   │
+│  • Canonical Normalization & Sanity Validation (Bounds Checks & SHA-256 Custody Hash)    │
+│  • Stratified Booking-Window Advance Purchase Indicators (T+1 to T+45)                   │
+│  • Pure Statistical Index Engine (Chained Laspeyres APIx, Base = 100)                     │
+│  • Decoupled ML Observational QA (FareGuard XGBoost, PriceGuard Isolation Forest, SHAP)   │
+│  • Market-Wide Price Shock Consensus Surveillance                                         │
+│  • Audit-Grade Dossiers & Context-Aware Reproducible Exports (PDF, CSV, XLSX)             │
+└───────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+The public-facing VAYANTARA web experience features a dedicated `/about` portal with a branded hero section and navigation bar, articulating the bridge between microeconomic airline yield algorithms and macroeconomic price indexation.
+
+---
+
+## 2. Problem Statement & Research Scope
 
 * **Smart India Hackathon Problem ID**: **SIH26056**
-* **Ministry / Organization**: **Ministry of Statistics & Programme Implementation (MoSPI) / Data Informatics & Innovation Division (DIID)**
+* **Target Institution**: **Ministry of Statistics & Programme Implementation (MoSPI)** / **Data Informatics & Innovation Division (DIID)**
 * **Category & Domain**: **Software / Smart Automation**
 
-### Mandated Objectives
-1. **Collect Airfare Observations**: Automate the collection of domestic economy airfare quotes across multiple airline and OTA portals via scheduled, ethical web collection.
-2. **Normalize and Validate**: Standardize disparate vendor payloads into canonical route, cabin, flight number, departure timing, and net/gross fare structures while rejecting physically corrupt records.
-3. **Route & Booking-Window Aware Indicators**: Stratify airfares across standardized advance-purchase booking horizons (`T+1`, `T+7`, `T+15`, `T+30`, `T+45`) across key domestic corridors to eliminate yield-management bias.
-4. **Augment CPI-Related Airfare Monitoring**: Provide high-frequency, reliable airfare price relatives to complement the transport component of the Consumer Price Index (CPI).
-5. **Preserve Provenance and Reproducibility**: Guarantee an immutable chain of custody with SHA-256 payload hashing, run IDs, and persistent audit trails for every observation and index figure.
+### Problem Context
+Modern airline commercial pricing relies on high-frequency, dynamic yield-management algorithms. Fares fluctuate continuously based on advance-booking horizons, real-time demand signals, load factors, and competitor moves. Traditional consumer price collection methods relying on periodic manual surveys fail to capture this intra-month volatility.
+
+The objective of SIH26056 is the **development of a real-time Airfare Price Index for India through automated collection of airline and Online Travel Aggregator (OTA) fare data to augment CPI-related airfare measurement.**
+
+### Research Status & Scope Boundaries
+> [!IMPORTANT]
+> **Prototype & Research Implementation Notice:**  
+> * **VAYANTARA** (formerly AirPulse) constitutes a **research prototype** developed for the Smart India Hackathon.
+> * The **Airfare Price Index (APIx)** is a statistical research index designed to evaluate high-frequency price relatives; **it is not an official Consumer Price Index (CPI) release**.
+> * Formal adoption for official national statistics requires MoSPI Price Statistics Division (PSD) review, official passenger expenditure weights, and verified multi-year baseline calibration.
 
 ---
 
-## 3. System Architecture
+## 3. What VAYANTARA Does
 
-AirPulse is architected around a decoupled, multi-tier topology that guarantees operational independence between web presentation, asynchronous browser collection, machine learning quality control, and institutional statistical indexing.
+1. **Ethical Automated Web Acquisition**: Gathers economy-class domestic airfare quotes across monitored city pairs using browser automation under bounded concurrency and strict access-monitoring guardrails.
+2. **Deterministic Normalization & Sanity Validation**: Converts disparate vendor payloads into canonical schemas while filtering physically corrupt observations (e.g., negative fares, inverted taxes, identical origin/destination).
+3. **Advance Booking-Horizon Stratification**: Partitions quotes into standardized advance-purchase windows (`T+1`, `T+7`, `T+15`, `T+30`, `T+45`) to isolate structural dynamic pricing from baseline inflation.
+4. **Independent Statistical Indexation (APIx)**: Computes a chained Laspeyres price-relative index ($Base = 100$) derived strictly from observed market fares, paired with a composite Coverage Quality Metric ($Q$).
+5. **Decoupled ML Quality Assurance**:
+   * **FareGuard**: Gradient-boosted regression (XGBoost) estimating expected fares to establish statistical baselines.
+   * **PriceGuard**: Multivariate Isolation Forest detecting anomalous quotes without modifying the index.
+   * **Selective TreeSHAP**: Evaluates feature attributions in rupee terms exclusively for anomalies to provide model interpretability.
+6. **Confirmed Market Shock Surveillance**: Detects multi-source price surges to distinguish genuine economic shocks from individual outlier noise.
+7. **Auditable Chain of Custody**: Persists SHA-256 payload hashes, run identifiers, collector versions, and immutable raw records protected by database triggers.
+
+---
+
+## 4. Key USPs — The Four Pillars
+
+```
+┌──────────────────────┬──────────────────────┬──────────────────────┬──────────────────────┐
+│        TRUST         │      RESILIENCE      │     INTELLIGENCE     │STATISTICAL INTEGRITY │
+├──────────────────────┼──────────────────────┼──────────────────────┼──────────────────────┤
+│ • SHA-256 Hashes     │ • Hybrid LIVE +      │ • FareGuard Expected │ • APIx Independent   │
+│ • Immutable Raw Log  │   IMPORTED Fallback  │   Fares (XGBoost)    │   of ML Predictions  │
+│ • Full Custody Chain │ • Zero Synthetic     │ • PriceGuard Anomaly │ • Observed Fares Only│
+│ • Explicit Origin    │   Leakage in Live    │   (Isolation Forest) │ • Stratified Windows │
+│   Labels             │ • Decoupled Engine   │ • Selective TreeSHAP │ • Prototype Weights  │
+└──────────────────────┴──────────────────────┴──────────────────────┴──────────────────────┘
+```
+
+* **Pillar 1: TRUST (Cryptographic Provenance)**  
+  Every quote is fingerprinted with SHA-256 upon reception and recorded in an append-only PostgreSQL table protected by a trigger preventing `UPDATE` or `DELETE` operations. Complete custody chains link observations to collector engines, timestamps, run IDs, and source URLs.
+* **Pillar 2: RESILIENCE (Graceful Degradation)**  
+  A strict Live Mode context resolver switches transparently between `LIVE`, `HYBRID`, and `IMPORTED_FALLBACK`. If web sources become degraded, verified historical imports keep analytics operational. Synthetic or replay data is never permitted to leak into Live Mode.
+* **Pillar 3: INTELLIGENCE (Observational ML & Explainability)**  
+  FareGuard estimates baseline price expectations, while PriceGuard identifies multi-dimensional anomalies. Selective TreeSHAP quantifies feature drivers in rupees without making causal claims about airline pricing strategy.
+* **Pillar 4: STATISTICAL INTEGRITY (Pure Mathematical Index)**  
+  The Airfare Price Index (APIx) is computed strictly from verified, observed market quotes. ML predictions are never used to impute missing observations or adjust index points.
+
+---
+
+## 5. System Architecture
+
+The platform uses a decoupled, multi-tier topology separating presentation, reverse proxy ingress, core REST microservices, asynchronous worker tasks, and managed cloud persistence.
 
 ```mermaid
 flowchart TB
     subgraph Tier1["1. Presentation Layer (Vercel Edge)"]
-        Browser["Analyst Web Browser\n(Desktop / Mobile)"]
-        NextJS["Next.js 14 App Router Dashboard\n• React 19, TypeScript 5, Tailwind CSS 4\n• shadcn/ui Component Primitives\n• Apache ECharts 6 Analytics\n• TanStack Query v5 Cache & Invalidation\n• Server-Side /backend-api URL Rewrite"]
+        Browser["Analyst Web Browser\n(Desktop / Tablet)"]
+        NextJS["Next.js 14 App Router (TypeScript 5)\n• React 19, Tailwind CSS, shadcn/ui\n• Apache ECharts 6 Interactive Analytics\n• TanStack Query v5 Server State & Cache\n• Server-Side /backend-api URL Rewrite"]
         Browser <-->|"HTTPS"| NextJS
     end
 
     subgraph Tier2["2. Ingress & Reverse Proxy (AWS EC2)"]
-        Nginx["Nginx 1.24+ Reverse Proxy (Ports 80 / 443)\n• SSL Termination & Security Headers\n• Host & Client Header Forwarding (X-Real-IP)\n• Internal Reverse Proxy -> 127.0.0.1:8000"]
-        NextJS -->|"/backend-api Rewrite\n(Proxy Pass HTTP/HTTPS)"| Nginx
+        Nginx["Nginx Reverse Proxy (Ports 80 / 443)\n• SSL Termination & Security Headers\n• Client Header Forwarding (X-Real-IP, Host)\n• Reverse Proxy -> 127.0.0.1:8000"]
+        NextJS -->|"/backend-api Rewrite"| Nginx
     end
 
     subgraph Tier3["3. Core Application & API Layer (Docker on EC2)"]
-        FastAPI["FastAPI Web API Container (Port 10000 -> Host 8000)\n• Python 3.11+ Asynchronous Engine\n• Pydantic v2 Request/Response Schemas\n• Supabase JWT Validation via Cached JWKS\n• DB-Enforced RBAC (analyst, admin)\n• REST Controllers (/api/v1/*)\n• Ingestion, Normalization & Audit Services"]
+        FastAPI["FastAPI Web API Container (Port 10000 -> Host 8000)\n• Python 3.11+ Asynchronous Engine\n• Pydantic v2 Request/Response Schemas\n• Supabase JWT Validation & DB Role Enforcement\n• REST Endpoints (/api/v1/*)\n• Model Artifacts Mounted at /app/models"]
         Nginx -->|"HTTP 127.0.0.1:8000"| FastAPI
     end
 
     subgraph Tier4["4. Background Workers & Scraping (Docker on EC2)"]
         Redis["Redis 7 Container\n(Task Broker & Result Backend)"]
-        Worker["Celery Worker Container\n• Python 3.11+ Worker Process\n• Playwright 1.44+ & Chromium Bundled\n• Crawl4AI Web Acquisition Engine\n• BaseCollector & Modular Source Adapters\n• Single-Session Headless Execution"]
-        Beat["Celery Beat Container\n• Cron-Style Periodic Scheduler\n• Route x Booking-Window Sweeps"]
+        Worker["Celery Worker Container (Concurrency=1)\n• Python 3.11+ Async Worker Process\n• Playwright / Headless Chromium Bundled\n• Crawl4AI Extraction Engine\n• Model Artifacts Mounted Read-Only (/app/models)"]
+        Beat["Celery Beat Container\n• Cron-Style Periodic Scheduler\n• Automated Route Sweeps & Health Checks"]
         
         FastAPI <-->|"Enqueue & Status"| Redis
         Redis <-->|"Dispatch Tasks"| Worker
@@ -61,13 +128,13 @@ flowchart TB
     end
 
     subgraph Tier5["5. Canonical Data, Auth & Storage (Supabase Cloud)"]
-        Postgres["Supabase PostgreSQL 17 Managed Database\n• Canonical raw_fares (SHA-256 Hashed, Trigger-Protected)\n• validated_fares (Sanity-Filtered, Deduplicated)\n• airfare_index & index_baskets (Laspeyres APIx)\n• Row-Level Security (RLS) & Native Enums\n• SQLAlchemy 2.x asyncpg Connection Pool"]
+        Postgres["Supabase PostgreSQL 17 Managed Database\n• raw_fares (SHA-256 Hashed, Trigger-Protected Immutable Store)\n• validated_fares (Sanity-Filtered, Deduplicated)\n• airfare_index & index_baskets (Laspeyres APIx)\n• Row-Level Security (RLS) & Native Enums\n• SQLAlchemy 2.x asyncpg Connection Pool"]
         Auth["Supabase Auth Service\n• JWT Token Generation & Session Management\n• profiles Table Linkage (Default 'analyst')"]
-        Realtime["Supabase Realtime Engine\n• PostgreSQL Change Data Capture (CDC)\n• WebSocket Broadcasts to Frontend"]
-        Storage["Supabase Private Storage Buckets\n• Raw HTML / JSON Payload Archives\n• Exported PDF Dossiers & Excel Sheets"]
+        Realtime["Supabase Realtime Engine\n• PostgreSQL Change Data Capture (CDC)\n• WebSocket Broadcasts to Next.js Frontend"]
+        Storage["Supabase Storage Buckets\n• Exported PDF Dossiers & Excel Workbooks"]
         
-        FastAPI -->|"asyncpg (Service Role)"| Postgres
-        Worker -->|"asyncpg (Service Role)"| Postgres
+        FastAPI -->|"asyncpg"| Postgres
+        Worker -->|"asyncpg"| Postgres
         FastAPI --> Storage
         Browser -.->|"Authenticate"| Auth
         Auth -.->|"Verify JWKS"| FastAPI
@@ -76,967 +143,668 @@ flowchart TB
     end
 
     subgraph LocalDev["Local Development Fallback"]
-        LocalPG["PostgreSQL 16 Alpine Container\n(Local Dev Only: Unset DATABASE_URL)"] -.->|"Fallback DB"| FastAPI
+        LocalPG["PostgreSQL 16 Alpine Container\n(Used ONLY when DATABASE_URL is unset)"] -.->|"Fallback DB"| FastAPI
     end
 ```
 
-### Detailed Tier Breakdown
-
-1. **Tier 1: Presentation Layer (Vercel)**
-   * **Framework**: Next.js 14 App Router with React 19 and TypeScript 5.
-   * **Design System**: Tailwind CSS 4 with institutional design tokens and accessible headless primitives via `shadcn/ui`.
-   * **Visualizations**: Apache ECharts 6 (`echarts-for-react`) providing interactive advance-purchase yield curves, corridor volatility heatmaps, and SHAP waterfall attributions.
-   * **State & Caching**: TanStack Query v5 managing server state, optimistic updates, and automatic query invalidation upon receiving pipeline events.
-   * **Secure Edge Proxy**: Configured in `next.config.ts`, the `/backend-api/:path*` route rewrite directs API calls to the server-only `BACKEND_ORIGIN`, preventing browser CORS issues and shielding backend infrastructure.
-
-2. **Tier 2: Ingress & Network Layer (AWS EC2)**
-   * **Host Operating System**: Ubuntu 24.04 LTS on AWS EC2.
-   * **Reverse Proxy**: Nginx listening on public ports 80/443, enforcing security headers, proxying incoming traffic to `http://127.0.0.1:8000`, and passing client identification headers (`Host`, `X-Real-IP`, `X-Forwarded-For`, `X-Forwarded-Proto`).
-   * **Isolation**: Database and Redis ports remain private and unexposed to public AWS security groups.
-
-3. **Tier 3: Core Application & REST API (Docker on EC2)**
-   * **Runtime**: Asynchronous Python 3.11+ running FastAPI 0.111+ inside a Docker container.
-   * **Internal Port Mapping**: Runs internally on port 10000, mapped to host `127.0.0.1:8000:10000`.
-   * **Security & Auth**: Validates Supabase JWTs against project public JWKS keys or shared secrets. User roles (`analyst`, `admin`) are verified against the database `profiles` table.
-   * **Database Access**: Fully asynchronous object-relational mapping via SQLAlchemy 2.x and `asyncpg`.
-
-4. **Tier 4: Distributed Workers & Browser Scraping (Docker on EC2)**
-   * **Task Orchestration**: Celery 5.4+ connected to Redis 7 (`redis://redis:6379/0`).
-   * **Periodic Scheduling**: Celery Beat executing cron-style sweeps across monitored route corridors and booking windows.
-   * **Browser Environment**: Playwright Chromium and Crawl4AI runtime dependencies are compiled directly into the container, allowing headless browser execution under Xvfb without host desktop packages.
-   * **Resource Governance**: Headless browser concurrency is strictly constrained (`CRAWL4AI_BROWSER_CONCURRENCY=1`) to operate safely within server memory budgets.
-
-5. **Tier 5: Canonical Data, Managed Auth & Storage (Supabase)**
-   * **Managed PostgreSQL 17**: Enforces Row-Level Security (RLS), native PostgreSQL enums, and JSONB schemas. An immutable database trigger on `raw_fares` blocks any `UPDATE` or `DELETE` commands.
-   * **Supabase Auth**: Issues cryptographic JWTs for analysts and administrators.
-   * **Supabase Realtime**: Emits WebSocket broadcasts on database changes, allowing frontend dashboards to update instantly as stages complete.
-   * **Supabase Storage**: Private object storage for raw HTML/JSON observation evidence and audit-grade PDF dossiers.
-   * **Local PostgreSQL Note**: The `postgres:16-alpine` container in `docker-compose.yml` is strictly a local offline development fallback. Production environments connect directly to Supabase.
+### Infrastructure Summary
+* **Presentation**: Next.js 14 App Router hosted on **Vercel**, using server-side URL rewrites (`/backend-api/:path*`) to shield backend endpoints.
+* **Compute Host**: **AWS EC2** (`t3.small`, Ubuntu 24.04 LTS) executing containerized FastAPI, Celery worker, Celery Beat, and Redis under Docker Compose.
+* **Ingress**: Host **Nginx** reverse proxy handling incoming traffic and proxying to `127.0.0.1:8000`.
+* **Database & Auth**: Managed **Supabase Cloud** (PostgreSQL 17 with Row-Level Security, JWT Auth, and Realtime CDC).
+* **Isolation**: Redis and database ports are bound to loopback/internal bridge networks and remain unexposed to public security groups.
 
 ---
 
-## 4. Architecture Workflow
+## 6. End-to-End Data Flow
 
-AirPulse enforces strict separation between data collection and analytical ingestion. Collected payloads staged during web scraping cannot affect downstream analytics or indices until they pass through an explicit ingestion step.
+The lifecycle of an observation flows through distinct stages. A fundamental system invariant governs this architecture: **Collection is NOT ingestion. Staged fares cannot affect downstream analytics until explicitly ingested.**
 
 ```mermaid
 flowchart TD
-    subgraph Step1["Step 1: Ethical Multi-Source Web Acquisition"]
-        Req["SearchRequest Input\n(Origin, Destination, Date, Cabin='economy')"] --> RobCheck{"Check robots.txt &\nPolicy Status"}
-        RobCheck -- Disallowed --> Skip["Status: SKIPPED_POLICY\n(Halt Execution)"]
-        RobCheck -- Allowed --> EngRoute{"Engine Selector (AUTO)"}
-        EngRoute --> C4AI["Crawl4AI / Playwright\n(Headless Chromium, Concurrency=1)"]
-        EngRoute --> HTTP["Async HTTP / Scrapy\n(Lightweight APIs)"]
-        C4AI --> AccCheck{"Detect 403, 429,\nor CAPTCHA"}
-        AccCheck -- Restriction Detected --> Halt["Status: BLOCKED / CAPTCHA_DETECTED\n(Stop-and-Report, No Evasion)"]
-        AccCheck -- Clear --> ExtCard["Extract Public Flight Cards\n(Price, Taxes, Airline, Flight No)"]
-        HTTP --> ExtCard
+    subgraph S1["1. Live Scraping & Bounded Acquisition"]
+        Req["SearchRequest Input\n(Origin, Destination, Departure Date, Cabin='economy')"]
+        PreCheck{"Pre-Flight Check:\nrobots.txt & Policy"}
+        Req --> PreCheck
+        PreCheck -- Disallowed --> StopPol["Status: SKIPPED_POLICY\n(Abort Execution)"]
+        PreCheck -- Allowed --> BrowserEng["Crawl4AI / Playwright\n(Headless Chromium, Concurrency=1)"]
+        BrowserEng --> BarrierCheck{"Restriction Detected?\n(403 / 429 / CAPTCHA)"}
+        BarrierCheck -- Yes --> StopHalt["Status: BLOCKED / CAPTCHA_DETECTED\n(Stop and Report, Zero Evasion)"]
+        BarrierCheck -- No --> ExtCards["Extract Public Flight Cards\n(Price, Taxes, Carrier, Flight No)"]
     end
 
-    subgraph Step2["Step 2: Staging & Explicit Ingestion Gate"]
-        ExtCard --> RawEnv["Create Raw Envelope\n(UUID, Run ID, Timestamp, SHA-256 Hash)"]
-        RawEnv --> StagingDB["Write to collection_runs & Staging Storage\n(Isolated from Analytics)"]
-        StagingDB --> Gate{"Explicit Action:\n'Send to Data Ingestion'\n(Manual or Scheduled Trigger)"}
-        Gate -- Not Triggered --> StagedOnly["Staged Payloads Remain Isolated\n(Zero Impact on Indices or Models)"]
+    subgraph S2["2. Staging Before Ingestion"]
+        ExtCards --> Envelope["Wrap in Raw Envelope\n(UUID, Run ID, Timestamp, SHA-256 Hash)"]
+        Envelope --> StagedStore["Write to collection_runs Staging Store\n(Isolated from Analytics)"]
+        StagedStore --> Gate{"Explicit Ingestion Action\n'Send to Data Ingestion'"}
+        Gate -- Unapproved --> Idle["Data Remains Staged Only\n(Zero Impact on APIx / Models)"]
     end
 
-    subgraph Step3["Step 3: Canonical Ingestion & Validation"]
-        Gate -- Approved --> RawStore["Write to raw_fares\n(PostgreSQL Trigger: Immutable Append-Only)"]
-        RawStore --> Norm["Canonical Normalization\n(Standardize IATA, Cabin, Timestamps, Currency)"]
-        Norm --> Sanity{"Physical-Sanity Validation\n• Fare ₹500 - ₹500,000\n• Origin != Destination\n• Valid 3-Letter IATA Codes\n• Base Fare <= Total Fare"}
-        Sanity -- Invalid --> AuditRej["Write to audit_logs\n(Status: REJECTED with Reason Code)"]
-        Sanity -- Valid --> Dedup["Deterministic Deduplication\n(Compute quote_hash)"]
+    subgraph S3["3. Canonical Ingestion & Validation"]
+        Gate -- Approved --> RawTable["Write to raw_fares\n(PostgreSQL Trigger: Immutable Append-Only)"]
+        RawTable --> Norm["Normalize Payload\n(Standardize IATA, Cabin, Date, Net/Gross Currency)"]
+        Norm --> BoundsCheck{"Physical Sanity Check\n• ₹500 <= Total Fare <= ₹500,000\n• Origin != Destination\n• Valid 3-Letter IATA Codes\n• Base Fare <= Total Fare"}
+        BoundsCheck -- Failed --> RejectLog["Write to audit_logs\n(Status: REJECTED with Reason Code)"]
+        BoundsCheck -- Passed --> Dedup["Deterministic Deduplication\n(Compute quote_hash Fingerprint)"]
         Dedup --> DupCheck{"Duplicate Found?"}
-        DupCheck -- Yes --> MarkDup["Mark is_duplicate = true\n(Preserved in DB, Excluded from Index)"]
+        DupCheck -- Yes --> MarkDup["Flag is_duplicate = true\n(Preserved in DB, Excluded from Index)"]
         DupCheck -- No --> ValStore["Write to validated_fares\n(Status: VALID)"]
     end
 
-    subgraph Step4["Step 4: Feature Engineering"]
-        ValStore --> FeatGen["Feature Generation Service\n• Booking Window Lead Days (T+1 to T+45)\n• Day of Week, Is Weekend, Seasonality\n• Rolling Route Median, Std Dev, Volatility"]
-        FeatGen --> FeatStore["Write to fare_features Table"]
+    subgraph S4["4. Feature Engineering"]
+        ValStore --> FeatGen["Generate Analytical Features\n• Lead Days (T+1, T+7, T+15, T+30, T+45)\n• Day of Week, Is Weekend, Seasonality\n• Rolling Route Median, Std Dev, Volatility"]
+        FeatGen --> FeatTable["Persist to fare_features Table"]
     end
 
-    subgraph Step5["Step 5: Decoupled Processing Branches"]
-        FeatStore --> BranchA["Branch A: Statistical Index Engine (APIx)"]
-        FeatStore --> BranchB["Branch B: ML Quality Assurance Layer"]
+    subgraph S5["5. Decoupled Analytical Branches"]
+        FeatTable --> BranchAPIx["Branch A: Statistical Index Engine (APIx)"]
+        FeatTable --> BranchML["Branch B: ML Observational QA Layer"]
 
-        subgraph SubBranchA["Statistical Index (Pure Math)"]
-            BranchA --> FilterElig["Filter: Cabin='economy', Status='VALID',\nOrigin IN ('LIVE', 'IMPORTED'), Not Duplicate"]
-            FilterElig --> StrataCell["Stratify by Route (r) and Booking Window (b)"]
-            StrataCell --> CellMed["Compute Representative Cell Price: P(r,b,t) = Median"]
-            CellMed --> RelCalc["Compute Price Relative: P(r,b,t) / P(r,b,0)"]
-            RelCalc --> LaspAgg["Laspeyres Matched-Basket Aggregation\nSum(w * Relative) / Sum(w)"]
-            LaspAgg --> QScore["Compute Coverage Quality Score (Q)\nQ = 0.40 Cr + 0.25 Cs + 0.20 F + 0.15 V"]
-            QScore --> IndexDB["Write to airfare_index &\nindex_components Tables"]
+        subgraph SubAPIx["APIx Statistical Formulation (Pure Math)"]
+            BranchAPIx --> StratCells["Group by Route (r) and Booking Window (b)"]
+            StratCells --> CellMedian["Compute Representative Cell Median: P(r,b,t)"]
+            CellMedian --> PriceRel["Compute Price Relative: P(r,b,t) / P(r,b,0)"]
+            PriceRel --> LaspIndex["Laspeyres Matched-Basket Aggregation\nAPIx = 100 * Sum(w * Relative) / Sum(w)"]
+            LaspIndex --> CoverageQ["Compute Coverage Quality Score (Q)\nQ = 0.40 Cr + 0.25 Cs + 0.20 F + 0.15 V"]
+            CoverageQ --> StoreIndex["Persist to airfare_index &\nindex_components Tables"]
         end
 
-        subgraph SubBranchB["ML Quality Assurance (Observational QA)"]
-            BranchB --> FG["FareGuard (XGBoost Regressor)\nPredict Expected Fare ₹"]
-            FG --> ResCalc["Compute Residual:\nresidual = actual_fare - expected_fare"]
-            ResCalc --> PG["PriceGuard (Isolation Forest)\nMultivariate Anomaly Scoring"]
-            PG --> PGBin{"Empirical Percentile >= 0.75?"}
-            PGBin -- Yes (Anomaly) --> SHAP["Selective TreeSHAP Explainer\nCompute Rupee Impact Feature Drivers"]
-            PGBin -- No (Normal) --> NormLog["Log Normal Record Variance"]
-            SHAP --> AnomDB["Write to anomalies &\nalerts Tables"]
-            NormLog --> AnomDB
+        subgraph SubML["ML Quality Assurance (Decoupled QA)"]
+            BranchML --> FareGuard["FareGuard (XGBoost Regressor)\nPredict Expected Fare ₹"]
+            FareGuard --> Residual["Compute Residual:\nresidual = actual_fare - expected_fare"]
+            Residual --> PriceGuard["PriceGuard (Isolation Forest)\nMultivariate Anomaly Scoring"]
+            PriceGuard --> AnomGate{"Calibrated Percentile >= 0.75?"}
+            AnomGate -- Yes (Anomaly) --> TreeSHAP["Selective TreeSHAP Explainer\nCompute Rupee Feature Drivers"]
+            AnomGate -- No (Normal) --> LogNorm["Log Normal Variance Benchmark"]
+            TreeSHAP --> StoreAnom["Persist to anomalies &\nalerts Tables"]
+            LogNorm --> StoreAnom
         end
     end
 
-    subgraph Step6["Step 6: Realtime Notification & Presentation"]
-        IndexDB --> RTBroad["Supabase Realtime Broadcast"]
-        AnomDB --> RTBroad
-        RTBroad --> PushDash["Next.js Analyst Dashboard Updates\n(TanStack Query Cache Invalidation)"]
-        PushDash --> Export["Executive Dossier Exports\n(Audit-Grade PDF & Excel Spreadsheets)"]
+    subgraph S6["6. Realtime Notification, Shocks & Reports"]
+        StoreIndex --> RT["Supabase Realtime Broadcast"]
+        StoreAnom --> RT
+        RT --> PushUI["Update Next.js Dashboard via TanStack Cache Invalidation"]
+        PushUI --> ShockEval["Evaluate Multi-Source Price Shocks\n(Distinct from Anomaly Count)"]
+        PushUI --> Dossier["Context-Aware Reports\n(PDF Dossiers, CSV Datasets, XLSX Workbooks)"]
     end
 ```
 
-### Detailed Phase-by-Phase Workflow
+---
 
-1. **Phase 1: Ethical Multi-Source Web Acquisition**
-   * Pre-flight checks verify `robots.txt` and administrative compliance review notes.
-   * `SearchRequest` inputs specify standard research parameters (Economy, 1 adult, INR).
-   * The collector engine launches single-session headless Chromium or async HTTP requests.
-   * If upstream access barriers (HTTP 403, 429, CAPTCHA) are encountered, execution halts immediately with truthful status logging.
+## 7. Live Scraping Architecture
 
-2. **Phase 2: Staging & Explicit Ingestion Gate**
-   * Extracted flight cards are wrapped in a cryptographic envelope containing a SHA-256 hash of the raw response.
-   * Raw payloads are staged in `collection_runs`.
-   * **Critical Invariant**: Staged data remains completely isolated and cannot affect analytics, price indices, or machine learning models until an operator or scheduler explicitly triggers the ingestion action.
+VAYANTARA structures web collection around an extensible, object-oriented collector layer (`app/collectors/`) utilizing Python, Crawl4AI, and Playwright Chromium.
 
-3. **Phase 3: Canonical Ingestion & Validation**
-   * Staged observations pass through the ingestion gate and are written to `raw_fares`.
-   * An immutable database trigger enforces write-once behavior on `raw_fares`.
-   * Disparate structures are parsed into uniform route codes, carrier names, flight numbers, and net/tax fare amounts.
-   * Strict physical-sanity rules reject impossible fares (outside ₹500–₹500,000, $O = D$, malformed IATA codes), writing rejections to `audit_logs`.
-   * Deduplication assigns `is_duplicate = true` based on deterministic `quote_hash` matching without deleting any rows.
+### Verified Live Corridors
+The operational Live Scraping interface (`/scraping-test`) provides user-directed collection across three verified domestic corridors:
+* **`DEL → BOM`**: Delhi (Indira Gandhi International) $\leftrightarrow$ Mumbai (Chhatrapati Shivaji Maharaj)
+* **`DEL → CCU`**: Delhi (Indira Gandhi International) $\leftrightarrow$ Kolkata (Netaji Subhash Chandra Bose)
+* **`BOM → BLR`**: Mumbai (Chhatrapati Shivaji Maharaj) $\leftrightarrow$ Bengaluru (Kempegowda International)
 
-4. **Phase 4: Feature Engineering**
-   * Generates analytical attributes: advance booking lead days, booking window bucket (`T+1`, `T+7`, `T+15`, `T+30`, `T+45`), day of week, weekend flags, and historical rolling corridor medians.
-   * Feature rows are persisted to `fare_features`.
+### Operator Controls & Staging Behavior
+* **Corridor Dropdown**: Selects from registered, verified city pairs.
+* **User-Selectable Future Departure Date**: Enforces `min = today` in the `Asia/Kolkata` timezone to prevent past-date collection.
+* **Maximum Result Limit**: Hard bounds (default 5, operator adjustable up to 15) to minimize upstream server impact.
+* **Telemetry & Timestamping**: Tracks collection duration, HTTP status, and actual extraction timestamps.
+* **Staged Observation Table**: Extracted flight quotes (carrier, flight number, departure timing, net fare, taxes, and raw payload SHA-256) are displayed for operator review before any analytical ingestion occurs.
+* **Explicit Action**: The **Send to Data Ingestion** action triggers canonical pipeline processing.
 
-5. **Phase 5: Decoupled Processing Branches**
-   * **Branch A (APIx Statistical Engine)**: Operates strictly on validated, non-duplicate observed fares from `LIVE` and `IMPORTED` origins. Groups fares into corridor $\times$ booking-window cells, computes median prices, derives price relatives against baseline periods, and calculates the national Laspeyres index along with coverage quality metric ($Q$).
-   * **Branch B (ML Quality Assurance)**: Runs independently. FareGuard (XGBoost) predicts the expected baseline fare. PriceGuard (Isolation Forest) scores multivariate anomaly percentiles. For flagged anomalies (percentile $\ge 0.75$), TreeSHAP generates non-causal rupee attributions explaining model divergence.
-
-6. **Phase 6: Realtime Notification & Presentation**
-   * Index values, anomalies, and pipeline step transitions are written to the database.
-   * Supabase Realtime emits WebSocket broadcasts to connected browser sessions.
-   * TanStack Query invalidates affected queries, updating dashboard charts, yield curves, and alert feeds instantly.
-   * Analysts can generate audit-grade PDF dossiers and Excel workbooks on demand.
+### Multi-Source Extensibility vs. Verified Sources
+* **Multi-Source Extensible Architecture**: The `BaseCollector` interface supports `CRAWL4AI`, `PLAYWRIGHT`, `SCRAPY`, and async `HTTP` execution engines, with a dynamic source registry capable of onboarding additional portals.
+* **Currently Verified Live Source(s)**: The **HappyFares** prototype collector is verified in code under administrative review flags (`HAPPYFARES_PROTOTYPE_ENABLED=true` and documented compliance review notes). Yatra is supported via a secondary Playwright adapter. The platform does not claim universal automated extraction permissions across all commercial airline portals.
 
 ---
 
-## 5. Technology Stack with Details
+## 8. Data Origins & Operational Modes
 
-| Layer / Domain | Technology | Version | Purpose & Technical Implementation Details |
-|---|---|---|---|
-| **Frontend Framework** | Next.js | 14+ (App Router) | Server-side rendering (SSR), layout nesting, React Server Components, dynamic client routing, and edge delivery. Handles server-side `/backend-api` rewrites to isolate backend origins. |
-| **Frontend Language** | TypeScript | 5.x | Enforces strict compile-time typing across analytical models, dashboard properties, API responses, and chart configurations matching backend Pydantic models. |
-| **Styling & Design Tokens** | Tailwind CSS | 4.x | Utility-first styling framework implementing customized institutional tokens (neutral dark modes, accessible contrast ratios, tabular spacing). |
-| **Component Primitives** | shadcn/ui | Latest | Accessible, headless UI components built on Radix UI primitives, ensuring high keyboard and screen-reader accessibility. |
-| **Interactive Analytics** | Apache ECharts | 6.x (`echarts-for-react`) | Interactive high-performance Canvas/SVG rendering for advance-purchase yield curves, index comparison trendlines, corridor heatmaps, and SHAP waterfall charts. |
-| **Server State Management** | TanStack Query | 5.x | Asynchronous data fetching, automatic background revalidation, query deduplication, and event-driven cache invalidation from Realtime WebSocket events. |
-| **Client Auth & Realtime** | Supabase JS | 2.x (`@supabase/supabase-js`) | Manages client-side session tokens, secure authentication flows, and WebSocket channel subscriptions for live database table updates. |
-| **Backend Runtime** | Python | 3.11+ | Core asynchronous runtime leveraging performance enhancements in modern asyncio and typed data pipelines. |
-| **Web Framework** | FastAPI | 0.111+ | Asynchronous REST framework serving self-documenting OpenAPI (Swagger) contracts with high-throughput JSON serialization. |
-| **Data Validation** | Pydantic | v2 | High-speed C-based model validation for request payloads, API responses, and environment settings. |
-| **Database ORM** | SQLAlchemy | 2.x (async) | Fully asynchronous SQL toolkit and Object-Relational Mapper executing typed database queries via Python coroutines. |
-| **Database Driver** | asyncpg | 0.29+ | Asynchronous, binary-protocol PostgreSQL client driver providing low-latency database connectivity (`postgresql+asyncpg`). |
-| **Schema Migrations** | Alembic | 1.13+ | Version-controlled database migration framework acting as the single source of truth for all tables, triggers, enums, and foreign keys. |
-| **Web Acquisition Engine** | Crawl4AI | 0.9+ | Python-based automated scraping layer using Crawl4AI with Playwright/Chromium, designed for multi-source airline/OTA collection and extensible to Scrapy/direct Playwright adapters. Executes dynamic JS rendering under bounded concurrency. |
-| **Browser Automation** | Playwright / Chromium | 1.44+ | Headless Chromium automation engine bundled inside the backend Docker container, operating under Xvfb for rendering dynamic single-page applications. |
-| **HTTP & Static Collection** | Scrapy & HTTPX | Latest | High-throughput asynchronous crawler and async HTTP client for static pages, `robots.txt` parsing, and public REST endpoints. |
-| **Task Queue & Workers** | Celery | 5.4+ | Distributed task queue managing asynchronous execution of browser extraction, data ingestion, feature generation, and ML scoring. |
-| **Task Scheduling** | Celery Beat | 5.4+ | Cron-style periodic scheduler triggering automated collection sweeps across the route corridor $\times$ booking-window search matrix. |
-| **Message Broker & Cache** | Redis | 7.x | High-speed in-memory key-value store serving as the Celery task broker, result backend, and transient application cache. |
-| **Expected Fare ML** | XGBoost | 2.0+ | **FareGuard**: Gradient-boosted regression tree predicting expected baseline fares from route distance, booking horizon, seasonality, and rolling medians using time-based validation splits. |
-| **Anomaly Detection ML** | scikit-learn | 1.5+ | **PriceGuard**: Multivariate Isolation Forest evaluating actual fares, predicted baselines, residuals, and route dispersion using empirical percentile ranking. |
-| **Explainable ML** | SHAP | 0.45+ | TreeSHAP explainer generating selective, non-causal rupee feature attributions exclusively for flagged pricing anomalies ($\ge 0.75$ percentile) and on-demand audits. |
-| **Statistical Mathematics** | NumPy / SciPy / Pandas | Latest | Vectorized numerical data transformations, empirical percentile ranking, and Laspeyres / Jevons matched-basket index aggregation. |
-| **Canonical Database** | Supabase PostgreSQL | PostgreSQL 17 | Managed institutional relational database with Row-Level Security (RLS), native ENUMs, JSONB storage, and trigger-enforced raw immutability. |
-| **Identity & Security** | Supabase Auth | Managed | Cryptographic JWT issuance, user registration, session management, and JWKS signature verification. |
-| **Live Notifications** | Supabase Realtime | Managed | WebSocket-based Change Data Capture (CDC) listening to PostgreSQL table commits and broadcasting updates to the frontend. |
-| **Audit Object Storage** | Supabase Storage | Managed | Private S3-compatible object storage buckets archiving raw HTML/JSON payload snapshots and generated PDF dossiers. |
-| **Cloud Compute Host** | AWS EC2 | Ubuntu 24.04 LTS | Virtual server host executing containerized FastAPI, Celery worker, Celery Beat, and Redis services. |
-| **Reverse Proxy & Ingress** | Nginx | 1.24+ | Reverse proxy handling public port 80/443 traffic, security headers, SSL termination, and proxying to container port 8000. |
-| **Container Orchestration**| Docker & Docker Compose | Compose v2 | Multi-container packaging providing reproducible execution across development, staging, and production environments. |
-| **Edge Hosting** | Vercel | Production | Global content delivery network hosting the Next.js frontend with automated deployment pipelines. |
+Every observation in the database carries an immutable `data_origin` tag:
+* `LIVE`: Quotes gathered in real time by automated collectors.
+* `IMPORTED`: Real-world market observations imported from verified external files (e.g., historical exports).
+* `REPLAY`: Historical payloads replayed through the pipeline for deterministic regression testing.
+* `SYNTHETIC`: Mathematically simulated observations used solely for UI layout testing.
+* `MODELLED`: Algorithmic estimations generated by FareGuard (XGBoost).
 
----
-
-## 6. Why AirPulse
-
-In macroeconomic statistics and aviation analytics, notable research and operational gaps exist:
-
-* **Static Predictions vs. Real-Time Indexing**: Most aviation pricing solutions focus on predicting single future ticket fares for consumer booking. AirPulse addresses the less common yet critical requirement: calculating an auditable, high-frequency macroeconomic price index for statistical and policy monitoring.
-* **Black-Box ML vs. Institutional Explainability**: Commercial airline dynamic pricing models rely on opaque algorithms. Statistical agencies require transparent index formulations (Laspeyres / Jevons) paired with explainable machine learning (selective TreeSHAP) strictly reserved for quality assurance and anomaly detection.
-* **Weak Provenance in Web Data**: Web-scraped datasets often lack reproducible audit trails. AirPulse couples raw payload hashing, collector metadata, and database immutability to withstand institutional audit standards.
-* **Preserving Economic Shocks vs. Blind Outlier Removal**: Typical data pipelines discard extreme prices as noise. AirPulse distinguishes between corrupt entries (e.g., negative prices, malformed flight numbers) and genuine macroeconomic market shocks (e.g., holiday surges, capacity crunches), preserving real economic signals for inflation measurement.
-* **Resilient Handling of Data Modes**: Web portals undergo frequent frontend adjustments and access changes. An institutional system cannot halt when an upstream portal challenge occurs; it requires a disciplined hybrid fallback mechanism supporting verified imported baselines alongside live feeds, with isolated demo modes.
-
----
-
-## 7. Key USPs — The Four Pillars
-
-```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                            AIRPULSE FOUR PILLARS                             │
-├──────────────────────┬──────────────────────┬────────────────────────────────┤
-│       TRUST          │      RESILIENCE      │   INTELLIGENCE & INTEGRITY     │
-├──────────────────────┼──────────────────────┼────────────────────────────────┤
-│ • SHA-256 Provenance │ • LIVE + IMPORTED    │ • FareGuard (XGBoost Regressor)│
-│ • Immutable Raw Log  │   Graceful Fallback  │ • PriceGuard (Isolation Forest)│
-│ • Audit Trail        │ • Clear Degradation  │ • Selective SHAP Attribution   │
-│ • Origin Labels      │   States (No Fake)   │ • Pure APIx (Independent of ML)│
-└──────────────────────┴──────────────────────┴────────────────────────────────┘
-```
-
-### Pillar 1: TRUST
-* **SHA-256 Provenance**: Every collected payload is hashed using SHA-256 upon reception and written to an append-only raw store protected by database triggers.
-* **Complete Chain of Custody**: Every observation links to its source ID, collection run ID, pipeline run ID, collector engine, source URL, HTTP status, and ingestion timestamp.
-* **Explicit Origin Labels**: Records are categorized (`LIVE`, `IMPORTED`, `REPLAY`, `SYNTHETIC`, `MODELLED`), preventing unverified or simulated data from entering official statistics.
-
-### Pillar 2: RESILIENCE
-* **Hybrid LIVE + IMPORTED Architecture**: Combines live automated browser extraction with verified historical data imports (`GoibiboCsvImporter`, official reference datasets).
-* **Clear Degradation States**: If a live source encounters rate limiting or bot detection, the system transitions to an honest `IMPORTED_FALLBACK` ("LIVE SOURCE DEGRADED") or `EMPTY` state. AirPulse never manufactures synthetic data to simulate uptime in live views.
-* **Decoupled Architecture**: Statistical index calculations run independently from machine learning inference. If an ML dependency fails, index computation continues uninterrupted.
-
-### Pillar 3: INTELLIGENCE
-* **FareGuard (XGBoost)**: Provides expected baseline fares conditional on route distance, lead days, day of week, seasonality, and rolling corridor medians.
-* **PriceGuard (Isolation Forest)**: Multivariate anomaly detector scoring actual fares against predicted baselines, residuals, and route dispersion using empirical percentile ranking.
-* **Selective TreeSHAP**: Evaluates feature attribution in rupee terms exclusively for anomalies ($\ge 0.75$ percentile) and on-demand audits, minimizing unnecessary compute.
-
-### Pillar 4: STATISTICAL INTEGRITY
-* **Zero ML Imputation in Official APIx**: The Airfare Price Index is computed strictly from verified, observed market quotes. ML outputs are never used to impute missing observations.
-* **Route & Booking-Window Methodology**: Prevents yield-management skew by indexing advance-purchase horizons (`T+1` to `T+45`) across monitored corridors individually before basket aggregation.
-* **Coverage Quality Metric ($Q$)**: Every index point carries a published composite score measuring route coverage, source diversity, temporal freshness, and validation rate.
-
----
-
-## 8. Collection Architecture
-
-AirPulse structures all acquisition around an extensible, object-oriented collector layer located in `app/collectors/`.
-
-```
-                  BaseCollector (Abstract Contract)
-                                │
-        ┌───────────────────────┼───────────────────────┐
-        │                       │                       │
-Crawl4AICollector      PlaywrightCollector        ScrapyCollector
- (HappyFares DOM)       (Headless Script)        (High-Throughput)
-        │                       │                       │
-        └───────────────────────┼───────────────────────┘
-                                │
-                                ▼
-                       SearchRequest Input
-                                │
-                                ▼
-                   Normalized CollectorResult
-```
-
-### Core Contracts & Registry
-* **`BaseCollector`**: Abstract contract enforcing rate limits (`rate_limit_per_minute`), timeouts (`timeout_seconds`), backoff retries, and raw payload envelope creation.
-* **Dynamic Source Registry**: Discovers and instantiates registered collector classes dynamically based on source identifiers and configured capabilities.
-* **`SearchRequest`**: Strongly-typed model specifying origin IATA, destination IATA, departure date, passenger count (fixed to 1), cabin class (economy), and currency (`INR`).
-* **`CollectorResult` & Raw Envelope**: Immutable container bundling extracted flight quotes, HTTP status, request IDs, collector version, and a SHA-256 hash of the raw response payload.
-
-### Standardized Engine Outcomes & Statuses
-AirPulse records exact operational statuses rather than generic failure codes:
-* `SUCCESS`: Flights observed, validated, and staged successfully.
-* `PARTIAL`: Fewer quotes retrieved than requested, but returned fares are valid.
-* `NO_AVAILABILITY`: Source successfully returned zero scheduled flights for the requested corridor/date.
-* `BLOCKED`: Source returned an HTTP 403 or explicit "Access Denied" response.
-* `CAPTCHA_DETECTED`: Source presented a human verification challenge (Cloudflare, hCaptcha, etc.).
-* `AUTH_REQUIRED`: Portal requires interactive login or session cookies.
-* `FAILED`: Internal extraction exception or unexpected crash.
-* `SKIPPED_POLICY`: Extraction aborted because `robots.txt` disallows the path or operator review notes are absent.
-* `CONTENT_REQUIRES_JS`: Static extractor failed because dynamic DOM hydration is required.
-* `NOT_FOUND`: Upstream search route or carrier URL returned HTTP 404.
-* `PARSE_ERROR`: Page rendered successfully, but DOM structure did not match expected selectors.
-* `RATE_LIMITED`: Upstream HTTP 429 Too Many Requests response.
-* `TIMEOUT`: Network or rendering deadline exceeded.
-* `HTTP_ERROR`: Unhandled 5xx server-side error on upstream portal.
-
-### Execution Engine Model
-AirPulse supports five operational collection engines:
-1. `AUTO`: Dynamically evaluates source complexity; routes to Crawl4AI/Playwright for JS-heavy portals or HTTP for simple APIs.
-2. `CRAWL4AI`: Headless Chromium managed through Crawl4AI for complex single-page applications.
-3. `SCRAPY`: Asynchronous scraping engine for high-volume static pages and lightweight endpoints.
-4. `PLAYWRIGHT`: Direct Playwright script execution with fine-grained event listeners.
-5. `REPLAY`: Offline playback of pre-recorded fixture runs for reproducible testing.
-
-*Current Prototype Behavior*: In `AUTO` mode, dynamic airline/OTA portals route to the Crawl4AI / Playwright-based execution path.
-
-### Bounded Operational Behavior
-To ensure responsible research execution:
-* **Low Concurrency**: Maximum concurrent browser sessions restricted to 1 (`CRAWL4AI_BROWSER_CONCURRENCY=1`).
-* **Strict Result Caps**: Max 5–15 observations per crawl (`CRAWL4AI_DEFAULT_MAX_RESULTS=5`).
-* **Browser Concurrency 1**: Exactly 1 browser instance runs at a time to prevent resource exhaustion.
-* **Stop on Access Restrictions**: Halts instantly upon encountering access restrictions.
-* **No CAPTCHA Bypass**: Captchas are detected and reported, never solved.
-* **No Proxy Evasion**: No residential proxy pools or rotating IP infrastructure.
-* **No Anti-Bot Circumvention**: Does not forge browser fingerprints or evade security controls.
-
----
-
-## 9. Ethical Collection Design
-
-AirPulse adheres to defensive, ethical web extraction practices suited for government statistical bodies:
-
-* **Robots.txt & Terms/Policy Review**: The engine checks the upstream portal's `robots.txt` before launching any browser instance. If the target URL path is disallowed for the research user agent, collection halts with `SKIPPED_POLICY`.
-* **Rate Limiting**: Built-in throttles enforce minimum delays between requests (default 60s) and trigger a 5-minute cooldown upon any upstream failure.
-* **Bounded Requests**: Requests are capped to modest counts (5–15 quotes) to prevent load on upstream servers.
-* **Block & CAPTCHA Detection**: Automated heuristics identify HTTP 403, HTTP 429, Cloudflare challenge walls, and CAPTCHA markers.
-* **Stop-and-Report Behavior**: When an access barrier is detected, AirPulse immediately logs the exact failure stage and aborts execution. It never attempts to bypass access controls.
-* **No Bypass of Restrictions**: No evasion of 403 Forbidden, 429 Too Many Requests, CAPTCHAs, or access barriers.
-* **HappyFares Bounded Prototype**: HappyFares is currently enabled as a bounded prototype source in code under strict review toggles (`HAPPYFARES_PROTOTYPE_ENABLED=false` by default, requiring operator verification notes).
-
----
-
-## 10. Data Origins and Operational Modes
-
-Every record in AirPulse is tagged with an immutable `data_origin` label:
-
-| Origin | Meaning | Eligibility |
-|---|---|---|
-| `LIVE` | Fares extracted in real time by automated collectors. | Eligible for Live Mode and official APIx calculation. |
-| `IMPORTED` | Real-world observations imported from verified external files (e.g., historical OTA exports). | Eligible for Live Mode and official APIx calculation as a fallback. |
-| `REPLAY` | Historical recorded payloads replayed through the pipeline for deterministic regression testing. | Prohibited from Live Mode metrics; used in test harnesses. |
-| `SYNTHETIC` | Mathematically generated observations for load testing and empty-state development. | **Strictly prohibited** from Live Mode metrics and official APIx. |
-| `MODELLED` | Algorithmic estimations generated by FareGuard (XGBoost). | Used solely for QA benchmarks and anomaly residuals; never enters the index. |
+### Live Mode Resolver Rules
+The frontend and API determine operational status dynamically based on canonical counts:
 
 ```mermaid
 flowchart TD
-    Start["Request Live Mode Context"] --> Check{"Evaluate Database Counts\n(WHERE data_origin IN ('LIVE', 'IMPORTED')\nAND validation_status = 'VALID'\nAND NOT is_duplicate)"}
-    
-    Check -->|"LIVE > 0 AND IMPORTED > 0"| Hybrid["Mode: HYBRID\nLabel: 'HYBRID LIVE + IMPORTED'\nBadge: Active"]
-    Check -->|"LIVE > 0 AND IMPORTED = 0"| LiveOnly["Mode: LIVE_DATA\nLabel: 'LIVE DATA'\nBadge: Active"]
-    Check -->|"LIVE = 0 AND IMPORTED > 0"| Fallback["Mode: IMPORTED_FALLBACK\nLabel: 'IMPORTED FALLBACK'\nHealth Badge: 'LIVE SOURCE DEGRADED'"]
-    Check -->|"LIVE = 0 AND IMPORTED = 0"| Empty["Mode: EMPTY\nLabel: 'No data available'\nBadge: Offline / Empty State"]
+    Start["Live Mode Context Query"] --> Count["Query Active Fares:\nCOUNT(origin = 'LIVE') AS live_count\nCOUNT(origin = 'IMPORTED') AS imported_count"]
+    Count --> Decision{Resolve Mode}
+    Decision -->|"live_count > 0 AND imported_count > 0"| Hybrid["Mode: HYBRID\nLabel: 'HYBRID LIVE + IMPORTED'\nBadge: Active"]
+    Decision -->|"live_count > 0 AND imported_count = 0"| LiveOnly["Mode: LIVE_DATA\nLabel: 'LIVE DATA'\nBadge: Active"]
+    Decision -->|"live_count = 0 AND imported_count > 0"| Fallback["Mode: IMPORTED_FALLBACK\nLabel: 'IMPORTED FALLBACK'\nHealth Badge: 'LIVE SOURCE DEGRADED'"]
+    Decision -->|"live_count = 0 AND imported_count = 0"| Empty["Mode: EMPTY\nLabel: 'No data available'\nDisplay Honest Empty State (—)"]
 
-    SyntheticCheck["SYNTHETIC / REPLAY / MODELLED Rows"] -.->|"STRICT FILTER: BARRING"| Check
+    subgraph Exclusion["Strict Invariant"]
+        E1["SYNTHETIC"]
+        E2["REPLAY"]
+        E3["MODELLED"]
+    end
+    Exclusion -.->|"STRICTLY BARRED FROM LIVE MODE"| Count
 ```
 
-### Live Mode Rules
-* `LIVE > 0` and `IMPORTED > 0` $\rightarrow$ **HYBRID** (`HYBRID LIVE + IMPORTED`)
-* `LIVE = 0` and `IMPORTED > 0` $\rightarrow$ **IMPORTED_FALLBACK** (`IMPORTED FALLBACK`, health badge: `LIVE SOURCE DEGRADED`)
-* `LIVE > 0` and `IMPORTED = 0` $\rightarrow$ **LIVE_DATA** (`LIVE DATA`)
-* Neither (`LIVE = 0` and `IMPORTED = 0`) $\rightarrow$ **EMPTY** (`No data available`)
-
-**Invariant**: Never allow `SYNTHETIC`, `REPLAY`, or `MODELLED` to silently appear as `LIVE`.
-
-### Demo Mode
-* In Demo Mode (`DEMO_MODE=true`), the frontend displays isolated synthetic and replay snapshots with prominent visual badges (`DEMO MODE` / `MOCK DATA`), allowing interface inspection without network activity.
+* **Invariant**: `SYNTHETIC`, `REPLAY`, and `MODELLED` records are strictly barred from Live Mode and can never influence live metrics or official index figures.
+* **Demo Mode**: When `DEMO_MODE=true` is enabled, the platform displays isolated mock/synthetic datasets clearly marked with prominent visual badges (`DEMO MODE` / `MOCK DATA`).
 
 ---
 
-## 11. Provenance Model
+## 9. APIx — Pure Statistical Index Formulation
 
-To ensure statistical auditability for MoSPI and RBI analysts, AirPulse captures complete observation-level provenance:
+The **Airfare Price Index (APIx)** is calculated purely using statistical index number formulas, completely independent of machine learning models.
 
-```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                        AIRPULSE OBSERVATION PROVENANCE                       │
-├──────────────────────────┬───────────────────────────────────────────────────┤
-│ Observation ID           │ UUID v4 (Primary Key in raw_fares & validated)    │
-│ Source ID                │ Originator portal / carrier identifier            │
-│ Collection Run ID        │ Links back to collection_runs batch execution     │
-│ Pipeline Run ID          │ Identifies the exact downstream processing run   │
-│ Acquisition Method       │ Automated engine (CRAWL4AI, PLAYWRIGHT, HTTP)     │
-│ Data Origin              │ LIVE, IMPORTED, REPLAY, SYNTHETIC, MODELLED       │
-│ Provider                 │ Airline carrier or aggregator name                │
-│ Observed Timestamp       │ Exact UTC timestamp of collection from portal     │
-│ Source URL / Evidence    │ Target itinerary search URL and raw response body │
-│ Checksum / Hash          │ SHA-256 cryptographic hash of raw response        │
-│ Importer Identity        │ User ID / system identity triggering the run      │
-│ Audit Trail              │ Append-only log of validation decisions & edits   │
-└──────────────────────────┴───────────────────────────────────────────────────┘
-```
-
-Raw records written to `raw_fares` are protected by a PostgreSQL trigger that rejects any `UPDATE` or `DELETE` statement, preserving an immutable historical log.
-
----
-
-## 12. Validation / Outlier Philosophy
-
-AirPulse enforces strict rules to prevent corrupt inputs from distorting economic indicators:
-
-1. **Invalid Records Rejected**: Records failing physical-sanity bounds are rejected and routed to audit logs with reason codes:
-   * Net/gross fare outside ₹500–₹500,000.
-   * Origin IATA identical to Destination IATA ($O = D$).
-   * Malformed or unrecognized 3-letter IATA airport codes.
-   * Negative taxes or base fares exceeding total fares.
-2. **Duplicates Marked / Deduped**: Repeated observations for the same flight number, departure time, and fare are marked with `is_duplicate = true` based on their deterministic `quote_hash`. Duplicate rows remain in the database for frequency analysis but are excluded from index aggregation. Records are never purged.
-3. **Valid Unusual Fares Preserved**: High fares (e.g., last-minute festival surges of ₹35,000 on DEL–BOM) pass sanity validation and are preserved in the index basket. Valid prices reflecting market dynamics are never censored.
-4. **Economic Shocks Preserved**: Systemic price surges caused by holiday seasons or capacity crunches are treated as macroeconomic inflation signals, not noise.
-5. **Sold-Out Representation**: Flights with zero seat availability are recorded with status `NO_AVAILABILITY`. They are **never** represented as `fare = 0`.
-6. **Missing ML Predictions**: If FareGuard cannot produce an inference, the value is recorded as `NULL` (`MODEL_UNAVAILABLE`). The system **never** inserts fake ₹0 predictions.
-
----
-
-## 13. Machine Learning Quality Assurance Layer
-
-Machine learning in AirPulse functions as an **observational quality assurance system** around the index pipeline, never inside it.
-
-```mermaid
-flowchart TD
-    ValFare["Validated Fare Observation\n(Actual Price ₹)"] --> Feat["Feature Extraction\n(Distance, Lead Days, Day of Week, Route Median)"]
-    
-    Feat --> FG["FareGuard (XGBoost Regressor)"]
-    FG --> Status{"Inference Status"}
-    Status -->|"Success"| ExpFare["Expected Fare (₹)"]
-    Status -->|"Missing Features"| Null1["NULL (INSUFFICIENT_FEATURES)"]
-    Status -->|"Model Unloaded"| Null2["NULL (MODEL_UNAVAILABLE)"]
-    Status -->|"Exception"| Null3["NULL (MODEL_ERROR)"]
-    Status -->|"Ineligible Record"| Null4["NULL (NOT_ELIGIBLE)"]
-
-    ExpFare --> Res["Compute Residual\nresidual = actual_fare - expected_fare\nresidual_pct = residual / expected_fare"]
-    
-    Res --> PG["PriceGuard (Isolation Forest)"]
-    PG --> PGCheck{"Prediction Available?"}
-    PGCheck -->|"Yes"| Score["Multivariate Anomaly Score\nEmpirical Percentile Calibration (0.0 to 1.0)"]
-    PGCheck -->|"No"| NotScored["Status: NOT_SCORED"]
-    
-    Score --> PGBin{"Percentile >= 0.75?"}
-    PGBin -->|"Yes (Anomaly)"| SHAP["Selective TreeSHAP Explainer\nGenerates Rupee Driver Attributions"]
-    PGBin -->|"No (Normal)"| LogOK["Record Flagged Normal (Variance Logged)"]
-    
-    SHAP --> Alert["Analyst Alert Dossier\n(Non-Causal Explanation Persisted)"]
-```
-
-### FareGuard
-* **XGBoost Expected Fare Model**: Predicts expected baseline fare conditional on route distance, lead days, day of week, seasonality, fuel index, and historical rolling medians.
-* **Active Model Registry**: Tracks serialized model artifacts (`models/`) with metadata, version strings, and feature definitions.
-* **Batch Inference**: Processes feature batches asynchronously without blocking request serving.
-* **Temporal Train/Validation Strategy**: Employs time-based splitting (70% train, 15% validation, 15% test) to prevent forward-looking data leakage.
-* **Retraining Separate from Inference**: Retraining runs as scheduled offline batch jobs; models are never trained synchronously inside web requests.
-* **Explicit Prediction States**:
-  * `SCORED`: Valid expected fare computed.
-  * `MODEL_UNAVAILABLE`: Pre-trained model weights not loaded.
-  * `INSUFFICIENT_FEATURES`: Missing required input attributes.
-  * `MODEL_ERROR`: Numerical failure or prediction outside sanity bounds.
-  * `NOT_ELIGIBLE`: Record type not eligible for estimation (non-economy, invalid date).
-
-### PriceGuard
-* **Isolation Forest**: Multivariate anomaly detector evaluating pricing behavior.
-* **Features Used**: Actual fare, predicted fare, residual (₹), residual percentage (%), booking window lead days, recent route median, recent route standard deviation, and volatility.
-* **Prediction Unavailable State**: If FareGuard produces no prediction, PriceGuard assigns `NOT_SCORED`.
-
-### Selective SHAP
-* **Selective Invocation**: TreeSHAP values are evaluated only for flagged anomalies (percentile $\ge 0.75$), high-residual excursions, representative samples, or on-demand analyst review requests.
-* **Persisted Explanation**: Persisted as structured JSON detailing top feature drivers and directional rupee contributions.
-* **Not Causal**: SHAP values explain *why the model expected ₹X*; they do not assert causal economic market mechanisms.
-
----
-
-## 14. APIx Design — Pure Statistical Formulation
-
-The **Airfare Price Index (APIx)** is completely independent from machine learning models.
-
-* **Observed Data Only**: Calculated strictly from validated, eligible observed fares (`LIVE` + `IMPORTED`) for economy cabin travel.
-* **Route Basket & Booking Windows**: Stratified by directional route corridors and advance booking lead times.
-* **Route Weights**: Basket route weights represent passenger traffic shares across monitored corridors.
-* **Daily Index Generation**: Computed daily using a matched-basket chained Laspeyres index methodology:
+### Mathematical Formulation
+APIx is formulated as a chained, matched-basket Laspeyres price index:
 
 $$\text{APIx}_t = 100 \times \frac{\sum_{r} \sum_{b} w(r,b) \cdot \left[ \frac{P(r,b,t)}{P(r,b,0)} \right]}{\sum_{r} \sum_{b} w(r,b)}$$
 
 Where:
 * $r$: Directional route corridor (e.g., `DEL → BOM`).
-* $b$: Standard advance booking window (`T+1`, `T+7`, `T+15`, `T+30`, `T+45`).
-* $P(r,b,t)$: Representative price (median validated fare) for route $r$ and window $b$ on day $t$.
-* $P(r,b,0)$: Baseline period price for the identical route and booking-window cell.
-* $w(r,b)$: Statistical basket weight assigned to corridor $r$ and window $b$.
+* $b$: Advance booking window (`T+1`, `T+7`, `T+15`, `T+30`, `T+45`).
+* $P(r,b,t)$: Representative cell price (median validated economy fare) for corridor $r$ and window $b$ on day $t$.
+* $P(r,b,0)$: Baseline period price for the identical corridor and booking window.
+* $w(r,b)$: Statistical weight assigned to corridor $r$ and window $b$.
+* $\text{Base Value}$: Standardized at $100$.
+
+### Stratified Booking Windows
+Stratifying by advance-purchase horizon eliminates yield-management bias:
+* **`T+1`** (0–2 days): Emergency and urgent business travel (highest yield volatility).
+* **`T+7`** (3–10 days): Short-notice commercial travel.
+* **`T+15`** (11–20 days): Standard planned domestic travel (baseline anchor).
+* **`T+30`** (21–35 days): Advance planned personal and leisure travel.
+* **`T+45`** (36+ days): Long-range advance booking (promotional fare tier).
+
+### Representative Corridors & Basket Designation
+* **Representative Routes**: `DEL-BOM`, `DEL-BLR`, `BOM-BLR`, `DEL-CCU`, `BLR-HYD`, `MAA-DEL`.
+* **Prototype Basket Notice**: Current index weights are explicitly designated as a **PROTOTYPE / RESEARCH basket** based on estimated passenger traffic distribution. They are not official MoSPI Price Statistics Division (PSD) or DGCA annual traffic weights.
+
+### Composite Coverage Quality Metric ($Q$)
+Every published index point is accompanied by a quality metric ($0.0 \le Q \le 1.0$):
+
+$$Q = 0.40 C_r + 0.25 C_s + 0.20 F + 0.15 V$$
+
+Where $C_r$ is corridor coverage ratio, $C_s$ is source diversity, $F$ is temporal freshness, and $V$ is the sanity validation pass rate.
+
+---
+
+## 10. Machine Learning Quality Assurance Layer
+
+Machine learning in VAYANTARA functions strictly as an **observational quality control system** operating in parallel with the data pipeline.
+
+```
+                    Validated Observed Fare (Actual ₹)
+                                   │
+                                   ▼
+             Feature Generation (Distance, Lead Days, Medians)
+                                   │
+                                   ▼
+                   FareGuard (XGBoost Regressor)
+                     Model: fareguard-xgb-v1
+                                   │
+                    ┌──────────────┴──────────────┐
+                    ▼                             ▼
+        Finite Expected Fare (₹)         Inference Unavailable
+                    │                             │
+                    ▼                             ▼
+         Compute Residual (₹, %)            NULL Output
+                    │                     (Exact Status Code)
+                    ▼                             │
+               PriceGuard                         ▼
+           (Isolation Forest)                PriceGuard:
+         Model: priceguard-if-v1             NOT_SCORED
+                    │                   (Never Flagged Normal)
+        ┌───────────┴───────────┐
+        ▼                       ▼
+Percentile >= 0.75      Percentile < 0.75
+    (Anomaly)               (Normal)
+        │                       │
+        ▼                       ▼
+ Selective TreeSHAP        Logged Normal
+  (Rupee Drivers)            Variance
+        │
+        ▼
+   Anomaly Dossier
+```
+
+### FareGuard (Expected Fare Regressor)
+* **Model Identity**: `FAREGUARD_XGBOOST` (version `fareguard-xgb-v1`).
+* **Algorithm**: Gradient-boosted regression trees predicting baseline economy fares conditional on route distance, lead days, day of week, seasonality, and rolling corridor medians.
+* **Runtime Behavior**: Fitted model artifact loaded from active model registry (`models/fareguard-xgb-v1.joblib`) with in-worker caching.
+* **Sanity Rules**: Persists finite positive predictions only. If features are incomplete or models unavailable, the prediction remains `NULL`. **The system never outputs ₹0 as a placeholder.**
+* **Audited Statuses**: `MODEL_UNAVAILABLE`, `MODEL_ARTIFACT_MISSING`, `MODEL_LOAD_ERROR`, `INSUFFICIENT_FEATURES`, `FEATURE_SCHEMA_MISMATCH`, `NOT_ELIGIBLE`.
+* **Validation Note**: Verification commands confirm model loading and execution, not real-world forecasting accuracy beyond the fitted domain.
+
+### PriceGuard (Multivariate Anomaly Detector)
+* **Model Identity**: `PRICEGUARD_ISOLATION_FOREST` (version `priceguard-if-v1`).
+* **Algorithm**: Isolation Forest scoring pricing anomalies based on actual fare, predicted baseline, residual ($₹$), residual percentage ($\%$), lead days, and rolling corridor dispersion.
+* **Runtime Behavior**: Fitted active artifact loaded from registry (`models/priceguard-if-v1.joblib`). Models are never refitted during normal data ingestion.
+* **Gating Invariant**: Requires a valid FareGuard prediction. If FareGuard is unavailable, PriceGuard assigns `NOT_SCORED`. **An unscored observation is never labelled as NORMAL.**
+
+### Selective TreeSHAP (Model Explainability)
+* **Selective Invocation**: Evaluated exclusively for flagged pricing anomalies (calibrated percentile $\ge 0.75$) or on-demand analyst review to conserve compute.
+* **Explanation Output**: Decomposes model divergence into top feature drivers and directional rupee contributions.
+* **Interpretability Boundary**: **"SHAP explains model contribution, not airline pricing cause."** It clarifies why the mathematical estimator expected fare $X$, not the commercial strategy of the airline.
+
+---
+
+## 11. Price Shock Center
+
+The **Price Shock Center** (`/shocks`) operates as a distinct surveillance mechanism separate from individual PriceGuard anomalies.
+
+```
+┌───────────────────────────────────────┬───────────────────────────────────────┐
+│          PRICEGUARD ANOMALY           │              PRICE SHOCK              │
+├───────────────────────────────────────┼───────────────────────────────────────┤
+│ • Observation-level outlier           │ • Market-wide / corridor surge        │
+│ • Single quote variance               │ • Multi-source agreement required     │
+│ • Evaluated by Isolation Forest       │ • Cross-vendor consensus rule         │
+│ • Explains statistical deviation      │ • Signals macroeconomic shock         │
+└───────────────────────────────────────┴───────────────────────────────────────┘
+```
+
+* **Core Rule**: **Anomaly Count $\ne$ Price Shock Count.** An individual high quote is an anomaly; a Price Shock requires corroborated market-wide elevation.
+* **Confirmed Shock Criteria**:
+  1. Corroboration across $\ge 3$ independent sources.
+  2. Substantial sample volume ($\ge 15$ quotes).
+  3. Minimum price surge ($\ge 25\%$ above baseline median).
+  4. Robust statistical divergence ($\text{Robust } Z\text{-score} \ge 3.0$).
+* **Shared Source of Truth**: The sidebar shock notification badge and the `/shocks` page query the exact same backend service (`/api/v1/alerts?alert_type=PRICE_SHOCK`).
+* **Mode Barring**: Live Mode price shock monitoring strictly excludes `SYNTHETIC`, `REPLAY`, and `MODELLED` records.
+
+---
+
+## 12. 30-Day Observed History & Backtesting
+
+VAYANTARA includes a longitudinal backtesting framework (`/backtesting`) designed to evaluate index stability and track empirical inflation relationships.
+
+### Genuine Observation Days vs. Future Departure Dates
+> [!IMPORTANT]
+> **Definition of 30-Day History:**  
+> **30 days of VAYANTARA history means 30 genuine, sequential observation calendar days.**  
+> It does **not** mean scraping 30 future departure dates on a single afternoon. Daily collection sweeps across fixed booking horizons (`T+1`, `T+7`, `T+15`, `T+30`, `T+45`) build an authentic longitudinal time series.
+
+### Backtesting Status Model
+The backtesting engine records standardized evaluation statuses:
+* `VERIFIED`: Benchmark dataset loaded, date ranges match, and statistical concordance is verified.
+* `PARTIAL`: Overlapping data available for a subset of corridors or booking windows.
+* `NO_MATCH`: Evaluated time periods or route baskets do not intersect.
+* `BENCHMARK_NOT_LOADED`: External comparison dataset has not been imported.
+* `INSUFFICIENT_HISTORY`: Insufficient continuous observation days to compute rolling correlations.
+* `NOT_COMPARABLE`: Structural or frequency divergence prevents direct alignment.
+* `FAILED`: Internal processing exception during backtest execution.
+
+### Analytical Capabilities & DGCA Transparency
+* **Internal Historical APIx Backtest**: Evaluates volatility, lead-lag relationships, and advance-purchase yield curves across continuous observed days.
+* **Monthly CPI Comparison**: Aligns monthly aggregated APIx price relatives against the transport sub-component of the MoSPI Consumer Price Index.
+* **DGCA Route Benchmark Policy**: The platform contains an extensible adapter for Directorate General of Civil Aviation (DGCA) monthly city-pair tariff statistics. VAYANTARA transparently states:  
+  *"DGCA/Public benchmark adapter available; verified comparison requires a comparable official dataset."*  
+  Verified alignment is not claimed unless a real, comparable official series is actively loaded.
+
+---
+
+## 13. Reports & Context-Aware Exports
+
+VAYANTARA provides an export engine (`/provenance`, `/downloads`, and contextual export dialogs across analytical pages) that produces reproducible reports in **PDF**, **CSV**, and **XLSX** formats.
+
+### Context-Aware Resolution
+Every export job encapsulates full operational context:
+
+$$\text{Export Context} = \text{Current Page} + \text{Data Mode} + \text{Active Filters} + \text{Route} + \text{Booking Window} + \text{Date Range} + \text{Resolved Dataset}$$
+
+* **Live Mode Integrity**: Exports generated in Live Mode use the live/imported context resolver and **never leak Demo, Synthetic, Replay, or Modelled records**.
+* **Supported Formats**:
+  * **PDF**: Audit-grade, formatted dossiers generated via Python ReportLab (e.g., 2-page MoSPI Backtest Dossier, Data Quality Audit, Route Intelligence Summary).
+  * **CSV**: Raw and filtered tabular datasets containing full quote attributes, carrier details, and SHA-256 custody hashes.
+  * **XLSX**: Multi-tab workbooks containing summary KPI sheets, stratified booking-window matrices, and calculation metadata.
+* **Meaningful File Naming**: Files follow standard naming conventions (e.g., `airpulse-fares-del-bom-2026-08-01_2026-09-02.csv`, `airpulse-apix-components-2026-09-02.xlsx`, `airpulse-backtest-dossier-2026-q3.pdf`).
+
+---
+
+## 14. Data Provenance & Quality Rules
+
+### Provenance Custody Chain
+To meet statistical audit standards, every observation tracks complete lineage:
+* `Observation ID`: Immutable UUID v4.
+* `Source Identity & URL`: Origin portal and exact search URL.
+* `Collection Timestamp`: UTC timestamp of portal extraction.
+* `Collection & Pipeline Run IDs`: Foreign keys linking back to batch execution logs.
+* `Acquisition Engine`: Collector mechanism used (`CRAWL4AI`, `PLAYWRIGHT`, `HTTP`).
+* `Cryptographic Checksum`: SHA-256 hash of the raw response payload.
+* `Model & Index Versions`: Active model version tags applied during scoring.
+* **Immutable Store**: `raw_fares` is protected by a PostgreSQL trigger that aborts any incoming `UPDATE` or `DELETE` statement.
+* **Import Integrity**: Imported historical datasets retain explicit `IMPORTED` labels and are never disguised as live extractions.
+
+### Data Quality & Sanity Rules
+* **Invalid Fares Rejected**: Fares outside ₹500–₹500,000, records with $Origin = Destination$, malformed IATA codes, or negative taxes are routed to `audit_logs` with explicit rejection codes.
+* **Duplicates Flagged**: Duplicate observations sharing an identical `quote_hash` are marked with `is_duplicate = true`. They are preserved for auditability but excluded from index calculations.
+* **Valid Unusual Fares Preserved**: Genuine market surges (e.g., ₹35,000 festival fares) pass physical validation and are preserved in the index basket.
+* **Sold-Out Flights**: Flights with zero available seats are logged as `NO_AVAILABILITY` / `SOLD_OUT`. **They are never entered as `fare = 0`.**
+* **Missing ML Estimates**: If FareGuard cannot score a record, the expected value remains `NULL`. **The platform never inserts fake ₹0 predictions.**
+
+---
+
+## 15. Realtime & Loading UX
+
+* **Zero Fake Placeholders**: When loading live data, dashboard components display structural skeleton loaders; they never flash temporary fake zeros or manufactured metrics.
+* **Stage-Aware Ingestion Progress**: Data Ingestion (`/ingestion`) renders real-time stage progress (`INGEST` $\rightarrow$ `NORMALIZE` $\rightarrow$ `VALIDATE` $\rightarrow$ `DEDUP` $\rightarrow$ `FEATURES` $\rightarrow$ `FAREGUARD` $\rightarrow$ `PRICEGUARD` $\rightarrow$ `SHAP` $\rightarrow$ `APIx` $\rightarrow$ `ALERTS`).
+* **Authoritative Historical Estimates**: Ingestion duration estimates are derived from historical run timing (`/api/v1/ingestion/timing-history`) and dataset size. No fixed artificial timers are used; backend status remains authoritative.
+* **Supabase Realtime**: Emits PostgreSQL Change Data Capture (CDC) events via WebSockets to invalidate TanStack Query caches, backed by an automated polling fallback.
+
+---
+
+## 16. Public Site Experience & Branding
+
+The repository includes a modern public presentation layer introducing the **VAYANTARA** mission:
+* **Public Landing Page**: Introduces the institutional vision of transforming airfare movement into macroeconomic intelligence.
+* **Dedicated About Route (`/about`)**: Full-width branded hero featuring aviation and national network assets, explaining the relationship between micro airfares and CPI inflation measurement.
+* **Unified Navigation**: A shared header and footer architecture provides seamless navigation between public informational pages and authenticated operational dashboards.
+
+---
+
+## 17. Complete Technology Stack
+
+| Layer / Subsystem | Technology | Version | Purpose & Technical Implementation |
+|---|---|---|---|
+| **Frontend Framework** | Next.js | 14+ (App Router) | Server-side rendering (SSR), layout nesting, React 19 Server Components, and client routing. Configures `/backend-api` rewrite. |
+| **Language (Frontend)**| TypeScript | 5.x | Enforces strict compile-time typing matching backend Pydantic schemas. |
+| **Styling & Tokens** | Tailwind CSS | 4.x | Utility styling implementing institutional neutral dark themes and accessible contrast ratios. |
+| **Component Primitives**| shadcn/ui | Latest | Headless accessible components built on Radix UI primitives. |
+| **Analytics & Charts** | Apache ECharts | 6.x (`echarts-for-react`) | Interactive Canvas/SVG charts for yield curves, index trends, and SHAP attributions. |
+| **Server State** | TanStack Query | 5.x | Asynchronous query caching, optimistic UI updates, and WebSocket-driven cache invalidation. |
+| **Client Auth & CDC** | Supabase JS | 2.x | Session token management and WebSocket subscriptions to table change events. |
+| **Backend Runtime** | Python | 3.11+ | High-performance asynchronous execution runtime. |
+| **Web API Framework** | FastAPI | 0.111+ | Asynchronous REST framework serving OpenAPI contracts with Pydantic v2 validation. |
+| **Database ORM** | SQLAlchemy | 2.x (async) | Fully asynchronous object-relational mapping via Python coroutines. |
+| **Database Driver** | asyncpg | 0.29+ | High-throughput binary protocol PostgreSQL client driver (`postgresql+asyncpg`). |
+| **Schema Migrations** | Alembic | 1.13+ | Version-controlled database migration framework (single source of truth for schema). |
+| **Web Acquisition** | Crawl4AI | 0.9.3 | Bounded automated browser extraction engine leveraging Playwright/Chromium. |
+| **Browser Automation** | Playwright / Chromium | 1.44+ | Headless browser execution operating under Xvfb inside Docker containers. |
+| **Task Queue & Broker**| Celery & Redis | Celery 5.4+, Redis 7 | Distributed task processing for collection, ingestion, health checks, and daily indexing. |
+| **Expected Fare ML** | XGBoost | 2.0+ | **FareGuard**: Gradient-boosted regression tree predicting expected baseline fares. |
+| **Anomaly Detection** | scikit-learn | 1.6.1 (Pinned) | **PriceGuard**: Multivariate Isolation Forest evaluating actual fares and model residuals. |
+| **Explainable ML** | SHAP | 0.45+ | TreeSHAP explainer generating rupee feature attributions for flagged pricing anomalies. |
+| **Numerical Math** | NumPy / SciPy / Pandas | Latest | Vectorized transformations, percentile calibrations, and Laspeyres index aggregations. |
+| **Document Engines** | ReportLab & OpenPyXL | ReportLab 4.1+, OpenPyXL 3.1+ | Generates audit-grade PDF dossiers, Excel workbooks, and Matplotlib chart assets. |
+| **Canonical Database** | Supabase PostgreSQL | PostgreSQL 17 | Managed relational database with Row-Level Security (RLS) and append-only triggers. |
+| **Host Environment** | AWS EC2 | Ubuntu 24.04 LTS | Cloud compute host executing Docker Compose services (`t3.small` prototype). |
+| **Reverse Proxy** | Nginx | 1.24+ | Ingress reverse proxy handling public port 80/443 traffic and forwarding to container port 8000. |
+
+---
+
+## 18. Current Major Pages
+
+The web application provides 15 specialized analytical views matching current navigation:
+
+1. **Overview** (`/overview`): Headline APIx index, daily movement, corridor volatility, and collection health status.
+2. **Live Scraping** (`/scraping-test`): Controlled single-run live extraction probe across verified corridors with real-time stage progress and staging review table.
+3. **Data Ingestion** (`/ingestion`): Granular stage pipeline monitoring, dataset-size/historical timing estimates, and the explicit ingestion gate.
+4. **APIx** (`/apix`): Daily chained Laspeyres price index trendlines, matched-basket decomposition, and coverage quality score ($Q$).
+5. **Fare Explorer** (`/fares`): Filterable, searchable repository of validated fare observations.
+6. **Route Intelligence** (`/routes`): Corridor-level dispersion, median fares, route yield curves, and carrier market shares.
+7. **Booking Windows** (`/booking-windows`): Advance-purchase horizons (`T+1` to `T+45`), yield compression, and lead-time volatility.
+8. **Anomaly Center** (`/anomalies`): PriceGuard flagged outliers, calibrated percentiles, and analyst review workflows.
+9. **Price Shocks** (`/shocks`): Confirmed market-wide, multi-source price surges (independent of individual anomaly counts).
+10. **Models** (`/models`): Active model registry (`fareguard-xgb-v1`, `priceguard-if-v1`), schema validation, and evaluation metrics.
+11. **Backtesting** (`/backtesting`): Continuous 30-day observed history, benchmark comparison adapter (DGCA / MoSPI reference series).
+12. **Pipeline Monitor** (`/pipeline`): Granular step telemetry, execution duration, and error diagnostics.
+13. **Data Quality** (`/data-quality`): Coverage quality metric ($Q$), physical bounds rejection breakdown, and deduplication statistics.
+14. **Run History** (`/ingestion` history): Complete audit trail of collection and ingestion batches.
+15. **Provenance / Exports** (`/provenance`, `/downloads`): Cryptographic custody chains, SHA-256 payload verification, and context-aware downloads.
+
+---
+
+## 19. Deployment Architecture & Operations
+
+### Cloud Deployment Topology
+* **Frontend**: Next.js 14 App Router hosted on **Vercel**.
+* **Backend**: Docker Compose stack on an **AWS EC2** instance (Ubuntu 24.04 LTS, `t3.small`).
+* **Reverse Proxy**: Host Nginx proxying incoming port 80/443 traffic to container port `8000`.
+* **Database & Authentication**: Managed **Supabase Cloud** (PostgreSQL 17).
+
+### Container Services (`docker-compose.yml`)
+1. `api`: FastAPI application running internally on port 10000, mapped to `127.0.0.1:8000:10000`. Mounts `./models:/app/models`.
+2. `worker`: Celery background worker with Playwright Chromium and Crawl4AI. Mounts `./models:/app/models:ro`. Concurrency is set to 1 (`worker_concurrency=1`).
+3. `beat`: Celery Beat periodic scheduler triggering background collection sweeps, source health checks, and daily APIx calculations.
+4. `redis`: Redis 7 broker and result backend bound to internal loopback (`127.0.0.1:6379`).
+5. `postgres`: Local PostgreSQL 16 container used strictly as an offline development fallback when `DATABASE_URL` is unset.
+
+### Model Artifact Deployment
+The machine learning quality-control layer requires fitted model artifacts at runtime:
+* `models/fareguard-xgb-v1.joblib` (FareGuard XGBoost regressor)
+* `models/priceguard-if-v1.joblib` (PriceGuard Isolation Forest anomaly detector)
 
 > [!IMPORTANT]
-> **Prototype Basket Designation:**  
-> The current index basket in AirPulse is explicitly labelled as a **PROTOTYPE basket**. Route and booking-window weights represent baseline passenger shares until official MoSPI Price Statistics Division (PSD) or DGCA annual traffic weights are loaded into the active basket. Obsolete historical CPI weights are not used as current weights.
+> **Model Deployment Invariants:**  
+> * Trained binary artifacts (`.joblib`) are excluded from Git tracking to preserve repository hygiene.
+> * Production deployment must ensure these fitted files are transferred to the host `models/` directory before starting containers.
+> * Both `api` and `worker` services mount `./models` to `/app/models` to access identical fitted weights.
+> * Run the read-only diagnostic command inside both containers to verify model presence:
+>   ```bash
+>   docker compose exec worker python -m app.scripts.check_ml_models
+>   docker compose exec api python -m app.scripts.check_ml_models
+>   ```
+
+### Celery Background Tasks
+Celery tasks registered in `app/workers/celery_app.py`:
+* `app.workers.collection_tasks.collect_staged_live_task`: Bounded browser collection execution.
+* `app.workers.collection_tasks.schedule_collection_run`: Scheduled matrix collection sweeps.
+* `app.workers.collection_tasks.process_collection_run_task`: Collection payload processing.
+* `app.workers.collection_tasks.sync_all_government_references`: Government reference synchronization.
+* `app.workers.health_tasks.check_all_sources_health`: Periodic source health checks (every 15 min).
+* `app.workers.index_tasks.calculate_daily_index_task`: Daily matched-basket APIx index calculation.
+
+Worker concurrency is intentionally low (`worker_concurrency=1`, `worker_prefetch_multiplier=1`) to prevent memory exhaustion on prototype AWS EC2 instances.
 
 ---
 
-## 15. Representative Prototype Basket
+## 20. Local Development Setup
 
-The prototype database incorporates high-density domestic corridors and stratified booking windows:
+### Prerequisites
+* Python 3.11+
+* Node.js 20+ & npm
+* Docker & Docker Compose
+* Git
 
-### Representative Routes
-* **`DEL-BOM`**: Delhi $\leftrightarrow$ Mumbai (High-density trunk corridor)
-* **`DEL-BLR`**: Delhi $\leftrightarrow$ Bengaluru (Business / Tech corridor)
-* **`BOM-BLR`**: Mumbai $\leftrightarrow$ Bengaluru (Commercial corridor)
-* **`DEL-CCU`**: Delhi $\leftrightarrow$ Kolkata (East-West trunk corridor)
-* **`BLR-HYD`**: Bengaluru $\leftrightarrow$ Hyderabad (Regional tech corridor)
-* **`MAA-DEL`**: Chennai $\leftrightarrow$ Delhi (North-South trunk corridor)
+### 1. Backend Setup (`airpulse-api`)
+```bash
+cd airpulse-api
 
-### Advance Booking Windows
-* **`T+1`** (0–2 days): Emergency / Last-minute business travel (highest yield variance)
-* **`T+7`** (3–10 days): Short-notice commercial travel
-* **`T+15`** (11–20 days): Short-term planned travel (baseline anchor)
-* **`T+30`** (21–35 days): Advance planned leisure / personal travel
-* **`T+45`** (36+ days): Long-range advance booking (promotional fare tier)
+# Create and activate virtual environment
+python -m venv venv
+# On Linux/macOS:
+source venv/bin/activate
+# On Windows:
+.\venv\Scripts\activate
 
-*Note: These are prototype representative routes and booking windows until official production weights are loaded.*
+# Install dependencies
+pip install -r requirements.txt
 
----
+# Install Playwright browser dependencies (if running scrapers locally)
+playwright install chromium
 
-## 16. Realtime Pipeline & Monitoring
+# Configure environment variables
+cp .env.example .env
+# Edit .env to supply your Supabase and Redis credentials
 
-Pipeline execution is tracked across granular stages with independent database transactions:
+# Apply database schema migrations
+alembic upgrade head
 
-* **`pipeline_runs` & `pipeline_steps`**: Track every phase from collection through normalization, validation, deduplication, feature extraction, ML scoring, and index calculation.
-* **Stage Attributes**: Each step records its `status` (`PENDING`, `RUNNING`, `COMPLETED`, `PARTIAL`, `FAILED`, `SKIPPED`), start/finish timestamps, duration, processed row count, error backtraces, progress percentage, and retry attempts.
-* **Idempotency**: Downstream steps can be safely retried without creating duplicate records or corrupting raw inputs.
-* **Independent Stage Commits**: Each pipeline step executes within its own database transaction to ensure partial failures do not roll back completed stages.
+# Run unit and integration tests
+pytest tests/unit tests/integration -v
 
-### Frontend Pages Updated from Realtime / Invalidation
-Frontend views subscribe to Supabase Realtime WebSocket events and TanStack Query cache invalidation:
-* **Overview**: Headline APIx index, daily movement, and collection health.
-* **APIx**: Historical index trendlines, Laspeyres relatives, and basket breakdowns.
-* **Fare Explorer**: Searchable grid of validated fares with full filter controls.
-* **Provenance**: End-to-end chain of custody and raw extraction evidence viewer.
-* **Route Intelligence**: Corridor-level fare dispersion, median comparisons, and volume.
-* **Booking Windows**: Advance-purchase yield curves across `T+1` to `T+45`.
-* **Anomalies**: PriceGuard flagged outliers with severity indicators.
-* **Alerts**: Active threshold notifications (price shocks, source degradation).
-* **Models**: Active model registry status, evaluation metrics, and drift monitors.
-* **Pipeline Monitor**: Real-time stage execution timeline and task diagnostics.
-* **Data Quality**: Coverage quality metric ($Q$), rejection breakdown, and deduplication stats.
-* **Run History**: Complete historical log of collection and ingestion batches.
-
----
-
-## 17. Database / Schema Architecture
-
-Database migrations managed via **Alembic** (`airpulse-api/alembic/versions/`) serve as the single source of truth for schema definitions.
-
-### Core Entity Groups
-* **Canonical Raw Store**: `raw_fares` (immutable SHA-256 payload store, protected by trigger).
-* **Validated Fares**: `validated_fares` (normalized, sanity-filtered, deduplicated observations).
-* **Feature Store**: `fare_features` (lead days, day of week, rolling route medians).
-* **ML Inference & Quality**: `fare_predictions` (FareGuard), `anomalies` (PriceGuard), `shap_explanations`.
-* **Index Tables**: `airfare_index`, `index_baskets`, `index_basket_routes`, `index_components`.
-* **Model Registry**: `ml_models` (model versions, active flags, performance metrics).
-* **Audit & Reference Tables**: `audit_logs`, `profiles`, `reference_datasets`, `benchmark_fares`.
-* **Collection & Pipeline Runs**: `collection_runs`, `pipeline_runs`, `pipeline_steps`.
-
----
-
-## 18. Authentication / Roles
-
-AirPulse integrates **Supabase Auth** with database-enforced role verification:
-
-```
-[ Frontend: Supabase Auth ] ──▶ Bearer JWT ──▶ [ FastAPI: JWT Verification ]
-                                                        │
-                                                        ▼
-                                            [ Query profiles Table ]
-                                                        │
-                                    ┌───────────────────┴───────────────────┐
-                                    ▼                                       ▼
-                             Role = 'analyst'                        Role = 'admin'
-                          (Standard Operator)                     (Elevated Control)
+# Start backend server
+uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-* **`analyst`**: Standard authenticated operator role. Assigned by default to newly registered users via database trigger migration (`0003_fix_profile_role_default`). Grants access to operational dashboards, live runs, data exports, and anomaly review.
-* **`admin`**: Restricted elevated role for administrative changes, pipeline overrides, and model registry management.
-* **`viewer`**: Legacy read-only role, no longer assigned in normal registration workflows.
-* **Security Invariant**: The database `profiles` table is the authoritative source of truth for user roles. Role claims inside client JWTs are never trusted for authorization decisions. Service-role credentials are strictly kept on the backend.
+### 2. Frontend Setup (`frontend`)
+```bash
+cd frontend
+
+# Install Node dependencies
+npm install
+
+# Configure environment variables
+cp .env.example .env.local
+# Set BACKEND_ORIGIN=http://127.0.0.1:8000
+
+# Start Next.js development server
+npm run dev
+```
+Open [http://localhost:3000](http://localhost:3000) to view the application.
 
 ---
 
-## 19. Deployment Instructions
-
-### Backend (AWS EC2 + Docker Compose + Nginx)
-
-1. **Host Environment**: Launch an AWS EC2 instance running **Ubuntu 24.04 LTS** (recommended: `t3.small` or `t3.medium`).
-2. **Clone & Configure Environment**:
-   ```bash
-   git clone https://github.com/DebadritNag/SIH56.git
-   cd SIH56/airpulse-api
-   cp .env.example .env
-   # Populate .env with Supabase credentials, Redis settings, and secrets
-   ```
-3. **Build and Launch Containerized Stack**:
-   ```bash
-   docker compose up -d --build
-   ```
-   *Runs FastAPI internally in container on port 10000, mapped to `127.0.0.1:8000`.*
-4. **Configure Nginx Reverse Proxy**:
-   Nginx reverse proxies public port 80/443 traffic to `http://127.0.0.1:8000`:
-   ```nginx
-   server {
-       listen 80;
-       server_name <YOUR_DOMAIN_OR_IP>;
-
-       location / {
-           proxy_pass http://127.0.0.1:8000;
-           proxy_set_header Host $host;
-           proxy_set_header X-Real-IP $remote_addr;
-           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-           proxy_set_header X-Forwarded-Proto $scheme;
-       }
-   }
-   ```
-   ```bash
-   sudo nginx -t && sudo systemctl reload nginx
-   ```
-
-### Frontend (Vercel)
-
-1. Connect the GitHub repository to **Vercel** and select `frontend/` as the project root.
-2. Configure environment variables in the Vercel Dashboard (see section below).
-3. The Next.js App Router uses the `/backend-api/:path*` rewrite configured in `next.config.ts` to proxy requests to your EC2 Nginx endpoint without exposing server-only origins to the client browser.
-4. Deploy the application.
-
----
-
-## 20. Environment Variable Reference
+## 21. Environment Variable Reference
 
 ### Backend (`airpulse-api/.env`)
-| Variable | Description | Safe Placeholder / Example |
+| Variable | Description | Safe Example / Placeholder |
 |---|---|---|
-| `APP_ENV` | Environment name | `production` / `development` |
+| `APP_ENV` | Environment identifier | `production` / `development` |
 | `PORT` | Container internal port | `10000` |
-| `DATABASE_URL` | Async connection string to Supabase PostgreSQL | `postgresql+asyncpg://postgres:<PASSWORD>@db.<PROJECT_REF>.supabase.co:5432/postgres` |
-| `DATABASE_URL_SYNC` | Synchronous connection string for Alembic migrations | `postgresql://postgres:<PASSWORD>@db.<PROJECT_REF>.supabase.co:5432/postgres` |
-| `DATABASE_POOL_URL` | Supabase transaction pooler (pgBouncer) | `postgresql+asyncpg://postgres.<PROJECT_REF>:<PASSWORD>@<POOLER_HOST>:6543/postgres` |
+| `DATABASE_URL` | Async connection string to Supabase PostgreSQL | `postgresql+asyncpg://postgres:<DB_PASSWORD>@<DB_HOST>:5432/postgres` |
+| `DATABASE_URL_SYNC` | Synchronous connection string for Alembic | `postgresql://postgres:<DB_PASSWORD>@<DB_HOST>:5432/postgres` |
+| `DATABASE_POOL_URL` | Supabase transaction pooler (pgBouncer) | `postgresql+asyncpg://postgres.<REF>:<DB_PASSWORD>@<POOLER_HOST>:6543/postgres` |
 | `SUPABASE_URL` | Supabase project API URL | `https://<PROJECT_REF>.supabase.co` |
 | `SUPABASE_ANON_KEY` | Supabase public anonymous API key | `<ANON_KEY>` |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase administrative key (Backend only) | `<SERVICE_ROLE_KEY>` |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase administrative service role key (Backend only) | `<SERVICE_ROLE_KEY>` |
 | `SUPABASE_JWT_SECRET` | Secret used to verify Supabase JWT signatures | `<JWT_SECRET>` |
-| `AUTH_STRICT` | Require strict JWT verification (disable dev tokens) | `true` (in production) |
+| `AUTH_STRICT` | Require strict JWT verification (disable dev tokens) | `true` |
 | `REDIS_URL` | Redis broker and cache connection URL | `redis://redis:6379/0` |
 | `CELERY_BROKER_URL` | Celery broker URL | `redis://redis:6379/0` |
 | `CELERY_RESULT_BACKEND` | Celery result storage URL | `redis://redis:6379/1` |
+| `MODEL_DIR` | Filesystem path to serialized ML models | `/app/models` |
 | `CRAWL4AI_ENABLED` | Master toggle for Crawl4AI browser automation | `true` |
 | `CRAWL4AI_BROWSER_CONCURRENCY` | Maximum concurrent Chromium browser instances | `1` |
-| `CRAWL4AI_DEFAULT_MAX_RESULTS`| Hard cap on observations extracted per crawl | `5` |
-| `HAPPYFARES_PROTOTYPE_ENABLED` | Gate for HappyFares prototype extraction | `false` (default) |
-| `HAPPYFARES_REVIEW_NOTES` | Administrative review documentation | `Completed manual terms review` |
+| `CRAWL4AI_DEFAULT_MAX_RESULTS`| Maximum observations extracted per crawl | `5` |
+| `HAPPYFARES_PROTOTYPE_ENABLED` | Gate for HappyFares prototype extraction | `false` |
+| `HAPPYFARES_REVIEW_NOTES` | Administrative compliance review documentation | `Completed manual terms review` |
 | `CORS_ORIGINS` | Permitted origins for CORS validation | `["https://<YOUR_APP>.vercel.app","http://localhost:3000"]` |
 
 ### Frontend (`frontend/.env.local`)
-| Variable | Scope | Description | Safe Placeholder / Example |
+| Variable | Scope | Description | Safe Example / Placeholder |
 |---|---|---|---|
-| `BACKEND_ORIGIN` | **Server-Only** | Upstream EC2/Nginx endpoint used by Next.js rewrite | `http://<EC2_PUBLIC_IP_OR_DOMAIN>` |
+| `BACKEND_ORIGIN` | **Server-Only** | Upstream EC2/Nginx endpoint used by Next.js rewrite | `http://<EC2_HOST_OR_DOMAIN>` |
 | `NEXT_PUBLIC_API_BASE_URL` | Browser-Visible | Base path for frontend API calls | `/backend-api` |
 | `NEXT_PUBLIC_API_V1_PREFIX` | Browser-Visible | API version prefix | `/api/v1` |
 | `NEXT_PUBLIC_SUPABASE_URL` | Browser-Visible | Supabase project URL | `https://<PROJECT_REF>.supabase.co` |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Browser-Visible | Supabase public client key | `<ANON_KEY>` |
 | `NEXT_PUBLIC_HCAPTCHA_SITEKEY` | Browser-Visible | Public hCaptcha widget sitekey | `<HCAPTCHA_SITEKEY>` |
 
-> [!WARNING]
-> **Client-Side Environment Warning:**  
-> Any variable prefixed with `NEXT_PUBLIC_` is inlined into the client-side JavaScript bundle during build time and can be inspected by anyone in the browser. Never place database connection strings, JWT signing secrets, or the Supabase `SERVICE_ROLE_KEY` in frontend environment variables.
-
 ---
 
-## 21. HappyFares Prototype
+## 22. API Endpoints & Health Probes
 
-HappyFares is implemented as a bounded, code-verified Crawl4AI extraction prototype for the high-density DEL–BOM corridor:
+The FastAPI backend exposes REST endpoints under `/api/v1`:
 
-* **Manually Reviewed Prototype Gate**: Must have `HAPPYFARES_PROTOTYPE_ENABLED=true` and non-empty `HAPPYFARES_REVIEW_NOTES` documenting operator compliance review before extraction will run.
-* **Crawl4AI Enabled**: Requires `CRAWL4AI_ENABLED=true`.
-* **Bounded Result Count**: Restricted to 1 adult passenger, Economy class, INR currency, and a maximum of 5–15 quotes per execution.
-* **Stop on Blocking / CAPTCHA**: Immediately aborts upon encountering HTTP 403, 429, or access verification challenges.
-* **Staging-Only until Explicit Ingestion**: Extracted quotes are written to `collection_runs` only. They do not alter official APIx or ML models until an operator selects **Send to Data Ingestion**.
-* **Permission Disclaimer**: AirPulse does not claim universal automated extraction permission across all commercial airline/OTA portals.
-
----
-
-## 22. API / Health
-
-The backend exposes self-documenting REST endpoints under `/api/v1`:
-
-* `GET /health`: Basic operational health probe.
-* `GET /api/v1/system/supabase-diagnostics`: Verifies database connectivity, schema version, and Supabase service status.
-* `GET /api/v1/live/config`: Retrieves active live collector configuration and gate statuses.
+* `GET /health`: Basic service operational health probe.
+* `GET /api/v1/system/supabase-diagnostics`: Verifies database connectivity, schema versions, and Supabase service status.
+* `GET /api/v1/live/config`: Returns active live collector configuration, gates, and verified corridors.
 * `GET /api/v1/live-mode/status`: Returns current Live Mode context, observation counts, and active health badges.
-* `GET /api/v1/index/latest`: Fetches the most recent official APIx index calculation and coverage quality score ($Q$).
+* `GET /api/v1/live-mode/history`: Returns continuous observed history days and benchmark availability.
+* `GET /api/v1/index/latest`: Fetches the latest official APIx index calculation and Coverage Quality score ($Q$).
 * `GET /api/v1/fares`: Queries validated fares with support for route, booking window, date, and origin filters.
-* `POST /api/v1/live/collect`: Triggers a bounded collection run (requires `analyst` or `admin` role).
-* `POST /api/v1/live/ingest`: Explicitly ingests staged records into the canonical raw store (requires `analyst` or `admin` role).
+* `GET /api/v1/alerts`: Returns active alerts and confirmed market price shocks.
+* `POST /api/v1/live/runs`: Enqueues a bounded collection run into the staging table (requires `analyst` or `admin` role).
+* `POST /api/v1/live/runs/{run_id}/ingest`: Explicitly triggers canonical ingestion for a staged collection run (requires `analyst` or `admin` role).
 
 ---
 
-## 23. Testing and Verification
+## 23. Testing & Verification
 
-AirPulse maintains a test suite covering backend logic, database behavior, and web scrapers:
+The project includes unit, integration, and diagnostic test suites:
 
 ```bash
 cd airpulse-api
 pytest tests/unit tests/integration -v
 ```
 
-### Verified Test Areas
-* **Mode Resolver Tests** (`test_live_mode_acceptance.py`): Confirms `resolve_mode()` maps live and imported counts to `HYBRID`, `LIVE_DATA`, `IMPORTED_FALLBACK`, or `EMPTY`.
-* **Live/Imported Fallback Tests**: Verifies that when live counts are 0 and imported counts > 0, mode resolves to `IMPORTED_FALLBACK` with health badge `LIVE SOURCE DEGRADED`.
-* **Synthetic-Only Live Empty**: Confirms that having only synthetic/replay data leaves Live Mode honest and empty (`EMPTY`), while Demo Mode displays populated snapshots.
-* **API Tests**: Validates endpoints for fares, index calculation, ingestion, and health checks.
-* **Migration Verification**: Verifies Alembic schema migrations apply cleanly from clean state to head.
-* **Browser Startup Diagnostics** (`scripts/check_chrome.py`): Executes in the Docker container build to confirm Chromium launches cleanly with Xvfb before container start.
-* **Collection Status Handling** (`test_happyfares_crawl4ai.py`): Verifies access-check handling for HTTP 403 (`BLOCKED`), 429 (`RATE_LIMITED`), CAPTCHA challenges (`CAPTCHA_DETECTED`), and 404 (`NOT_FOUND`).
+### Key Test Coverage
+* **Mode Resolver Acceptance** (`test_live_mode_acceptance.py`): Verifies `resolve_mode()` maps observation counts to `HYBRID`, `LIVE_DATA`, `IMPORTED_FALLBACK`, or `EMPTY`.
+* **Barred Synthetic Data**: Confirms synthetic or replay data leaves Live Mode in an honest empty state (`EMPTY`).
+* **Live ML Inference** (`test_live_inference.py`): Exercises actual saved model artifacts with real feature vectors, verifying positive prediction bounds, residual calculations, `NOT_SCORED` handling, and selective TreeSHAP execution.
+* **Corridor Validation**: Tests bounds and date serialization across `DEL-BOM`, `DEL-CCU`, and `BOM-BLR`.
+* **Access Barrier Handling**: Verifies stop-and-report behavior for HTTP 403 (`BLOCKED`), 429 (`RATE_LIMITED`), and CAPTCHA challenges (`CAPTCHA_DETECTED`).
+* **Database Schema Migrations**: Verifies Alembic migrations apply cleanly to head.
 
 ---
 
-## 24. 30-Day Validation / Benchmarking
+## 24. Ethical Collection & Defensive Guardrails
 
-AirPulse maintains an internal 30-day continuous observed airfare history to support short-term trend analysis and volatility tracking across target corridors.
+VAYANTARA follows defensive, ethical collection principles suited for public statistical bodies:
 
-### Official Benchmark Comparison Policy
-* **30-Day Observed History**: AirPulse maintains its own continuous 30-day observed airfare history to validate index responsiveness and seasonal stability.
-* **DGCA Comparison**: Comparing observed AirPulse indices against official Directorate General of Civil Aviation (DGCA) monthly route tariffs is architected into the system and will activate once a compatible public benchmark is verified.
-* **Benchmark Status Transparency**: AirPulse does **not** claim an active DGCA route-wise monthly benchmark is currently loaded. If a verified DGCA dataset matching the observed time window is unavailable, the platform transparently displays:  
-  `"DGCA benchmark not loaded. AirPulse observations remain available above."`
-
----
-
-## 25. Research / International Context
-
-National statistical offices worldwide are evaluating automated web collection to measure consumer price dynamics:
-
-* **US Bureau of Labor Statistics (BLS)**: The BLS airline fare index uses web-based price collection across sampled airline itineraries, stratifying quotes by representative trip sampling and advance-purchase horizons.
-* **Statistical Agency Adoption**: Modern statistical bodies increasingly adopt automated web scraping to capture high-frequency dynamic pricing across travel and retail sectors.
-* **The AirPulse Prototype**: AirPulse combines high-frequency collection, booking window stratification (`T+1` to `T+45`), explainable ML quality assurance, cryptographic provenance, and daily Laspeyres indexing into an institutional prototype for Indian domestic aviation.
+* **Policy & robots.txt Adherence**: The engine evaluates `robots.txt` directives and operator review notes prior to launching browser instances. Disallowed paths halt execution with `SKIPPED_POLICY`.
+* **Rate Limits & Mandatory Cooldowns**: Bounded request frequencies with built-in throttles and an automatic 5-minute cooldown upon upstream failures.
+* **Low Concurrency**: Headless browser execution is strictly constrained to 1 concurrent instance (`CRAWL4AI_BROWSER_CONCURRENCY=1`).
+* **Modest Result Caps**: Extractions are bounded to 5–15 observations per query.
+* **Stop-and-Report Protocol**: When access barriers (HTTP 403, HTTP 429, Cloudflare challenge walls, or CAPTCHAs) are detected, VAYANTARA logs the barrier and terminates execution.
+* **Absolute Zero Circumvention**: The system contains no CAPTCHA solvers, no residential proxy rotators, and no browser fingerprint spoofing mechanisms.
 
 ---
 
-## 26. Security Architecture
+## 25. Research & International Positioning
 
-AirPulse incorporates multi-layered defensive security controls:
-
-* **No Secrets in Frontend**: Frontend bundles contain only public anonymous keys (`NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_HCAPTCHA_SITEKEY`). Backend secrets (`SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET`, database passwords) remain strictly server-side.
-* **No Service-Role Key Client-Side**: The privileged service-role key is never transmitted to or executed within the browser.
-* **Least Privilege Access Control**: Frontend users read operational metadata only; all analytical fare writes and index calculations happen through the privileged backend service role.
-* **PostgreSQL Row-Level Security (RLS)**: Enforced across sensitive database tables.
-* **Comprehensive Audit Trail**: Every ingestion, configuration change, and administrative action is recorded in `audit_logs`.
-* **Immutable Raw Provenance**: Raw payloads are hashed with SHA-256 and protected from alteration or deletion by database triggers.
-* **Bounded Collection**: Requests are strictly rate-limited and capped in volume.
-* **No Anti-Bot Bypass**: The acquisition engine contains zero anti-bot evasion, proxy rotation, or CAPTCHA bypass mechanisms.
-* **Containerized Deployment**: Browser automation and worker processes run in isolated Docker containers.
+National statistical offices worldwide are exploring automated web scraping to capture high-frequency consumer price dynamics:
+* **US Bureau of Labor Statistics (BLS)**: Uses web collection across sampled airline itineraries, stratifying quotes by route sampling and advance-purchase horizons.
+* **Academic & Institutional Literature**: Research on scanner and online price collection (e.g., the Billion Prices Project) demonstrates that online price relatives track official headline CPI while providing leading indicators of turning points.
+* **The VAYANTARA Position**:  
+  *We did not identify a publicly documented implementation combining high-frequency multi-source airfare collection, booking-window indexing, explainable ML quality assurance, and cryptographic provenance in one transparent statistical prototype for Indian civil aviation.*
 
 ---
 
-## 27. Design Principles
+## 26. Smart India Hackathon (SIH26056) Alignment
 
-1. **Observed Data Before Modeled Data**: The primary measure of airfare inflation must originate from real market observations, not predictive estimates.
-2. **APIx Independent from ML**: The statistical price index is calculated purely from observed fares. Machine learning is strictly decoupled for quality assurance.
-3. **No Fake Live Data**: If a live source is unavailable, display an honest `EMPTY` or `IMPORTED_FALLBACK` state. Never manufacture synthetic numbers to simulate uptime.
-4. **No ₹0 Placeholder Predictions**: If a model cannot evaluate a fare, output `NULL` / `MODEL_UNAVAILABLE`, never a fake ₹0 prediction.
-5. **Preserve Valid Shocks/Outliers**: Reject malformed or physically impossible prices, but preserve genuine market price surges to reflect true economic volatility.
-6. **Explicit Origin Labels**: Maintain strict separation between `LIVE`, `IMPORTED`, `REPLAY`, `SYNTHETIC`, and `MODELLED` data.
-7. **Explicit Ingestion**: Raw collection must never touch analytical tables or indices without an explicit ingestion command.
-8. **Reproducible Runs**: Ensure every published index point can be audited back to the raw SHA-256 payloads that created it.
-9. **Ethical Collection**: Respect `robots.txt`, limit request rates, enforce bounded batch sizes, and cease execution when access is restricted.
-
----
-
-## 28. Architecture Diagrams
-
-### A. End-to-End Data Pipeline
-```mermaid
-flowchart TD
-    subgraph Acquisition["1. Acquisition Layer"]
-        C4["Crawl4AI / Playwright Headless"] --> RawEnv["Raw Payload Envelope (SHA-256 Hash)"]
-    end
-    
-    subgraph Staging["2. Staging & Gate"]
-        RawEnv --> CR["collection_runs (Staged Payloads)"]
-        CR --> Gate{"Explicit Ingestion Action"}
-    end
-    
-    subgraph Ingestion["3. Canonical Ingestion"]
-        Gate -- Approved --> RF["raw_fares (Immutable Trigger)"]
-        RF --> Norm["Canonical Normalization"]
-        Norm --> Val["Sanity Validation (Bounds, Origin != Dest)"]
-        Val --> Dedup["Deterministic Deduplication (quote_hash)"]
-        Dedup --> Feat["Feature Generation (Lead Days, Route Medians)"]
-    end
-    
-    subgraph Decoupled["4. Decoupled Processing"]
-        Feat --> APIx["APIx Statistical Engine (Chained Laspeyres Index)"]
-        Feat --> ML["ML QA: FareGuard (XGBoost) -> PriceGuard (Isolation Forest)"]
-        ML --> SHAP["Selective TreeSHAP (Percentile >= 0.75)"]
-    end
-    
-    subgraph Output["5. Consumption"]
-        APIx --> DBIdx["airfare_index Table"]
-        SHAP --> DBAnom["anomalies & alerts Tables"]
-        DBIdx --> Dash["Next.js Analyst Dashboard"]
-        DBAnom --> Dash
-    end
-```
-
-### B. Cloud Deployment Architecture
-```mermaid
-flowchart TB
-    Client["Analyst Web Browser"]
-    
-    subgraph CloudVercel["Vercel Edge Network"]
-        NextJS["Next.js 14 App Router\n• Server-Side Rendering\n• /backend-api Rewrite"]
-    end
-    
-    subgraph AWS["AWS EC2 Host (Ubuntu 24.04)"]
-        Nginx["Nginx Reverse Proxy\n(Port 80/443 -> 127.0.0.1:8000)"]
-        
-        subgraph DockerCompose["Docker Compose Stack"]
-            FastAPI["FastAPI Web API Container\n(Port 10000, Python 3.11+)"]
-            Redis["Redis 7 Container\n(Broker & Cache)"]
-            Worker["Celery Worker Container\n(Crawl4AI / Chromium Inside)"]
-            Beat["Celery Beat Container\n(Periodic Matrix Scheduler)"]
-        end
-    end
-    
-    subgraph CloudSupabase["Supabase Cloud"]
-        Postgres["PostgreSQL 17 Database\n(Row-Level Security, Enums, Triggers)"]
-        Auth["Supabase Auth (JWT)"]
-        Realtime["Supabase Realtime (WebSockets)"]
-        Storage["Supabase Storage (Payloads, Dossiers)"]
-    end
-
-    Client -->|"HTTPS"| NextJS
-    NextJS -->|"Proxy /backend-api"| Nginx
-    Nginx --> FastAPI
-    FastAPI <--> Redis
-    Redis <--> Worker
-    Redis <--> Beat
-    FastAPI -->|"asyncpg"| Postgres
-    Worker -->|"asyncpg"| Postgres
-    Client -->|"Authenticate"| Auth
-    Postgres -->|"Table Changes"| Realtime
-    Realtime -->|"Live Notifications"| Client
-    FastAPI --> Storage
-```
-
-### C. ML / Anomaly / Index Decoupled Relationship
-```mermaid
-flowchart LR
-    Obs["Validated Fare Observations\n(LIVE + IMPORTED)"]
-    
-    subgraph StatisticalIndex["Statistical Index Pipeline (Pure Math)"]
-        Obs --> Cell["Group by Route (r) & Window (b)"]
-        Cell --> Med["Compute Representative Price P(r,b,t)"]
-        Med --> Rel["Calculate Price Relatives [P_t / P_0]"]
-        Rel --> Agg["Laspeyres Matched-Basket Aggregation"]
-        Agg --> APIxOutput["Published APIx Index Value\n+ Coverage Quality Metric (Q)"]
-    end
-    
-    subgraph MLQA["ML Quality Assurance (Observational QA Only)"]
-        Obs --> FeatEng["Feature Extraction"]
-        FeatEng --> FG["FareGuard Regressor (XGBoost)\nExpected Fare ₹"]
-        FG --> ResCalc["Residual Calculation\nactual - expected"]
-        ResCalc --> PG["PriceGuard Isolation Forest\nMultivariate Anomaly Score"]
-        PG --> AnomFilter{"Percentile >= 0.75?"}
-        AnomFilter -- Yes --> TreeSHAP["Selective TreeSHAP\nRupee Impact Attribution"]
-        AnomFilter -- No --> NormalLog["Logged Normal Variance"]
-        TreeSHAP --> AlertLog["Analyst Anomaly Alert"]
-    end
-
-    APIxOutput -.->|"Independent of"| MLQA
-```
-
-### D. Live vs. Demo Data Mode Resolver
-```mermaid
-flowchart TD
-    Req["Request Data Context Resolver"] --> Query["Query Validated Fares:\nCOUNT(data_origin = 'LIVE') AS live_count\nCOUNT(data_origin = 'IMPORTED') AS imported_count"]
-    
-    Query --> Dec{Resolve Mode}
-    Dec -->|"live_count > 0 AND imported_count > 0"| M1["Mode: HYBRID\nLabel: 'HYBRID LIVE + IMPORTED'\nBadge: Active"]
-    Dec -->|"live_count > 0 AND imported_count = 0"| M2["Mode: LIVE_DATA\nLabel: 'LIVE DATA'\nBadge: Active"]
-    Dec -->|"live_count = 0 AND imported_count > 0"| M3["Mode: IMPORTED_FALLBACK\nLabel: 'IMPORTED FALLBACK'\nHealth Badge: 'LIVE SOURCE DEGRADED'"]
-    Dec -->|"live_count = 0 AND imported_count = 0"| M4["Mode: EMPTY\nLabel: 'No data available'\nDisplay Honest Empty State (—)"]
-    
-    subgraph Barred["Strict Exclusion Invariant"]
-        B1["SYNTHETIC"]
-        B2["REPLAY"]
-        B3["MODELLED"]
-    end
-    
-    Barred -.->|"Strictly Barred from Live Mode"| Query
-```
-
----
-
-## 29. Repository Structure
-
-```
-SIH56/
-├── airpulse-api/               # FastAPI backend application (Python 3.11+)
-│   ├── alembic/                # Database schema migrations (Alembic = single source of truth)
-│   │   └── versions/           # Versioned migration scripts (tables, triggers, enums)
-│   ├── app/
-│   │   ├── api/                # REST route controllers (/api/v1)
-│   │   │   └── v1/             # Endpoints: index, fares, live, ingestion, runs, alerts
-│   │   ├── auth/               # Supabase JWT validation & DB profile role resolution
-│   │   ├── collectors/         # Acquisition layer (BaseCollector, Crawl4AI, Playwright, Scrapy)
-│   │   │   ├── sources/        # Source extractors (e.g., happyfares.py)
-│   │   │   └── registry.py     # Dynamic source capability registry
-│   │   ├── core/               # App configuration, security, constants, enums, exceptions
-│   │   ├── db/                 # SQLAlchemy 2.x async models, enums, session management
-│   │   ├── ml/                 # FareGuard (XGBoost), PriceGuard (Isolation Forest), SHAP
-│   │   ├── schemas/            # Typed Pydantic request/response validation models
-│   │   ├── services/           # Ingestion, normalization, validation, deduplication, APIx engine
-│   │   └── workers/            # Celery application, collection tasks, and Beat scheduler
-│   ├── docs/                   # Backend architecture and technical specifications
-│   ├── models/                 # Pre-trained serialized model artifacts (.joblib)
-│   ├── scripts/                # Database seeders, verification tools, browser diagnostic scripts
-│   ├── tests/                  # Unit and integration test suites (pytest)
-│   ├── Dockerfile              # Production containerfile with Chromium & Crawl4AI
-│   ├── docker-compose.yml      # Local orchestration (API, worker, beat, Redis, local PG fallback)
-│   └── requirements.txt        # Python dependency manifest
-├── frontend/                   # Next.js 14 analytical dashboard (TypeScript, Tailwind CSS)
-│   ├── src/
-│   │   ├── app/                # App Router pages, layout structures, and API rewrite targets
-│   │   │   ├── (auth)/         # Login, registration, and password recovery pages
-│   │   │   └── (dashboard)/    # Analytical views: overview, apix, fares, provenance, anomalies
-│   │   ├── components/         # Reusable UI primitives (shadcn/ui), charts (ECharts), tables
-│   │   └── lib/                # API client, Supabase client, data mappers, PDF/Excel export
-│   ├── next.config.ts          # Server-only BACKEND_ORIGIN rewrite configuration
-│   ├── package.json            # Frontend dependency manifest
-│   └── vercel.json             # Vercel deployment configuration
-├── docs/                       # Project-level architecture and deployment runbooks
-├── .github/                    # CI/CD workflow definitions
-└── README.md                   # System documentation
-```
-
----
-
-## 30. Current Prototype Status
-
-### Working & Implemented
-* [x] **Core REST Backend**: Fully asynchronous FastAPI application serving 40+ endpoints under `/api/v1`.
-* [x] **Containerized Architecture**: Production Dockerfile with Playwright Chromium and Crawl4AI system dependencies.
-* [x] **Cloud Deployment Topology**: Next.js frontend deployed on Vercel; containerized backend deployed on AWS EC2 behind Nginx.
-* [x] **Managed Supabase Integration**: PostgreSQL 17 database, Supabase Auth with JWKS/HS256 verification, and Realtime event subscriptions.
-* [x] **Database Schema & Migrations**: Alembic migrations serving as the single source of truth for all tables, triggers, and enums.
-* [x] **Live Mode Resolver**: Robust context resolution for `HYBRID`, `LIVE_DATA`, `IMPORTED_FALLBACK`, and `EMPTY` modes with strict barring of synthetic data.
-* [x] **HappyFares Gated Prototype**: Functional, rate-bounded Crawl4AI scraper for the DEL–BOM corridor protected by administrative review toggles.
-* [x] **Provenance & Ingestion Gate**: Explicit separation between staged collection payloads and canonical analytical tables with SHA-256 hashing.
-* [x] **APIx Statistical Index Engine**: Route $\times$ booking-window Laspeyres price index formulation with coverage quality scoring ($Q$).
-* [x] **Decoupled ML Quality Assurance**: FareGuard (XGBoost) expected fare estimation, PriceGuard (Isolation Forest) anomaly scoring, and selective TreeSHAP explanation.
-
-### Prototype & Evolving
-* [ ] **Additional Airline & OTA Adapters**: Expanding beyond HappyFares to additional domestic carriers pending compliance reviews.
-* [ ] **Official Traffic Weights**: Transitioning from prototype passenger volume weights to live DGCA annual traffic synchronization.
-* [ ] **DGCA Official Benchmark Integration**: Incorporating verified monthly DGCA city-pair tariff series once a standardized public release is available.
-* [ ] **Production-Scale Distributed Scheduling**: Expanding Celery Beat execution across expanded regional airport matrices.
-
----
-
-## 31. Smart India Hackathon (SIH Alignment)
-
-| Problem Statement Deliverable | AirPulse Technical Implementation | Status |
+| Problem Statement Deliverable | Technical Implementation | Status |
 |---|---|---|
-| **Automated Multi-Source Collection** | Python scraping layer utilizing Crawl4AI with Playwright/Chromium with bounded request rates and ethical guardrails. | Implemented (HappyFares prototype operational; extensible adapter framework ready) |
-| **Python Scraping Architecture** | Modular `BaseCollector` architecture supporting `CRAWL4AI`, `PLAYWRIGHT`, `SCRAPY`, and `HTTP` engines. | Fully Implemented & Unit-Tested |
-| **Scheduled Acquisition** | Celery worker and Celery Beat scheduler configured for periodic route $\times$ booking-window sweeps. | Implemented & Docker-Ready |
-| **Clean, Deduplicated Database** | Canonical normalization, strict physical bounds checks (₹500–₹500k, $O \ne D$), and SHA-256 quote deduplication. | Fully Implemented & Enforced via DB Triggers |
-| **Complete Fare Attributes** | Tracks Origin, Destination, Carrier, Flight No, Booking Window, Base Fare, Taxes, and Total Fare in standard INR. | Fully Implemented in Canonical Schema |
-| **Airfare Price Index (APIx)** | Advance-purchase stratified chained Laspeyres index formulation with composite coverage quality score ($Q$). | Fully Implemented (Calculated strictly from observed fares) |
+| **Automated Multi-Source Collection** | Python scraping layer utilizing Crawl4AI and Playwright/Chromium with bounded request rates and ethical guardrails. | Implemented (HappyFares prototype operational; extensible adapter framework ready) |
+| **Modular Scraping Architecture** | Extensible `BaseCollector` contract supporting `CRAWL4AI`, `PLAYWRIGHT`, `SCRAPY`, and async `HTTP` engines. | Fully Implemented & Unit-Tested |
+| **Scheduled Acquisition** | Celery worker and Celery Beat scheduler configured for periodic corridor sweeps and health checks. | Implemented & Docker-Ready |
+| **Clean, Deduplicated Database** | Canonical normalization, physical sanity bounds checks (₹500–₹500,000, $Origin \ne Dest$), and SHA-256 quote deduplication. | Fully Implemented & Enforced via DB Triggers |
+| **Complete Fare Attributes** | Tracks Origin, Destination, Carrier, Flight No, Booking Window, Base Fare, Taxes, and Gross Total in standard INR. | Fully Implemented in Canonical Schema |
+| **Airfare Price Index (APIx)** | Advance-purchase stratified chained Laspeyres price index with composite Coverage Quality Metric ($Q$). | Fully Implemented (Calculated strictly from observed fares) |
 | **Route Weighting Framework** | Directional corridor weighting disaggregated across `T+1`, `T+7`, `T+15`, `T+30`, and `T+45` booking horizons. | Implemented (*Prototype baseline weights loaded*) |
-| **Web Dashboard** | Institutional Next.js dashboard featuring 12+ specialized analytical views, interactive ECharts, and export dossiers. | Fully Implemented on Vercel |
-| **Validation & Benchmarking** | Internal 30-day continuous observed history tracking paired with MoSPI CPI reference series ingestion. | Implemented (DGCA comparison framework ready) |
+| **Web Dashboard** | Institutional Next.js 14 dashboard featuring 15 specialized views, interactive ECharts, and export dossiers. | Fully Implemented on Vercel |
+| **Validation & Benchmarking** | Continuous 30-day observed history tracking paired with MoSPI CPI reference series ingestion. | Implemented (DGCA comparison framework ready) |
 | **Documentation & Tests** | Comprehensive test suite (pytest), migration history, and audit-grade architectural documentation. | Fully Implemented |
 
 ---
 
-## 32. Final Closing
+## 27. Honest Limitations
 
-> **AirPulse turns individual dynamic ticket prices into a transparent, traceable economic signal for India.**
+* **Bounded Verified Live Coverage**: Automated live collection is currently verified for three core domestic corridors (`DEL-BOM`, `DEL-CCU`, `BOM-BLR`).
+* **Source Verification Scope**: Not all Indian airlines and OTAs are production-verified; expanding coverage requires portal-specific compliance reviews.
+* **Longitudinal Observation Requirements**: True 30-day live backtesting requires genuine, continuous daily observation history. Scraping multiple future departure dates in a single run cannot replace longitudinal observation days.
+* **DGCA Benchmark Data Dependency**: Route-level official validation requires obtaining and loading an official, comparable DGCA city-pair tariff series.
+* **Prototype Statistical Weights**: Current route and booking-window basket weights represent baseline traffic estimates, not official MoSPI Price Statistics Division (PSD) weights.
+* **ML Inference vs. Accuracy**: Verification diagnostics confirm model execution and numerical sanity; they do not establish predictive accuracy outside the fitted training distribution.
+* **Prototype Infrastructure Sizing**: The backend is hosted on a prototype AWS EC2 `t3.small` instance (2 GB RAM) optimized for evaluation rather than high-concurrency commercial workloads.
+
+---
+
+## 28. Practical Future Work
+
+* **Expansion of Permitted Live Sources**: Onboard additional domestic airlines and OTAs following formal compliance reviews.
+* **Extended Corridor Matrix**: Add Tier-2 and regional UDAN corridors to broaden geographical coverage.
+* **Longitudinal Data Accumulation**: Accumulate 60+ continuous observation days to support multi-month backtesting and seasonal decomposition.
+* **Official MoSPI Weight Integration**: Incorporate official passenger expenditure and traffic weights when provided by MoSPI Price Statistics Division.
+* **Official DGCA Benchmark Synchronization**: Ingest and align official monthly DGCA average yield reports as benchmark series become available.
+* **Enhanced ML Evaluation**: Implement automated model drift detection and scheduled offline retraining pipelines.
+* **Distributed Horizontal Scaling**: Scale Celery worker pools across multiple compute instances with centralized browser orchestration.
+
+---
+
+## 29. Security & Compliance Discipline
+
+VAYANTARA enforces strict security controls:
+* **Zero Client-Side Secrets**: Frontend bundles contain only public anonymous keys (`NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_HCAPTCHA_SITEKEY`). Backend secrets (`SUPABASE_SERVICE_ROLE_KEY`, database passwords, JWT secrets) remain strictly server-side.
+* **Database-Enforced Authorization**: User roles (`analyst`, `admin`) are verified against the database `profiles` table; claims in client JWTs are never trusted for authorization.
+* **Immutable Audit Trail**: Administrative changes, pipeline transitions, and validation decisions are recorded in `audit_logs`.
+* **Append-Only Raw Store**: Raw payloads are hashed with SHA-256 and protected from alteration or deletion by database triggers.
+* **Isolated Infrastructure**: Database and Redis ports are bound to private networks and unexposed to public security groups.
+
+---
+
+## 30. License & Credits
+
+* **Smart India Hackathon Problem**: SIH26056 (Ministry of Statistics & Programme Implementation - MoSPI)
+* **License**: Open-source under the [MIT License](LICENSE).
