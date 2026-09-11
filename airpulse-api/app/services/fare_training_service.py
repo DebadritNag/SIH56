@@ -3,22 +3,13 @@
 Honest by design: builds features from actual observations, computes real
 per-route rolling medians, and refuses to emit fake metrics when there is
 not enough real data to train a meaningful model. As more scraped CSVs are
-imported, calling train() again yields a progressively better model.
+imported, explicit candidate evaluation can measure whether a replacement improves.
 """
 from __future__ import annotations
 
-import statistics
-from typing import Any, Dict, List, Optional
-from uuid import uuid4
-
+from typing import Any, Dict
 import pandas as pd
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.config import settings
-from app.core.utils import utc_now
-from app.db.models import Route, ValidatedFare
-from app.ml.fareguard import FareGuardModel
 from app.ml.features import FeatureBuilder
 
 MIN_ROWS_TO_TRAIN = 40  # below this a time-split XGBoost model is not meaningful
@@ -28,51 +19,13 @@ class FareTrainingService:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def _route_distance(self) -> Dict[Optional[str], float]:
-        rows = list((await self.session.execute(select(Route))).scalars().all())
-        return {str(r.id): float(r.distance_km or 1500.0) for r in rows}
-
     async def build_training_frame(self) -> pd.DataFrame:
-        fares = list((await self.session.execute(
-            select(ValidatedFare).where(ValidatedFare.validation_status == "VALID")
-        )).scalars().all())
-        if not fares:
-            return pd.DataFrame()
-
-        dist_map = await self._route_distance()
-
-        # Real per-route rolling median/std from the actual observations.
-        by_route: Dict[str, List[float]] = {}
-        for f in fares:
-            key = f"{f.origin}-{f.destination}"
-            by_route.setdefault(key, []).append(float(f.normalized_total_fare))
-        route_stats = {}
-        for key, vals in by_route.items():
-            med = statistics.median(vals)
-            std = statistics.pstdev(vals) if len(vals) > 1 else med * 0.1
-            route_stats[key] = (med, std)
-
-        feats: List[Dict[str, Any]] = []
-        targets: List[float] = []
-        for f in fares:
-            key = f"{f.origin}-{f.destination}"
-            med, std = route_stats.get(key, (float(f.normalized_total_fare), 1.0))
-            fv = FeatureBuilder.build_features_for_fare(
-                fare_id=str(f.id),
-                departure_dt=f.departure_at,
-                booking_window_days=f.booking_window_days or 0,
-                distance_km=dist_map.get(str(f.route_id), 1500.0),
-                airline_code=(f.airline or "UNKNOWN")[:12],
-                cabin_class=f.cabin or "economy",
-                route_recent_median=med,
-                route_recent_std=std,
-                source_reliability=1.0,
-            )
-            fv["normalized_total_fare"] = float(f.normalized_total_fare)
-            feats.append(fv)
-
-        df = pd.DataFrame(feats)
-        return df
+        from app.services.live_store import rows
+        fares = await rows(self.session, """SELECT v.*,r.distance_km FROM validated_fares v
+            JOIN routes r ON r.id=v.route_id WHERE v.validation_status='VALID'
+            AND NOT v.is_duplicate AND v.data_origin IN ('LIVE','IMPORTED')
+            ORDER BY v.collected_at,v.id""")
+        return FeatureBuilder.observed_training_frame(fares)
 
     async def train(self) -> Dict[str, Any]:
         df = await self.build_training_frame()
@@ -97,13 +50,6 @@ class FareTrainingService:
                 },
             }
 
-        # Enough data: train for real on FareGuard's exact feature columns.
-        model = FareGuardModel()
-        # ensure all FEATURE_COLS exist
-        for col in FareGuardModel.FEATURE_COLS:
-            if col not in df.columns:
-                df[col] = 0.0
-        metrics = model.train(df)
-        path = model.save(settings.MODEL_DIR if hasattr(settings, "MODEL_DIR") else "models")
-        return {"status": "trained", "rows": total, "metrics": metrics,
-                "model_version": model.version, "artifact_path": path}
+        # Do not overwrite an ACTIVE v1 artifact from a training endpoint.
+        return {"status": "candidate_evaluation_required", "rows": total,
+                "message": "Use python -m app.scripts.evaluate_fareguard_candidate with a genuine-data snapshot. Active artifacts are never overwritten by this endpoint."}

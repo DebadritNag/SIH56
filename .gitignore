@@ -121,6 +121,8 @@ airpulse-api/tests/unit/*
 !airpulse-api/docs/LIVE_ML_INFERENCE.md
 !airpulse-api/tests/unit/test_canonical_fare_view.py
 !airpulse-api/docs/LIVE_LINEAGE_REPAIR.md
+!airpulse-api/tests/unit/test_fareguard_positive_target.py
+!airpulse-api/docs/FAREGUARD_INVALID_PREDICTION.md
 airpulse-api/docs/UI_SHOCK_COUNT_FIX.md
 airpulse-api/tests/unit/test_live_inference.py
 .gitignore

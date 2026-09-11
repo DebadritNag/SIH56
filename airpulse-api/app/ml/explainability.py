@@ -13,6 +13,10 @@ class ExplainabilityService:
     3. Outputs strictly non-causal attribution (e.g. 'contributed to model expectation')."""
 
     def __init__(self, fareguard: FareGuardModel):
+        if getattr(fareguard, 'target_transform', 'identity') != 'identity':
+            from app.ml.live_inference import InferenceUnavailable
+            raise InferenceUnavailable('EXPLANATION_SCALE_UNSUPPORTED',
+                'Log-target candidate requires scale-aware SHAP review before activation; log impacts are not INR impacts')
         self.fareguard = fareguard
         self.explainer: Optional[shap.TreeExplainer] = None
         if fareguard.is_trained and fareguard.model is not None:

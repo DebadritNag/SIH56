@@ -182,14 +182,7 @@ async def process_live_fares(db, run_id, pipeline_id):
         if not fare['distance_km'] or fare['distance_km'] <= 0:
             fg_outcomes.append({'fare_id':str(fare['id']), 'prediction':None, 'status':'NOT_SCORED', 'reason':'INSUFFICIENT_FEATURES', 'detail':'Route distance unavailable'})
             continue
-        med, std = (statistics.median(values), statistics.pstdev(values)) if values else (float('nan'), float('nan'))
-        # Missing external features remain missing for XGBoost; no fabricated fuel/demand.
-        features = FeatureBuilder.build_features_for_fare(str(fare['id']), fare['departure_at'],
-            fare['booking_window_days'], float(fare['distance_km']), fare['airline'], fare['cabin'],
-            fuel_price=float('nan'), synthetic_demand_score=float('nan'), route_recent_median=med,
-            route_recent_std=std, source_reliability=float('nan'))
-        features['is_festival'] = float('nan')
-        features['actual_fare'] = float(fare['total_fare'])
+        features = FeatureBuilder.observed_features(fare, values)
         feature_rows.append(features)
         feature_fares.append(fare)
         clean_features = {k:None if isinstance(v,float) and not math.isfinite(v) else v for k,v in features.items()}
@@ -197,7 +190,7 @@ async def process_live_fares(db, run_id, pipeline_id):
             booking_window_days=fare['booking_window_days'],day_of_week=features['day_of_week'],
             is_weekend=bool(features['is_weekend']),season=features['season'],distance_km=float(fare['distance_km']),
             route_recent_median=clean_features['route_recent_median'],route_recent_std=clean_features['route_recent_std'],route_volatility=clean_features['route_recent_volatility'],
-            feature_version='live-observed-v1',features=clean_features)
+            feature_version=FeatureBuilder.OBSERVED_VERSION,features=clean_features)
     await stage('FEATURES',len(feature_rows),message='Only prior observed fares used; missing external features retained as null')
 
     predicted, scored, explained = 0, 0, 0

@@ -1,4 +1,6 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
+import math
+import statistics
 from typing import Any, Dict, List, Optional
 import pandas as pd
 from pydantic import BaseModel
@@ -34,6 +36,56 @@ class FeatureBuilder:
         6: "monsoon", 7: "monsoon", 8: "monsoon", 9: "monsoon",
         10: "post_monsoon", 11: "post_monsoon"
     }
+
+    OBSERVED_VERSION = 'observed-features-v2'
+
+    @classmethod
+    def observed_features(cls, fare, prior_route_fares):
+        """Shared training/inference contract: km, INR, IST dates, prior 30-day history.
+
+        Caller supplies only earlier observations from the same route. Unknown
+        external fields remain NaN, including festival status (unknown != false).
+        """
+        def timestamp(value):
+            parsed = datetime.fromisoformat(value.replace('Z', '+00:00')) if isinstance(value, str) else value
+            if parsed.tzinfo is None:
+                raise ValueError('Timezone required for observed features')
+            return parsed.astimezone(timezone(timedelta(hours=5, minutes=30)))
+        departure, observed = timestamp(fare['departure_at']), timestamp(fare['collected_at'])
+        days = (departure.date() - observed.date()).days
+        distance = float(fare['distance_km'])
+        if days < 0 or not math.isfinite(distance) or distance <= 0:
+            raise ValueError('Invalid observed lead days or route distance')
+        history = [float(value) for value in prior_route_fares]
+        if any(not math.isfinite(v) or v <= 0 for v in history):
+            raise ValueError('Invalid prior route fare')
+        missing = float('nan')
+        result = cls.build_features_for_fare(str(fare['id']), departure, days, distance,
+            fare.get('airline'), fare.get('cabin'), fuel_price=missing,
+            synthetic_demand_score=missing, source_reliability=missing,
+            route_recent_median=statistics.median(history) if history else missing,
+            route_recent_std=statistics.pstdev(history) if history else missing)
+        result['is_festival'] = missing
+        result['actual_fare'] = float(fare['total_fare'])
+        return result
+
+    @classmethod
+    def observed_training_frame(cls, fares):
+        """Same builder as LIVE, excluding equal-time and future route observations."""
+        def timestamp(value):
+            return datetime.fromisoformat(value.replace('Z', '+00:00')) if isinstance(value,str) else value
+        ordered = sorted(fares, key=lambda fare:(timestamp(fare['collected_at']),str(fare['id'])))
+        prior, features = {}, []
+        for fare in ordered:
+            observed = timestamp(fare['collected_at'])
+            history = prior.setdefault(str(fare['route_id']), [])
+            values = [value for time,value in history if observed-timedelta(days=30) <= time < observed]
+            row = cls.observed_features(fare, values)
+            row.update(normalized_total_fare=float(fare['normalized_total_fare']), observed_at=observed,
+                       data_origin=fare['data_origin'])
+            features.append(row)
+            history.append((observed,float(fare['normalized_total_fare'])))
+        return pd.DataFrame(features)
 
     @classmethod
     def build_features_for_fare(

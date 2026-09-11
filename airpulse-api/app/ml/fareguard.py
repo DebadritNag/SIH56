@@ -32,6 +32,7 @@ class FareGuardModel:
         self.version = version
         self.model: Optional[XGBRegressor] = None
         self.is_trained: bool = False
+        self.target_transform = 'identity'
 
     def train(
         self, df: pd.DataFrame, target_col: str = "normalized_total_fare"
@@ -83,17 +84,27 @@ class FareGuardModel:
         }
         return metrics
 
-    def predict_batch(self, df: pd.DataFrame) -> np.ndarray:
+    def predict_raw_batch(self, df: pd.DataFrame) -> np.ndarray:
         if not self.is_trained or self.model is None:
             # Fallback simple baseline estimation if untrained
             return df["route_recent_median"].values * (1.0 + 0.3 * (1.0 / np.maximum(1, df["booking_window_days"])))
         X = df[self.FEATURE_COLS].copy()
         return self.model.predict(X)
 
+    def predict_batch(self, df: pd.DataFrame) -> np.ndarray:
+        raw = self.predict_raw_batch(df)
+        if self.target_transform == 'identity':
+            return raw
+        if self.target_transform == 'log1p':
+            with np.errstate(over='ignore', invalid='ignore'):
+                return np.expm1(raw)
+        raise ValueError('Unknown FareGuard target transform')
+
     def save(self, directory: str) -> str:
         os.makedirs(directory, exist_ok=True)
         path = os.path.join(directory, f"{self.version}.joblib")
-        joblib.dump({"model": self.model, "version": self.version, "features": self.FEATURE_COLS}, path)
+        joblib.dump({"model": self.model, "version": self.version, "features": self.FEATURE_COLS,
+                     "target_transform": self.target_transform}, path)
         return path
 
     def load(self, path: str) -> None:
@@ -101,4 +112,5 @@ class FareGuardModel:
             data = joblib.load(path)
             self.model = data["model"]
             self.version = data["version"]
+            self.target_transform = data.get('target_transform', 'identity')
             self.is_trained = True
