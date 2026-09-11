@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import LiveCollectionTelemetry, { type CollectionProgress } from "./LiveCollectionTelemetry";
 import { Clock3, Loader2 } from "lucide-react";
 import { getData, postData } from "@/lib/api/client";
+import { invalidateAfterCollection, invalidateAfterIngestion } from "@/lib/queryInvalidation";
 
 type Quote = { carrier?: string; flight_number?: string; departure_date?: string; departure_time?: string; gross_total?: number; currency?: string; provenance?: { observed_at?: string } };
 type Run = { id: string; status: string; started_at?: string; finished_at?: string; created_at: string; quotes_received: number; metadata?: { progress?: CollectionProgress; request?: { source?: string; origin?: string; destination?: string; departure_date?: string }; ingestion_state?: string; result?: { failure_stage?: string; failure_reason?: string; collection_engine?: string; engine?: string; stop_reason?: string; source_url?: string }; processing?: { fareguard_scored: number; priceguard_scored: number; shap_count: number; records_processed: number; index: { status: string; index_value?: number; reason?: string } } }; pipelines?: { id: string; pipeline_type: string; status: string; error_summary?: string }[]; stages?: { id: string; step_name: string; status: string; records_output: number; message?: string }[]; quotes?: { id: string; raw_payload: Quote }[] };
@@ -28,7 +29,7 @@ export default function LiveCollection() {
   const recent = useQuery({ queryKey: ["live-runs"], queryFn: () => getData<Run[]>("/live/runs"), refetchInterval: 5000 });
   const runId = selected ?? recent.data?.[0]?.id;
   const detail = useQuery({ queryKey: ["live-run", runId], queryFn: () => getData<Run>(`/live/runs/${runId}`), enabled: !!runId, refetchInterval: q => q.state.data?.pipelines?.some(p => ["QUEUED", "RUNNING"].includes(p.status)) ? 2000 : 5000 });
-  const collect = useMutation({ mutationFn: () => postData<{ collection_run_id: string }>("/live/runs", { source, origin, destination, departure_date: departure, max_results: limit, engine: source === "happyfares" ? "CRAWL4AI" : "AUTO" }), onSuccess: data => { setSelected(data.collection_run_id); cache.invalidateQueries({ queryKey: ["live-runs"] }); cache.invalidateQueries({ queryKey: ["live-config", source] }); }, onError: () => { cache.invalidateQueries({ queryKey: ["live-config", source] }); }, onSettled: () => { submitLock.current = false; } });
+  const collect = useMutation({ mutationFn: () => postData<{ collection_run_id: string }>("/live/runs", { source, origin, destination, departure_date: departure, max_results: limit, engine: source === "happyfares" ? "CRAWL4AI" : "AUTO" }), onSuccess: async data => { setSelected(data.collection_run_id); await invalidateAfterCollection(cache); }, onError: () => { cache.invalidateQueries({ queryKey: ["live-config", source] }); }, onSettled: () => { submitLock.current = false; } });
   const ingest = useMutation({ mutationFn: () => postData(`/live/runs/${runId}/ingest`), onSuccess: () => cache.invalidateQueries({ queryKey: ["live-run", runId] }) });
   const run = detail.data;
   const state = run?.metadata?.ingestion_state;
@@ -38,7 +39,7 @@ export default function LiveCollection() {
   useEffect(() => {
     if (["COMPLETED", "PARTIAL"].includes(state ?? "")) {
       setRefreshingIngestion(true);
-      void cache.invalidateQueries().finally(() => setRefreshingIngestion(false));
+      void invalidateAfterIngestion(cache).finally(() => setRefreshingIngestion(false));
     }
   }, [state, runId, cache]);
   useEffect(() => {

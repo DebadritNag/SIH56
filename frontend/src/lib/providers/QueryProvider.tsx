@@ -5,8 +5,20 @@ import { useState, type ReactNode } from "react";
 
 /**
  * App-wide React Query provider. One client per browser session.
- * Realtime events (Supabase) will call queryClient.invalidateQueries(...) so the UI
- * refetches authoritative data from FastAPI (FastAPI stays the source of truth).
+ *
+ * staleTime = 0: operational dashboard data (anomaly counts, collection status,
+ * fare tables) must always reflect the latest committed backend state. A 30-second
+ * stale window was causing pages to display old anomaly/observation counts for
+ * up to 30 seconds after a new ingestion completed — the "2 anomalies → 20
+ * anomalies" flash bug. With staleTime=0 React Query still serves cached data
+ * instantly for fast navigation, but marks it stale immediately so a background
+ * refetch starts the moment any component is (re-)mounted.
+ *
+ * gcTime = 3 min: keep cache long enough for fast back-navigation but not so
+ * long that invalidated data lingers in memory.
+ *
+ * Realtime events (Supabase) will call queryClient.invalidateQueries(...) so the
+ * UI refetches authoritative data from FastAPI (FastAPI stays the source of truth).
  */
 export function QueryProvider({ children }: { children: ReactNode }) {
   const [client] = useState(
@@ -14,9 +26,11 @@ export function QueryProvider({ children }: { children: ReactNode }) {
       new QueryClient({
         defaultOptions: {
           queries: {
-            // Backend data is near-real-time; keep it fresh but avoid hammering.
-            staleTime: 30_000,
-            gcTime: 5 * 60_000,
+            // staleTime: 0 means every query is considered stale immediately after
+            // it resolves — React Query serves cached data instantly for navigation
+            // but triggers a background refetch so fresh data arrives quickly.
+            staleTime: 0,
+            gcTime: 3 * 60_000,
             refetchOnWindowFocus: false,
             retry: 1,
           },

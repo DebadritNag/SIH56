@@ -47,6 +47,7 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import { EChartWrapper } from '@/components/charts/EChartWrapper';
 import type { EChartsOption } from 'echarts';
+import { SyncIndicator } from '@/components/ui/SyncIndicator';
 import { NationalIndexChart } from '@/components/charts/NationalIndexChart';
 import { GlobalFilterBar } from '@/components/layout/GlobalFilterBar';
 import { GenerateReportButton } from '@/components/data/GenerateReportButton';
@@ -259,7 +260,7 @@ export default function OverviewPage() {
 
   // ── Data hooks ─────────────────────────────────────────────────────────────
 
-  const { ctx, isLoading: isCtxLoading } = useLiveModeContext();
+  const { ctx, isLoading: isCtxLoading, isFetching: isCtxFetching } = useLiveModeContext();
   const { summary, isFetching: isSummaryFetching, refetch: refetchSummary } = useDashboardSummary(filters);
   const { trend: trendData, isFetching: isTrendFetching, refetch: refetchTrend } = useNationalTrend(filters);
   const { contributors: contribSets, isFetching: isContribFetching, refetch: refetchContrib } = useRouteContributors(filters);
@@ -270,7 +271,7 @@ export default function OverviewPage() {
   const { data: faresList, isPending: isFaresPending } = useFares({ page_size: 5 });
   const { data: obsHistory, isPending: isHistoryPending } = useObservationHistory();
 
-  const isAnyFetching = isRefreshing || isSummaryFetching || isTrendFetching || isContribFetching;
+  const isAnyFetching = isRefreshing || isSummaryFetching || isTrendFetching || isContribFetching || isCtxFetching;
 
   const handleManualRefresh = async () => {
     setIsRefreshing(true);
@@ -580,6 +581,15 @@ export default function OverviewPage() {
         isFilterStale={isAnyFetching}
       />
 
+      {/* Sync banner — shown during background refetch so stale values are not
+          presented as fresh. Disappears once all active queries have settled. */}
+      {isAnyFetching && !isCtxLoading && (
+        <SyncIndicator
+          variant="banner"
+          label="Syncing latest airfare intelligence…"
+        />
+      )}
+
       {/* ── ROW 1 — 5 KPI Cards ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
 
@@ -608,7 +618,11 @@ export default function OverviewPage() {
         <KpiCard
           title="Latest Collection"
           value={collectionAgo ?? '—'}
-          sub={latestSourceLabel ?? (liveCount > 0 ? 'LIVE data' : importedCount > 0 ? 'Imported' : 'No collection yet')}
+          sub={
+            isCtxFetching
+              ? <SyncIndicator label="Checking…" />
+              : latestSourceLabel ?? (liveCount > 0 ? 'LIVE data' : importedCount > 0 ? 'Imported' : 'No collection yet')
+          }
           icon={<Clock className="w-4 h-4 text-white" />}
           accent={collectionAgo ? 'bg-emerald-600' : 'bg-slate-400'}
           loading={isCtxLoading}
@@ -628,7 +642,11 @@ export default function OverviewPage() {
         <KpiCard
           title="Active Anomalies"
           value={isShocksPending ? '—' : openAnomalies > 0 ? openAnomalies : '0'}
-          sub={openAnomalies > 0 ? 'PriceGuard signals' : 'All clear'}
+          sub={
+            isSummaryFetching
+              ? <SyncIndicator label="Updating…" />
+              : openAnomalies > 0 ? 'PriceGuard signals' : 'All clear'
+          }
           icon={<AlertTriangle className="w-4 h-4 text-white" />}
           accent={openAnomalies > 0 ? 'bg-rose-600' : 'bg-slate-400'}
         />

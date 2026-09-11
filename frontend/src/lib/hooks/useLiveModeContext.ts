@@ -88,7 +88,12 @@ export function useLiveModeContext() {
     // new data is imported or a live collection run completes.
     refetchInterval: 15_000,
     staleTime: 10_000,
-    placeholderData: isMock ? MOCK_CONTEXT : EMPTY_CONTEXT,
+    // In real mode: do NOT use EMPTY_CONTEXT as placeholder — showing zeros
+    // while the real fetch is pending causes the Overview to display
+    // "—" / "0 routes" / stale latest_collected for several seconds.
+    // Returning undefined means components can check isLoading and show a
+    // proper skeleton instead of incorrect zeroed values.
+    placeholderData: isMock ? MOCK_CONTEXT : undefined,
   });
 
   const ctx = q.data ?? (isMock ? MOCK_CONTEXT : EMPTY_CONTEXT);
@@ -96,6 +101,7 @@ export function useLiveModeContext() {
   return {
     ctx,
     isLoading: q.isLoading,
+    isFetching: q.isFetching,
     mode: ctx.mode,
     modeLabel: ctx.mode_label,
     healthBadge: ctx.health_badge,

@@ -13,6 +13,7 @@ import { endpoints } from '@/lib/api/endpoints';
 import { getData } from '@/lib/api/client';
 import { notify } from '@/lib/notify';
 import { ConfirmActionDialog } from '@/components/notifications/ConfirmActionDialog';
+import { invalidateAfterIngestion } from '@/lib/queryInvalidation';
 import { CollectionProgress } from '@/components/ui/CollectionProgress';
 
 const PIPELINE_STAGES = [
@@ -127,7 +128,7 @@ export default function IngestionPage() {
       if(progress.status==='COMPLETED') {
         while(!cancelled) {
           try {
-            await queryClient.invalidateQueries({}, {throwOnError:true});
+            await invalidateAfterIngestion(queryClient);
             await refetchRuns({throwOnError:true});
             break;
           } catch {
@@ -193,10 +194,7 @@ export default function IngestionPage() {
     try {
       const res = (await endpoints.triggerReplay('810dacd0-4321-4b9b-a8af-10c0c7276279')) as { data?: { quotes_processed?: number; run_id?: string } };
       await refetchRuns();
-      await queryClient.invalidateQueries({ queryKey: ['runs'] });
-      await queryClient.invalidateQueries({ queryKey: ['ingestion-status'] });
-      await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
-      await queryClient.invalidateQueries({ queryKey: ['fares'] });
+      await invalidateAfterIngestion(queryClient);
       notify.success('Pipeline replay completed', {
         id: 'replay-run',
         description: `Successfully replayed run #${res?.data?.run_id?.slice(0, 8) || '810dacd0'}. 26 fares scored.`,

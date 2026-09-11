@@ -10,6 +10,7 @@
  * Persisted in localStorage. Never silently disguises mock as real.
  */
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 export type DataMode = "real" | "mock";
 
@@ -30,6 +31,7 @@ export function DataModeProvider({ children }: { children: ReactNode }) {
   const [mode, setModeState] = useState<DataMode>("real");
   const [isSwitching, setIsSwitching] = useState(false);
   const [switchingTo, setSwitchingTo] = useState<DataMode | null>(null);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const saved = typeof window !== "undefined" ? window.localStorage.getItem(STORAGE_KEY) : null;
@@ -45,6 +47,12 @@ export function DataModeProvider({ children }: { children: ReactNode }) {
     setSwitchingTo(m);
     setModeState(m);
     if (typeof window !== "undefined") window.localStorage.setItem(STORAGE_KEY, m);
+
+    // Immediately invalidate the entire React Query cache when switching modes.
+    // This prevents the previous mode's data from flashing under the new mode's
+    // badge while the new queries are in-flight. The CircleReloadingAnimation
+    // overlay keeps the UI covered until the mode actually switches.
+    void queryClient.invalidateQueries();
 
     // Keep smooth circular reload animation active while queries re-fetch
     setTimeout(() => {

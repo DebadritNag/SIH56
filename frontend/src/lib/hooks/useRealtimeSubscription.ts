@@ -23,8 +23,18 @@ export type RealtimeStatus = "disabled" | "connecting" | "connected" | "error";
 
 // Map each realtime table to the query keys it should invalidate on change.
 const TABLE_INVALIDATIONS: Record<string, string[][]> = {
-  collection_runs: [["live-runs"], ["live-run"], ["fares"], ["ingestion-status"], ["runs"], ["dashboard-summary"]],
-  pipeline_runs: [["live-runs"], ["live-run"], ["ingestion-status"], ["runs"]],
+  collection_runs: [
+    ["live-runs"], ["live-run"], ["fares"], ["ingestion-status"], ["runs"],
+    ["dashboard-summary"],
+    // live-mode-context includes latest_collected; must refresh after any collection
+    ["live-mode-context"],
+    ["sources"], ["source-health"],
+    ["obs-history"],
+  ],
+  pipeline_runs: [
+    ["live-runs"], ["live-run"], ["ingestion-status"], ["runs"],
+    ["dashboard-summary"], ["live-mode-context"],
+  ],
   // A completed APIx pipeline step should refresh the dashboard + index views.
   pipeline_steps: [
     ["ingestion-status"],
@@ -32,6 +42,13 @@ const TABLE_INVALIDATIONS: Record<string, string[][]> = {
     ["apix-trend"],
     ["apix-latest"],
     ["top-route-movements"],
+    ["booking-window-summary"],
+    // Anomaly/fare counts change after a full pipeline completes
+    ["anomalies"],
+    ["fares"],
+    ["price-shocks"],
+    ["live-mode-context"],
+    ["obs-history"],
   ],
   scraping_test_runs: [["scraping-test"]],
   alerts: [["alerts"], ["dashboard-summary"], ["price-shocks"]],
@@ -70,10 +87,10 @@ export function useRealtimeSubscription(): { status: RealtimeStatus } {
         "postgres_changes",
         { event: "*", schema: "public", table },
         () => {
-          if (['collection_runs', 'pipeline_runs', 'pipeline_steps', 'airfare_index'].includes(table)) {
-            void queryClient.invalidateQueries();
-            return;
-          }
+          // Use targeted invalidation for all tables — the previous nuclear
+          // invalidateQueries() (no args) wiped every React Query cache entry
+          // including auth, provider, and scraping-test queries, causing
+          // unnecessary refetches and brief stale flashes across the entire app.
           const keys = TABLE_INVALIDATIONS[table] ?? [];
           for (const key of keys) {
             queryClient.invalidateQueries({ queryKey: key });
