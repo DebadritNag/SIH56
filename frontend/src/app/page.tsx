@@ -28,6 +28,7 @@ import {
 import { CountUp } from "@/components/landing/CountUp";
 import { VayantaraLogo } from "@/components/ui/VayantaraLogo";
 import { useAuth } from "@/lib/providers/AuthProvider";
+import { PublicNavbar } from "@/components/public/PublicNavbar";
 
 const NAV_TICKER = [
   { route: "DEL–BOM", change: "+11.4%", up: true },
@@ -52,60 +53,8 @@ export default function LandingPage() {
   return (
     <div className="bg-[#030B17] text-slate-100 font-sans antialiased selection:bg-brand-cyan selection:text-black overflow-x-hidden min-h-screen relative flex flex-col justify-between">
       <div className="relative z-10 flex flex-col justify-between min-h-screen">
-        {/* BEGIN: HeaderNav */}
-        <header
-          className="w-full border-b border-white/10 backdrop-blur-md sticky top-0 z-50 transition-colors duration-200"
-          style={{
-            background: "linear-gradient(180deg, rgba(6, 21, 34, 0.98) 0%, rgba(4, 17, 29, 0.96) 100%)",
-          }}
-        >
-          <div className="w-full max-w-[94vw] mx-auto px-4 sm:px-6 lg:px-8 py-3.5 sm:py-4 flex items-center justify-between">
-            {/* Brand Logo Container */}
-            <Link className="flex items-center group cursor-pointer shrink-0" href="/" title="VAYANTARA Home">
-              <div className="relative flex items-center justify-center py-1">
-                {/* Subtle localized radial glow behind the logo only */}
-                <div
-                  aria-hidden="true"
-                  className="absolute inset-0 -inset-x-5 -inset-y-3 rounded-full pointer-events-none"
-                  style={{
-                    background:
-                      "radial-gradient(ellipse at 28% 50%, rgba(0, 190, 255, 0.22) 0%, rgba(2, 132, 199, 0.10) 45%, transparent 72%)",
-                  }}
-                />
-                <Image
-                  src="/top left.png"
-                  alt="VAYANTARA"
-                  width={180}
-                  height={60}
-                  priority
-                  unoptimized
-                  className="w-[150px] sm:w-[175px] h-auto object-contain relative z-10 filter brightness-[1.22] contrast-[1.15] saturate-[1.15] drop-shadow-[0_0_1px_rgba(255,255,255,0.35)] transition-transform duration-200 group-hover:scale-[1.02]"
-                />
-              </div>
-            </Link>
-
-            {/* Navigation Links */}
-            <nav className="hidden md:flex items-center space-x-7 text-xs font-medium tracking-wide">
-              <Link className="text-white relative py-1.5 font-semibold" href="/">
-                Home
-                <span className="absolute bottom-0 left-0 w-full h-[2.5px] bg-brand-cyan rounded-full shadow-[0_0_8px_#00D2FF]" />
-              </Link>
-              <Link className="text-slate-300 hover:text-white transition-colors duration-150" href="/about">
-                About
-              </Link>
-            </nav>
-
-            {/* Action Items (Get Access) */}
-            <div className="flex items-center">
-              <Link
-                className="glow-cyan-btn inline-flex items-center justify-center px-5 py-2 text-xs font-semibold rounded-full bg-gradient-to-r from-brand-cyan to-sky-400 text-brand-dark hover:brightness-110 active:scale-95 transition-all cursor-pointer"
-                href="/signup"
-              >
-                Get Access <span className="ml-1.5 font-bold">→</span>
-              </Link>
-            </div>
-          </div>
-        </header>
+        {/* BEGIN: HeaderNav — shared PublicNavbar component */}
+        <PublicNavbar active="home" />
         {/* END: HeaderNav */}
 
         {/* BEGIN: HeroSection (Section-Restricted Background & Luminous Center Lighting) */}
