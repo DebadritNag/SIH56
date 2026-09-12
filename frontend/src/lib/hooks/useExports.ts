@@ -3,104 +3,107 @@ import { exportsApi } from '@/lib/api/exports';
 import { apiClient } from '@/lib/api/client';
 import { CreateExportInput, ExportJob } from '@/types';
 import { notify } from '@/lib/notify';
+import { useDataMode } from '@/lib/providers/DataModeProvider';
 
-const FALLBACK_EXPORTS: ExportJob[] = [
+// ---------------------------------------------------------------------------
+// Fallback catalog — only shown when the backend is completely unreachable.
+// data_origin is NOT set to LIVE unconditionally: it will be overridden by
+// the mode-aware logic below.
+// ---------------------------------------------------------------------------
+const makeFallbackExports = (mode: 'real' | 'mock'): ExportJob[] => [
   {
     id: 'exp-1092',
     export_type: 'FARE_OBSERVATIONS',
     export_format: 'CSV',
     title: 'National Fare Observations (Validated)',
-    filename: 'airpulse-fares-del-bom-2026-08-01_2026-09-02.csv',
+    filename: `vayantara-fares-${mode}-${new Date().toISOString().slice(0, 10)}.csv`,
     status: 'READY',
-    file_size_bytes: 5033164, // ~4.8 MB
-    row_count: 28452,
-    data_origin: 'LIVE',
-    checksum_sha256: '4d8a0c5f6e8b2a1c9e4d7f0b3a5c8e1d7a9b0c2e4f6a8b1c3d5e7f9a0b2c4d6',
+    file_size_bytes: mode === 'real' ? 0 : 5033164,
+    row_count: mode === 'real' ? 0 : 28452,
+    data_origin: mode === 'real' ? 'LIVE' : 'SYNTHETIC',
     created_at: new Date(Date.now() - 3600000).toISOString(),
     updated_at: new Date(Date.now() - 3600000).toISOString(),
     generated_at: new Date(Date.now() - 3600000).toISOString(),
+    parameters: { data_mode: mode },
   },
   {
     id: 'exp-1091',
-    export_type: 'APIX_COMPONENTS',
+    export_type: 'APIX_INDEX',
     export_format: 'XLSX',
     title: 'Official APIx Matched Basket Decomposition',
-    filename: 'airpulse-apix-components-2026-09-02.xlsx',
+    filename: `vayantara-apix-${mode}-${new Date().toISOString().slice(0, 10)}.xlsx`,
     status: 'READY',
-    file_size_bytes: 911360, // ~890 KB
-    row_count: 405,
-    data_origin: 'LIVE',
-    checksum_sha256: '8f4a1c0b3d5e7f9a2b4c6e8d0f2a4b6c8e0d2f4a6b8c0d2e4f6a8b0c2d4e6f8',
+    file_size_bytes: mode === 'real' ? 0 : 911360,
+    row_count: mode === 'real' ? 0 : 405,
+    data_origin: mode === 'real' ? 'LIVE' : 'SYNTHETIC',
     created_at: new Date(Date.now() - 7200000).toISOString(),
     updated_at: new Date(Date.now() - 7200000).toISOString(),
     generated_at: new Date(Date.now() - 7200000).toISOString(),
-  },
-  {
-    id: 'exp-1090',
-    export_type: 'BACKTEST_AUDIT_PDF',
-    export_format: 'PDF',
-    title: 'MoSPI Transport CPI 12-Month Backtest Audit',
-    filename: 'airpulse-backtest-dossier-2026-q3.pdf',
-    status: 'READY',
-    file_size_bytes: 1258291, // ~1.2 MB
-    page_count: 2,
-    data_origin: 'LIVE',
-    checksum_sha256: '3f8b91a0c4e7284102938475a1b2c3d4e5f60718293a4b5c6d7e8f9012345678',
-    created_at: new Date(Date.now() - 18000000).toISOString(),
-    updated_at: new Date(Date.now() - 18000000).toISOString(),
-    generated_at: new Date(Date.now() - 18000000).toISOString(),
-  },
-  {
-    id: 'exp-1089',
-    export_type: 'ANOMALIES',
-    export_format: 'CSV',
-    title: 'Multi-Source Anomaly Extract (PriceGuard)',
-    filename: 'airpulse-anomalies-2026-09-02.csv',
-    status: 'GENERATING',
-    progress_percent: 65.0,
-    current_stage: 'Preparing anomaly observations...',
-    data_origin: 'LIVE',
-    created_at: new Date(Date.now() - 120000).toISOString(),
-    updated_at: new Date().toISOString(),
+    parameters: { data_mode: mode },
   },
 ];
 
+// ---------------------------------------------------------------------------
+// useExports — list with mode in query key so mode switch invalidates cache
+// ---------------------------------------------------------------------------
 export function useExports(params?: { export_type?: string; status?: string }) {
+  const { mode } = useDataMode();
   return useQuery<ExportJob[]>({
-    queryKey: ['exports', params],
+    // mode is now part of the key — switching Live↔Demo invalidates this cache
+    queryKey: ['exports', mode, params],
     queryFn: async (): Promise<ExportJob[]> => {
       try {
         const res = await exportsApi.listExports(params);
         return res.items;
       } catch {
-        return FALLBACK_EXPORTS;
+        // Fallback only when backend is unreachable — use mode-appropriate catalog
+        return makeFallbackExports(mode);
       }
     },
-    refetchInterval: 4000, // Poll every 4 seconds for running jobs
+    refetchInterval: 4000,
   });
 }
 
+// ---------------------------------------------------------------------------
+// useCreateExport — pass data_mode explicitly to backend + fallback job
+// ---------------------------------------------------------------------------
 export function useCreateExport() {
   const qc = useQueryClient();
+  const { mode } = useDataMode();
 
   return useMutation({
     mutationFn: async (input: CreateExportInput): Promise<ExportJob> => {
+      // Ensure data_mode propagates to the backend even if caller forgot it
+      const enrichedInput: CreateExportInput = {
+        ...input,
+        data_mode: input.data_mode ?? mode,
+        parameters: {
+          ...(input.parameters ?? {}),
+          data_mode: input.data_mode ?? mode,
+          mode_label: (input.data_mode ?? mode) === 'real' ? 'LIVE DATA' : 'SIH DEMO MODE',
+        },
+      };
+
       try {
-        return await exportsApi.createExport(input);
+        return await exportsApi.createExport(enrichedInput);
       } catch {
-        // Fallback for offline or demo mode
+        // Offline fallback: create a client-side job descriptor that reflects the
+        // actual current mode — never hardcode data_origin to LIVE
+        const effectiveMode = enrichedInput.data_mode ?? mode;
         const newJob: ExportJob = {
           id: `exp-${Date.now()}`,
           export_type: input.export_type,
           export_format: input.format,
-          title: input.title || 'Official Airfare Intelligence Report',
-          filename: `airpulse-${input.export_type.toLowerCase().replace(/_/g, '-')}-${new Date().toISOString().slice(0, 10)}.${input.format.toLowerCase()}`,
+          title: input.title || 'VAYANTARA Airfare Intelligence Report',
+          filename: `vayantara-${input.export_type.toLowerCase().replace(/_/g, '-')}-${effectiveMode}-${new Date().toISOString().slice(0, 10)}.${input.format.toLowerCase()}`,
           status: 'READY',
           file_size_bytes: input.format === 'PDF' ? 148520 : 45200,
-          row_count: 81,
+          row_count: effectiveMode === 'real' ? 0 : 81,  // 0 rows in Live = no data, not fake data
           page_count: input.format === 'PDF' ? 2 : undefined,
-          data_origin: 'LIVE',
-          checksum_sha256: '4c8f0b1a9e3d5a7b2c4e6f8a0b2d4e6f8a0b2d4e6f8a0b2d4e6f8a0b2d4e6f8',
+          // data_origin reflects the mode: Live mode = LIVE, Demo mode = SYNTHETIC
+          data_origin: effectiveMode === 'real' ? 'LIVE' : 'SYNTHETIC',
+          filters: input.filters,
+          parameters: enrichedInput.parameters,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
           generated_at: new Date().toISOString(),
@@ -109,23 +112,27 @@ export function useCreateExport() {
       }
     },
     onSuccess: (job: ExportJob) => {
-      notify.success('Export generation started', {
-        description: job.filename,
-      });
+      notify.success('Export generation started', { description: job.filename });
       qc.invalidateQueries({ queryKey: ['exports'] });
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       notify.error('Export creation failed', {
-        description: err.message || 'Check filters and parameters.',
+        description: err instanceof Error ? err.message : 'Check filters and parameters.',
       });
     },
   });
 }
 
+// ---------------------------------------------------------------------------
+// useDownloadExport — mode-aware dispatch
+// ---------------------------------------------------------------------------
 export function useDownloadExport() {
   return useMutation({
     mutationFn: async (job: ExportJob) => {
       notify.info('Preparing download...', { description: job.filename });
+
+      // Resolve the mode that was frozen into this export job
+      const jobMode = (job.parameters?.data_mode as 'real' | 'mock' | undefined) ?? 'real';
 
       const isRealJob = /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(job.id);
       let blob: Blob;
@@ -134,23 +141,21 @@ export function useDownloadExport() {
         try {
           blob = await apiClient.downloadBlob(`/exports/${job.id}/stream`);
         } catch {
-          // Fallback to robust client generator if backend server is offline or unreachable
+          // Backend stream unavailable — generate client-side fallback
           if (job.export_format === 'PDF') {
             const { generateClientReportPdf } = await import('@/lib/export-generators/client-pdf');
             blob = await generateClientReportPdf(job);
           } else {
-            const sampleCsv = `route,window,base_fare,current_fare,contribution,status\nDEL-BOM,T+1,9850,11840,+0.85,VALID\nDEL-BOM,T+7,6900,7950,+0.73,VALID\nDEL-BLR,T+1,10500,12400,+0.69,VALID\nDEL-BLR,T+7,6700,7600,+0.56,VALID\nBOM-BLR,T+1,8100,9400,+0.50,VALID\nDEL-CCU,T+7,6200,6850,+0.29,VALID\nBOM-GOI,T+7,3500,3200,-0.19,VALID\n`;
-            blob = new Blob([sampleCsv], { type: 'text/csv' });
+            blob = new Blob([buildFallbackCsv(job, jobMode)], { type: 'text/csv' });
           }
         }
       } else {
-        // For fallback catalog items or demo mode, generate authentic valid PDF or CSV
+        // Fallback catalog items (non-UUID IDs)
         if (job.export_format === 'PDF') {
           const { generateClientReportPdf } = await import('@/lib/export-generators/client-pdf');
           blob = await generateClientReportPdf(job);
         } else {
-          const sampleCsv = `route,window,base_fare,current_price,contribution,status\nDEL-BOM,T+1,9850,11840,+0.85,VALID\nDEL-BOM,T+7,6900,7950,+0.73,VALID\nDEL-BLR,T+1,10500,12400,+0.69,VALID\nDEL-BLR,T+7,6700,7600,+0.56,VALID\nBOM-BLR,T+1,8100,9400,+0.50,VALID\nDEL-CCU,T+7,6200,6850,+0.29,VALID\nBOM-GOI,T+7,3500,3200,-0.19,VALID\n`;
-          blob = new Blob([sampleCsv], { type: 'text/csv' });
+          blob = new Blob([buildFallbackCsv(job, jobMode)], { type: 'text/csv' });
         }
       }
 
@@ -175,6 +180,39 @@ export function useDownloadExport() {
       });
     },
   });
+}
+
+/**
+ * Build a mode-aware CSV fallback.
+ * Live mode with no data → single informational row.
+ * Demo mode → representative sample rows clearly labelled SYNTHETIC.
+ */
+function buildFallbackCsv(job: ExportJob, mode: 'real' | 'mock'): string {
+  const header = `# VAYANTARA Airfare Intelligence Platform\n# Mode: ${mode === 'real' ? 'LIVE DATA' : 'SIH DEMO MODE'}\n# Export Type: ${job.export_type}\n# Generated: ${new Date().toISOString()}\n# Filters: ${JSON.stringify(job.filters ?? {})}\n#\n`;
+
+  if (mode === 'real') {
+    // In Live Mode: if we reach the CSV fallback it means the backend was unreachable.
+    // Return an explicit empty/no-data CSV — never fabricate Live rows.
+    return (
+      header +
+      `status,message\n` +
+      `NO_DATA,"No eligible Live-mode observations available. ` +
+      `Backend unreachable or no data matches the current filters."\n`
+    );
+  }
+
+  // Demo mode: return clearly labelled synthetic sample data
+  return (
+    header +
+    `data_origin,route,window,base_fare_inr,current_fare_inr,contribution_pts,status\n` +
+    `SYNTHETIC,DEL-BOM,T+1,9850,11840,+0.85,VALID\n` +
+    `SYNTHETIC,DEL-BOM,T+7,6900,7950,+0.73,VALID\n` +
+    `SYNTHETIC,DEL-BLR,T+1,10500,12400,+0.69,VALID\n` +
+    `SYNTHETIC,DEL-BLR,T+7,6700,7600,+0.56,VALID\n` +
+    `SYNTHETIC,BOM-BLR,T+1,8100,9400,+0.50,VALID\n` +
+    `SYNTHETIC,DEL-CCU,T+7,6200,6850,+0.29,VALID\n` +
+    `SYNTHETIC,BOM-GOI,T+7,3500,3200,-0.19,VALID\n`
+  );
 }
 
 export function useDeleteExport() {

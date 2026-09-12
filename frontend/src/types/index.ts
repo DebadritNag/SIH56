@@ -295,6 +295,8 @@ export interface CreateExportInput {
   description?: string;
   filters?: Record<string, unknown>;
   parameters?: Record<string, unknown>;
+  /** Canonical data mode from DataModeProvider. Must be passed explicitly. */
+  data_mode?: 'real' | 'mock';
 }
 
 export interface ExportDownloadInfo {

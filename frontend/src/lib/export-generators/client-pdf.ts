@@ -10,6 +10,70 @@ const BORDER_GRAY = [228, 231, 236]; // #E4E7EC
 const GREEN_TEXT = [2, 122, 72]; // #027A48
 const RED_TEXT = [180, 35, 24]; // #B42318
 const BLUE_TEXT = [21, 112, 239]; // #1570EF
+const AMBER_TEXT = [161, 84, 0]; // amber
+
+// ---------------------------------------------------------------------------
+// Helper: resolve data mode from job parameters
+// ---------------------------------------------------------------------------
+function resolveJobMode(job: ExportJob): 'real' | 'mock' {
+  const paramMode = job.parameters?.data_mode;
+  if (paramMode === 'real' || paramMode === 'mock') return paramMode;
+  // Legacy fallback: infer from data_origin
+  if (job.data_origin === 'SYNTHETIC' || job.data_origin === 'REPLAY') return 'mock';
+  return 'real';
+}
+
+function getModeLabel(mode: 'real' | 'mock'): string {
+  return mode === 'real' ? 'LIVE DATA' : 'SIH DEMO MODE';
+}
+
+function getDataContextLabel(job: ExportJob, mode: 'real' | 'mock'): string {
+  if (mode === 'mock') return 'SYNTHETIC / DEMO DATASET';
+  const origin = String(job.data_origin ?? '').toUpperCase();
+  if (origin === 'LIVE') return 'LIVE DATA ONLY';
+  if (origin === 'HYBRID' || origin === 'IMPORTED') return 'HYBRID LIVE + IMPORTED';
+  return 'LIVE + IMPORTED (HYBRID)';
+}
+
+// ---------------------------------------------------------------------------
+// Mode warning banner — inserted when Live mode has no real data (fallback)
+// ---------------------------------------------------------------------------
+function addModeWarningIfNeeded(doc: jsPDF, job: ExportJob, mode: 'real' | 'mock', yPos: number): number {
+  if (mode === 'real') {
+    // In real mode with client-side PDF fallback, warn that backend was unreachable
+    doc.setFillColor(255, 247, 237); // amber-50
+    doc.setDrawColor(217, 119, 6);   // amber-600
+    doc.setLineWidth(0.4);
+    doc.rect(14, yPos, 182, 8, 'FD');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(AMBER_TEXT[0], AMBER_TEXT[1], AMBER_TEXT[2]);
+    doc.text(
+      '⚠  LIVE MODE — BACKEND UNREACHABLE: Report structure generated client-side. ' +
+      'Real observation data requires backend connectivity. ' +
+      'Data tables show representative structure only.',
+      16, yPos + 5,
+      { maxWidth: 178 }
+    );
+    return yPos + 12;
+  } else {
+    // Demo mode — clearly label as synthetic
+    doc.setFillColor(239, 246, 255); // blue-50
+    doc.setDrawColor(59, 130, 246);  // blue-500
+    doc.setLineWidth(0.4);
+    doc.rect(14, yPos, 182, 8, 'FD');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(BLUE_TEXT[0], BLUE_TEXT[1], BLUE_TEXT[2]);
+    doc.text(
+      'ℹ  SIH DEMO MODE — SYNTHETIC DATA: All figures in this report are generated from ' +
+      'the standardized SIH demo dataset. Values do not reflect actual market conditions.',
+      16, yPos + 5,
+      { maxWidth: 178 }
+    );
+    return yPos + 12;
+  }
+}
 
 function addHeaderBanner(
   doc: jsPDF,
@@ -20,10 +84,13 @@ function addHeaderBanner(
 ) {
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = 14;
+  const mode = resolveJobMode(job);
+  const modeLabel = getModeLabel(mode);
+  const contextLabel = getDataContextLabel(job, mode);
 
   // Header Box
   doc.setFillColor(NAVY[0], NAVY[1], NAVY[2]);
-  doc.rect(0, 0, pageWidth, 28, 'F');
+  doc.rect(0, 0, pageWidth, 32, 'F');
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
@@ -40,6 +107,18 @@ function addHeaderBanner(
   );
   doc.text(subtitle, margin, 21);
 
+  // Mode / data context row
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7);
+  doc.setTextColor(mode === 'real' ? [52, 211, 153] as unknown as string : [147, 197, 253] as unknown as string);
+  const modeText = `Mode: ${modeLabel}  |  Data: ${contextLabel}  |  Generated: ${new Date().toISOString().slice(0,19).replace('T',' ')} UTC`;
+  doc.setTextColor(
+    mode === 'real' ? 52 : 147,
+    mode === 'real' ? 211 : 197,
+    mode === 'real' ? 153 : 253
+  );
+  doc.text(modeText, margin, 27);
+
   // Right-side badge
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7);
@@ -53,6 +132,15 @@ function addHeaderBanner(
   doc.text('Classification: OFFICIAL STATISTICAL ARTIFACT', pageWidth - margin, 21, {
     align: 'right',
   });
+  // Active filters summary on right
+  const filterStr = Object.entries(job.filters ?? {})
+    .filter(([, v]) => v !== undefined && v !== null && v !== 'ALL')
+    .map(([k, v]) => `${k}:${Array.isArray(v) ? v.join(',') : v}`)
+    .join(' | ');
+  if (filterStr) {
+    doc.setFontSize(6);
+    doc.text(`Filters: ${filterStr.slice(0, 55)}`, pageWidth - margin, 27, { align: 'right' });
+  }
 }
 
 function addInstitutionalFooter(doc: jsPDF) {
@@ -84,15 +172,16 @@ function addInstitutionalFooter(doc: jsPDF) {
 // ---------------------------------------------------------------------------
 function renderAnomalyReport(doc: jsPDF, job: ExportJob) {
   const margin = 14;
+  const mode = resolveJobMode(job);
   addHeaderBanner(
     doc,
     'PRICEGUARD + FAREGUARD AUDIT',
-    'AIRPULSE — ANOMALY INTELLIGENCE REPORT',
+    'VAYANTARA — ANOMALY INTELLIGENCE REPORT',
     'Statistical Anomaly Investigation, Machine Learning Attribution & Market Surge Dossier',
     job
   );
 
-  let y = 33;
+  let y = addModeWarningIfNeeded(doc, job, mode, 36);
   const filters = job.filters || {};
   const routeFilter = (filters.route as string) || (filters.origin && filters.destination ? `${filters.origin}-${filters.destination}` : 'All Corridors');
   const sevFilter = (filters.severity as string) || 'ALL SEVERITIES';
@@ -137,23 +226,28 @@ function renderAnomalyReport(doc: jsPDF, job: ExportJob) {
   );
   y += 7;
 
-  // Severity KPI Cards
+  // Severity KPI Cards — mode-conditional
   autoTable(doc, {
     startY: y,
     margin: { left: margin, right: margin },
     theme: 'grid',
     styles: { fontSize: 7.5, cellPadding: 2.5, halign: 'center', lineColor: BORDER_GRAY as [number, number, number], lineWidth: 0.2 },
     head: [['Total Active Anomalies', 'Critical (>65% Deviation)', 'High (40-65% Deviation)', 'Multi-Source Convergence Rate']],
-    body: [
-      ['14 Flagged Incidents', '3 Critical Outliers', '5 High Surges', '98.2% Cross-Validated'],
-      ['Requiring statistical signoff', 'Immediate investigation required', 'Elevated yield pressure', 'Agreement across direct & OTA channels'],
-    ],
+    body: mode === 'real'
+      ? [
+          ['—  (Live data required)', '— ', '— ', '— '],
+          ['Backend connectivity required', 'Real PriceGuard results', 'Real PriceGuard results', 'Real cross-source data'],
+        ]
+      : [
+          ['14 Flagged Incidents', '3 Critical Outliers', '5 High Surges', '98.2% Cross-Validated'],
+          ['SYNTHETIC: demo values', 'SYNTHETIC: demo values', 'SYNTHETIC: demo values', 'SYNTHETIC: demo values'],
+        ],
     headStyles: { fillColor: NAVY as [number, number, number], textColor: [255, 255, 255], fontStyle: 'bold' },
     columnStyles: {
       0: { fontStyle: 'bold', textColor: NAVY as [number, number, number] },
-      1: { fontStyle: 'bold', textColor: RED_TEXT as [number, number, number] },
-      2: { fontStyle: 'bold', textColor: [181, 71, 8] },
-      3: { fontStyle: 'bold', textColor: GREEN_TEXT as [number, number, number] },
+      1: { fontStyle: 'bold', textColor: mode === 'real' ? SLATE_DARK as [number, number, number] : RED_TEXT as [number, number, number] },
+      2: { fontStyle: 'bold', textColor: mode === 'real' ? SLATE_DARK as [number, number, number] : [181, 71, 8] as [number, number, number] },
+      3: { fontStyle: 'bold', textColor: mode === 'real' ? SLATE_DARK as [number, number, number] : GREEN_TEXT as [number, number, number] },
     },
   });
 
@@ -226,17 +320,18 @@ function renderAnomalyReport(doc: jsPDF, job: ExportJob) {
 // ---------------------------------------------------------------------------
 function renderRouteIntelligenceReport(doc: jsPDF, job: ExportJob) {
   const margin = 14;
+  const mode = resolveJobMode(job);
   const route = ((job.filters?.route as string) || (job.filters?.origin && job.filters?.destination ? `${job.filters.origin}-${job.filters.destination}` : 'DEL-BOM'));
 
   addHeaderBanner(
     doc,
     'CORRIDOR YIELD & PERFORMANCE',
-    `AIRPULSE — ROUTE INTELLIGENCE DOSSIER: ${route}`,
+    `VAYANTARA — ROUTE INTELLIGENCE DOSSIER: ${route}`,
     'Corridor Performance, Advance Purchase Curves, Carrier Dispersion & Volatility Analysis',
     job
   );
 
-  let y = 33;
+  let y = addModeWarningIfNeeded(doc, job, mode, 36);
   autoTable(doc, {
     startY: y,
     margin: { left: margin, right: margin },
@@ -293,15 +388,16 @@ function renderRouteIntelligenceReport(doc: jsPDF, job: ExportJob) {
 // ---------------------------------------------------------------------------
 function renderBookingWindowsReport(doc: jsPDF, job: ExportJob) {
   const margin = 14;
+  const mode = resolveJobMode(job);
   addHeaderBanner(
     doc,
     'YIELD CURVE & LEAD TIME ELASTICITY',
-    'AIRPULSE — ADVANCE BOOKING WINDOW ANALYSIS',
+    'VAYANTARA — ADVANCE BOOKING WINDOW ANALYSIS',
     'Dynamic Yield Curves, Lead Time Price Elasticity & Strata Decomposition (T+1 to T+45)',
     job
   );
 
-  let y = 33;
+  let y = addModeWarningIfNeeded(doc, job, mode, 36);
   autoTable(doc, {
     startY: y,
     margin: { left: margin, right: margin },
@@ -348,15 +444,16 @@ function renderBookingWindowsReport(doc: jsPDF, job: ExportJob) {
 // ---------------------------------------------------------------------------
 function renderDataQualityReport(doc: jsPDF, job: ExportJob) {
   const margin = 14;
+  const mode = resolveJobMode(job);
   addHeaderBanner(
     doc,
     'STATISTICAL INTEGRITY & COVERAGE',
-    'AIRPULSE — STATISTICAL DATA QUALITY & COVERAGE MATRIX',
+    'VAYANTARA — STATISTICAL DATA QUALITY & COVERAGE MATRIX',
     '6-Pillar Statistical Validation, Physical Sanity, Deduplication & Completeness Audit',
     job
   );
 
-  let y = 33;
+  let y = addModeWarningIfNeeded(doc, job, mode, 36);
   autoTable(doc, {
     startY: y,
     margin: { left: margin, right: margin },
@@ -404,15 +501,16 @@ function renderDataQualityReport(doc: jsPDF, job: ExportJob) {
 // ---------------------------------------------------------------------------
 function renderApixBacktestReport(doc: jsPDF, job: ExportJob) {
   const margin = 14;
+  const mode = resolveJobMode(job);
   addHeaderBanner(
     doc,
     'MACROECONOMIC INFLATION AUDIT',
-    'AIRPULSE: HIGH-FREQUENCY AIRFARE PRICE INDEX (APIx)',
+    'VAYANTARA: HIGH-FREQUENCY AIRFARE PRICE INDEX (APIx)',
     '12-Month Empirical Backtest & CPI Transport Sub-Index Augmentation Audit Dossier',
     job
   );
 
-  let y = 33;
+  let y = addModeWarningIfNeeded(doc, job, mode, 36);
   autoTable(doc, {
     startY: y,
     margin: { left: margin, right: margin },
