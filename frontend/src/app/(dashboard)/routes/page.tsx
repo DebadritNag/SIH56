@@ -1,5 +1,6 @@
 'use client';
 
+import { SUPPORTED_CORRIDORS, supportedCorridor } from '@/lib/supported-corridors';
 import { useDataMode } from '@/lib/providers/DataModeProvider';
 import { useQuery } from '@tanstack/react-query';
 import { getData } from '@/lib/api/client';
@@ -25,17 +26,6 @@ import { RouteAdvancePurchaseChart } from '@/components/charts/RouteAdvancePurch
 import { ExportDialog } from '@/components/dialogs/ExportDialog';
 import { formatINR, formatPercent } from '@/lib/formatters';
 
-const AVAILABLE_ROUTES = [
-  { code: 'DEL-BOM', label: 'DEL → BOM (Delhi - Mumbai)' },
-  { code: 'DEL-BLR', label: 'DEL → BLR (Delhi - Bengaluru)' },
-  { code: 'BOM-BLR', label: 'BOM → BLR (Mumbai - Bengaluru)' },
-  { code: 'DEL-CCU', label: 'DEL → CCU (Delhi - Kolkata)' },
-  { code: 'HYD-DEL', label: 'HYD → DEL (Hyderabad - Delhi)' },
-  { code: 'BOM-GOI', label: 'BOM → GOI (Mumbai - Goa)' },
-  { code: 'BLR-PNQ', label: 'BLR → PNQ (Bengaluru - Pune)' },
-  { code: 'CCU-GAU', label: 'CCU → GAU (Kolkata - Guwahati)' },
-];
-
 export default function RoutesPage() {
   const { mode } = useDataMode();
   return <RouteIntelligence key={mode} live={mode === 'real'} />;
@@ -45,17 +35,18 @@ function RouteIntelligence({ live }: { live: boolean }) {
   const searchParams = useSearchParams();
   const urlRoute = searchParams.get('route');
 
-  const [selectedRouteCode, setSelectedRouteCode] = useState(urlRoute || 'DEL-BOM');
+  const [selectedRouteCode, setSelectedRouteCode] = useState(supportedCorridor(urlRoute));
   const [selectedWindows, setSelectedWindows] = useState<number[]>([1, 7, 15, 30, 45]);
   const [showExport, setShowExport] = useState(false);
 
   useEffect(() => {
-    if (urlRoute && urlRoute !== selectedRouteCode) {
-      setSelectedRouteCode(urlRoute);
+    if (supportedCorridor(urlRoute) !== selectedRouteCode) {
+      setSelectedRouteCode(supportedCorridor(urlRoute));
     }
   }, [urlRoute]);
 
   const handleRouteChange = (newCode: string) => {
+    newCode = supportedCorridor(newCode);
     setSelectedRouteCode(newCode);
     router.push(`/routes?route=${newCode}`, { scroll: false });
   };
@@ -110,12 +101,13 @@ function RouteIntelligence({ live }: { live: boolean }) {
         <div className="flex flex-wrap items-center gap-2">
           <label className="text-xs text-[#667085] font-semibold">Select Route:</label>
           <select
+            aria-label="Select Route"
             value={selectedRouteCode}
             onChange={(e) => handleRouteChange(e.target.value)}
             className="bg-[#F8FAFC] border border-[#D0D5DD] font-semibold text-xs text-[#101828] rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer min-w-[200px]"
           >
-            {[...AVAILABLE_ROUTES, { code: 'BLR-HYD', label: 'BLR - HYD' }, { code: 'MAA-DEL', label: 'MAA - DEL' }].map((r) => (
-              <option key={r.code} value={r.code}>
+            {SUPPORTED_CORRIDORS.map((r) => (
+              <option key={r.id} value={r.id}>
                 {r.label}
               </option>
             ))}

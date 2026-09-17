@@ -128,3 +128,5 @@ airpulse-api/tests/unit/test_live_inference.py
 .gitignore
 airpulse-api/tests/unit/test_live_inference.py
 airpulse-api/tests/unit/test_confirmed_shocks.py
+
+!frontend/src/__tests__/corridors-and-pdf.test.cjs

@@ -1,3 +1,4 @@
+import { renderObservedAnomalies } from "./anomaly-pdf";
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { ExportJob, ExportType } from '@/types';
@@ -110,7 +111,6 @@ function addHeaderBanner(
   // Mode / data context row
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7);
-  doc.setTextColor(mode === 'real' ? [52, 211, 153] as unknown as string : [147, 197, 253] as unknown as string);
   const modeText = `Mode: ${modeLabel}  |  Data: ${contextLabel}  |  Generated: ${new Date().toISOString().slice(0,19).replace('T',' ')} UTC`;
   doc.setTextColor(
     mode === 'real' ? 52 : 147,
@@ -572,6 +572,8 @@ export async function generateClientReportPdf(job: ExportJob): Promise<Blob> {
 
   switch (exportType) {
     case 'ANOMALIES':
+      renderObservedAnomalies(doc, job);
+      break;
     case 'PRICE_SHOCKS':
     case 'ALERTS':
       renderAnomalyReport(doc, job);

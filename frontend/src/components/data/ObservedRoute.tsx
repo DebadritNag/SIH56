@@ -1,4 +1,6 @@
 'use client';
+
+import { SUPPORTED_CORRIDORS } from '@/lib/supported-corridors';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getData } from '@/lib/api/client';
@@ -16,7 +18,7 @@ export function ObservedRoute() {
   return <div className="space-y-5 rounded border bg-white p-6">
     <h1 className="text-xl font-semibold">Route Intelligence — Observed Fares</h1>
     <select aria-label="Route" value={route} onChange={e => setRoute(e.target.value)} className="border rounded p-2">
-      {['DEL-BOM','DEL-BLR','BOM-BLR','DEL-CCU','BLR-HYD','MAA-DEL'].map(code => <option key={code}>{code}</option>)}
+      {SUPPORTED_CORRIDORS.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
     </select>
     {q.isPending ? <p>Loading observations…</p> : q.isError ? <p>Unable to load observations.</p> : <>
       <p className="text-2xl font-semibold">Median fare: {q.data?.current_median_fare == null ? '—' : formatINR(q.data.current_median_fare)}</p>

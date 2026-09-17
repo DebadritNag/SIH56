@@ -137,7 +137,14 @@ export function useDownloadExport() {
       const isRealJob = /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(job.id);
       let blob: Blob;
 
-      if (isRealJob) {
+      if (job.export_type === 'ANOMALIES' && job.export_format === 'PDF' && Array.isArray(job.parameters?.anomaly_rows)) {
+        if (!job.parameters.anomaly_rows.length) {
+          notify.info('No anomalies available to export.');
+          return;
+        }
+        const { generateClientReportPdf } = await import('@/lib/export-generators/client-pdf');
+        blob = await generateClientReportPdf(job);
+      } else if (isRealJob) {
         try {
           blob = await apiClient.downloadBlob(`/exports/${job.id}/stream`);
         } catch {

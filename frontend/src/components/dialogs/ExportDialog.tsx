@@ -1,5 +1,6 @@
 'use client';
 
+import { notify } from '@/lib/notify';
 import React, { useState } from 'react';
 import { Download, X, FileText, CheckCircle2, ShieldAlert, Sparkles, Filter } from 'lucide-react';
 import { ExportFormat, ExportType } from '@/types';
@@ -14,6 +15,7 @@ interface ExportDialogProps {
   filters?: Record<string, any>;
   filterSummary?: { label: string; value: string }[];
   estimatedRows?: number;
+  parameters?: Record<string, unknown>;
 }
 
 const FORMAT_OPTIONS: Record<ExportType, ExportFormat[]> = {
@@ -52,6 +54,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
   filters = {},
   filterSummary = [],
   estimatedRows,
+  parameters,
 }) => {
   const allowedFormats = FORMAT_OPTIONS[exportType] || ['CSV', 'XLSX', 'PDF'];
   const [format, setFormat] = useState<ExportFormat>(defaultFormat || allowedFormats[0]);
@@ -63,18 +66,22 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
   if (!open) return null;
 
   const handleGenerate = () => {
+    if (exportType === 'ANOMALIES' && Array.isArray(parameters?.anomaly_rows) && !parameters.anomaly_rows.length) {
+      notify.info('No anomalies available to export.');
+      return;
+    }
     createExportMutation.mutate(
       {
         export_type: exportType,
         format,
         title,
         filters,
-        parameters: { include_metadata: includeMetadata },
+        parameters: { ...parameters, include_metadata: includeMetadata },
       },
       {
         onSuccess: async (job) => {
           onClose();
-          await downloadMutation.mutateAsync(job);
+          await downloadMutation.mutateAsync({ ...job, parameters: { ...job.parameters, ...parameters } });
         },
       }
     );

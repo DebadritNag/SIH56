@@ -1,5 +1,7 @@
 'use client';
 
+import { SUPPORTED_CORRIDORS } from '@/lib/supported-corridors';
+
 import React from 'react';
 import { RotateCw, SlidersHorizontal, RotateCcw, GitCompare } from 'lucide-react';
 import { clsx } from 'clsx';
@@ -131,13 +133,8 @@ export const GlobalFilterBar: React.FC<GlobalFilterBarProps> = ({
           aria-label="Filter by Route Basket"
           className="bg-[#F8FAFC] border border-[#D0D5DD] text-[#101828] font-medium rounded px-2.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
         >
-          <option value="ALL">All Monitored Routes (81)</option>
-          <option value="DEL-BOM">DEL → BOM (Delhi - Mumbai)</option>
-          <option value="DEL-BLR">DEL → BLR (Delhi - Bengaluru)</option>
-          <option value="BOM-BLR">BOM → BLR (Mumbai - Bengaluru)</option>
-          <option value="DEL-CCU">DEL → CCU (Delhi - Kolkata)</option>
-          <option value="HYD-DEL">HYD → DEL (Hyderabad - Delhi)</option>
-          <option value="BOM-GOI">BOM → GOI (Mumbai - Goa)</option>
+          <option value="ALL">All Supported Corridors (3)</option>
+          {SUPPORTED_CORRIDORS.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
         </select>
 
         {/* Source Filter */}

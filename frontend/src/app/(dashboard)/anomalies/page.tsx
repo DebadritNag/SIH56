@@ -94,6 +94,7 @@ export default function AnomaliesPage() {
             format="PDF"
             title="AirPulse — Anomaly Intelligence Report"
             filters={{ severity: severityFilter }}
+            parameters={{ anomaly_rows: filtered, anomaly_data_context: isMock ? 'DEMO / SYNTHETIC' : liveCtx.mode === 'LIVE_DATA' ? 'LIVE' : liveCtx.mode === 'IMPORTED_FALLBACK' ? 'IMPORTED' : 'HYBRID LIVE + IMPORTED' }}
           />
           {dataMode === 'mock' && <MockBadge />}
           <span className="px-2.5 py-1 bg-rose-50 text-rose-700 font-bold rounded border border-rose-200">
@@ -109,6 +110,7 @@ export default function AnomaliesPage() {
         defaultFormat="CSV"
         title="Multi-Source Anomaly Extract (PriceGuard)"
         filters={{ severity: severityFilter }}
+            parameters={{ anomaly_rows: filtered, anomaly_data_context: isMock ? 'DEMO / SYNTHETIC' : liveCtx.mode === 'LIVE_DATA' ? 'LIVE' : liveCtx.mode === 'IMPORTED_FALLBACK' ? 'IMPORTED' : 'HYBRID LIVE + IMPORTED' }}
         filterSummary={[
           { label: 'Severity Filter', value: severityFilter },
           { label: 'Model', value: 'PriceGuard Isolation Forest' },

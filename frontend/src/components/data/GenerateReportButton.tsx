@@ -40,6 +40,10 @@ export function GenerateReportButton({
   const { mode, isSwitching } = useDataMode();
 
   const handleClick = () => {
+    if (exportType === 'ANOMALIES' && Array.isArray(parameters?.anomaly_rows) && !parameters.anomaly_rows.length) {
+      notify.info('No anomalies available to export.');
+      return;
+    }
     // Freeze mode at click time — do not read it again during async processing.
     const frozenMode: 'real' | 'mock' = mode;
 
@@ -61,7 +65,7 @@ export function GenerateReportButton({
     createExport.mutate(input, {
       onSuccess: async (job) => {
         if (autoDownload) {
-          await downloadExport.mutateAsync(job);
+          await downloadExport.mutateAsync({ ...job, parameters: { ...job.parameters, ...input.parameters } });
         }
       },
     });

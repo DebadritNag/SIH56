@@ -1,5 +1,6 @@
 'use client';
 
+import { SUPPORTED_CORRIDORS } from '@/lib/supported-corridors';
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, MapPin, AlertTriangle, Terminal, Activity, ArrowRight, X } from 'lucide-react';
@@ -19,8 +20,7 @@ interface CommandItem {
 }
 
 const COMMAND_ITEMS: CommandItem[] = [
-  { id: '1', category: 'Routes', title: 'DEL → BOM (Delhi - Mumbai)', subtitle: 'Heavy corridor • Traffic Weight 14.2%', href: '/routes/del-bom', icon: MapPin },
-  { id: '2', category: 'Routes', title: 'DEL → BLR (Delhi - Bengaluru)', subtitle: 'Business route • Traffic Weight 11.5%', href: '/routes/del-blr', icon: MapPin },
+  ...SUPPORTED_CORRIDORS.map(c => ({ id: `route-${c.id}`, category: 'Routes', title: c.label, subtitle: 'Supported corridor', href: `/routes?route=${c.id}`, icon: MapPin })),
   { id: '3', category: 'Anomalies', title: 'Open Anomaly #ANM-1842', subtitle: 'DEL-BOM +57.7% deviation • Gated SHAP ready', href: '/anomalies/anm-1842', icon: AlertTriangle },
   { id: '4', category: 'Testing', title: 'Live Scraping', subtitle: 'Controlled single-request extraction probe', href: '/scraping-test', icon: Terminal },
   { id: '5', category: 'Operations', title: 'Data Ingestion Control Room', subtitle: 'View Batch Collection Run #1842', href: '/ingestion', icon: Activity },

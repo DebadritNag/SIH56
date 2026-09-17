@@ -1,5 +1,7 @@
 "use client";
 
+import { SUPPORTED_CORRIDORS } from '@/lib/supported-corridors';
+
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import LiveCollectionTelemetry, { type CollectionProgress } from "./LiveCollectionTelemetry";
@@ -22,7 +24,8 @@ export default function LiveCollection() {
   const [departure, setDeparture] = useState(() => new Date(Date.now() + 7 * 86400000).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }));
   const [limit, setLimit] = useState(5);
   const config = useQuery({ queryKey: ["live-config", source], queryFn: () => getData<{ corridors: { id: string; origin: string; destination: string; label: string }[]; server_now?: string; cooldown_until?: string | null; enabled: boolean; worker_enabled: boolean; browser_available?: boolean | null; engine?: string; browser_message?: string; message: string }>("/live/config", { source }), refetchInterval: 15000 });
-  const corridor = config.data?.corridors?.find(c => c.id === corridorId);
+  const corridors = SUPPORTED_CORRIDORS.filter(c => config.data?.corridors?.some(allowed => allowed.id === c.id));
+  const corridor = corridors.find(c => c.id === corridorId);
   const origin = corridor?.origin;
   const destination = corridor?.destination;
   const today = new Date(now).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
@@ -63,7 +66,7 @@ export default function LiveCollection() {
     {config.data?.browser_available === false && <p role="alert" className="rounded border border-amber-400 p-4">{config.data.browser_message}</p>}
     {cooldownSeconds > 0 && <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-950"><div className="flex items-center gap-2"><Clock3 aria-hidden className="h-5 w-5" /><div><p className="text-sm font-semibold">Source cooldown</p><p className="text-xs">The previous attempt stopped. Collection unlocks automatically; it will not retry on its own.</p></div></div><span className="text-xl font-semibold tabular-nums" aria-label={`Cooldown remaining ${cooldownSeconds} seconds`}>{cooldownLabel}</span></div>}
     <form className="flex flex-wrap items-end gap-4 rounded border p-4" onSubmit={e => { e.preventDefault(); if (!busy && !cooldownSeconds && corridor && !submitLock.current) { submitLock.current = true; collect.mutate(); } }}>
-      <label className="grid min-w-0 gap-1 text-sm">Corridor<select className={inputClass} value={corridorId} disabled={!!busy || !config.data} onChange={e => setCorridorId(e.target.value)}>{config.data?.corridors?.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}</select></label>
+      <label className="grid min-w-0 gap-1 text-sm">Corridor<select className={inputClass} value={corridorId} disabled={!!busy || !config.data} onChange={e => setCorridorId(e.target.value)}>{corridors.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}</select></label>
       <label className="grid gap-1 text-sm">Departure<input className={inputClass} type="date" min={today} disabled={!!busy} required value={departure} onChange={e => setDeparture(e.target.value)} /></label>
       <label className="grid gap-1 text-sm">Maximum fares<input className={inputClass} type="number" disabled={!!busy} min={1} max={15} required value={limit} onChange={e => setLimit(Number(e.target.value))} /></label>
       <button className="rounded bg-blue-700 px-4 py-2 text-white disabled:opacity-40" disabled={!!busy || !corridor || cooldownSeconds > 0 || !config.data?.enabled || !config.data.worker_enabled || config.data.browser_available === false}>{busy ? <span className="flex items-center gap-2"><Loader2 aria-hidden className="h-4 w-4 animate-spin motion-reduce:animate-none" />Collecting…</span> : cooldownSeconds > 0 ? `Available in ${cooldownLabel}` : "Collect live fares"}</button>
