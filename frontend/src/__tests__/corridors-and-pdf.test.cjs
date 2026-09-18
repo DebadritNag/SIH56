@@ -72,6 +72,51 @@ for (const dataMode of ['real', 'mock']) {
 }
 console.log('PASS corridor options, defaults, unsupported URL and each route query/export rendering');
 
+const mutations = [], requests = [];
+const LiveCollection = load('components/LiveCollection.tsx', {
+  '@/lib/supported-corridors': corridors,
+  './LiveCollectionTelemetry': { __esModule: true, default: stub },
+  'lucide-react': { Clock3: stub, Loader2: stub },
+  '@/lib/queryInvalidation': { invalidateAfterCollection: stub, invalidateAfterIngestion: stub },
+  '@/lib/api/client': {
+    getData: (url, params) => { requests.push({ url, params }); },
+    postData: (url, payload) => { requests.push({ url, payload }); },
+  },
+  '@tanstack/react-query': {
+    useQueryClient: () => ({ invalidateQueries: stub }),
+    useMutation: options => { mutations.push(options); return { isPending: false }; },
+    useQuery: options => {
+      options.queryFn();
+      if (options.queryKey[0] === 'live-config') return { data: {
+        corridors: corridors.SUPPORTED_CORRIDORS, enabled: true, worker_enabled: true,
+      } };
+      if (options.queryKey[0] === 'live-runs') return { data: [{
+        id: 'historical-yatra', created_at: '2026-09-06T12:00:00Z', status: 'FAILED', quotes_received: 0,
+        metadata: { request: { source: 'yatra', origin: 'DEL', destination: 'BOM' } },
+      }] };
+      return {};
+    },
+  },
+}).default;
+const collectionHtml = renderToStaticMarkup(React.createElement(LiveCollection));
+const sourceSelector = collectionHtml.match(/Source<select[^>]*>(.*?)<\/select>/)[1];
+assert.equal(sourceSelector, '<option value="happyfares" selected="">HappyFares</option>');
+assert.ok(!sourceSelector.toLowerCase().includes('yatra'));
+assert.ok(!collectionHtml.includes('HappyFares (prototype)'));
+assert.ok(collectionHtml.includes('historical-yatra'));
+assert.ok(collectionHtml.includes('>yatra</td>')); // Historical provenance is still rendered.
+assert.deepEqual(requests.find(r => r.url === '/live/config').params, { source: 'happyfares' });
+mutations[0].mutationFn();
+const collectionRequest = requests.find(r => r.payload);
+assert.equal(collectionRequest.url, '/live/runs');
+assert.equal(collectionRequest.payload.source, 'happyfares');
+assert.equal(collectionRequest.payload.engine, 'CRAWL4AI');
+assert.equal(collectionRequest.payload.origin, 'DEL');
+assert.equal(collectionRequest.payload.destination, 'BOM');
+assert.equal(collectionRequest.payload.max_results, 5);
+assert.match(collectionRequest.payload.departure_date, /^\d{4}-\d{2}-\d{2}$/);
+console.log('PASS HappyFares-only selector, unchanged collection payload and preserved Yatra history');
+
 // Reproduce the exact original error using the installed library.
 assert.throws(() => new jsPDF().setTextColor([52, 211, 153]), /jsPDF.f3/);
 const pdf = load('lib/export-generators/anomaly-pdf.ts');

@@ -17,7 +17,7 @@ export default function LiveCollection() {
   const [now, setNow] = useState(Date.now);
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(timer); }, []);
   const [selected, setSelected] = useState<string | null>(null);
-  const [source, setSource] = useState("happyfares");
+  const source = "happyfares";
   const [corridorId, setCorridorId] = useState("DEL-BOM");
   const submitLock = useRef(false);
   const [refreshingIngestion, setRefreshingIngestion] = useState(false);
@@ -60,7 +60,7 @@ export default function LiveCollection() {
   const inputClass = "rounded border border-slate-300 bg-white p-2 text-slate-900";
   return <main className="space-y-6 p-6">
     <div><h1 className="text-2xl font-semibold">Live collection</h1><p className="mt-2 text-sm text-slate-500">Collect observed OTA fares, review raw results, then send them through the ingestion pipeline.</p></div>
-    <label className="flex items-center gap-3">Source<select className={inputClass} value={source} disabled={!!busy} onChange={e => { setSource(e.target.value); collect.reset(); }}><option value="yatra">Yatra</option><option value="happyfares">HappyFares (prototype)</option></select></label>
+    <label className="flex items-center gap-3">Source<select className={inputClass} value={source} disabled><option value="happyfares">HappyFares</option></select></label>
     {config.data && !config.data.enabled && <p role="alert" className="rounded border border-amber-400 p-4">{source} is disabled. Configure {source.toUpperCase()}_PROTOTYPE_ENABLED and {source.toUpperCase()}_REVIEW_NOTES after manual review{source === "happyfares" ? ", and enable CRAWL4AI_ENABLED on the API and worker" : ""}.</p>}
     {config.data && !config.data.worker_enabled && <p role="alert">The backend live worker is disabled.</p>}
     {config.data?.browser_available === false && <p role="alert" className="rounded border border-amber-400 p-4">{config.data.browser_message}</p>}
