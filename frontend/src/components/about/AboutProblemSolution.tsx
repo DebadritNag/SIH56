@@ -59,13 +59,13 @@ export function AboutProblemSolution() {
               </div>
 
               {/* Resolution — Vayantara logo */}
-              <div className="w-full max-w-[300px] sm:w-5/12 h-40 bg-white border border-slate-200 rounded-2xl shadow-sm flex items-center justify-center p-4">
+              <div className="w-full max-w-[340px] sm:w-5/12 h-[200px] bg-white border border-slate-200 rounded-2xl shadow-sm flex items-center justify-center p-4">
                 <Image
-                  src="/app.png"
-                  alt="Vayantara Airfare Intel India"
-                  width={1280}
-                  height={1280}
-                  sizes="128px"
+                  src="/Hero middle.png"
+                  alt="Vayantara Airfare Intelligence"
+                  width={1536}
+                  height={1024}
+                  sizes="(max-width: 640px) 80vw, 280px"
                   className="h-full w-full object-contain"
                 />
               </div>
