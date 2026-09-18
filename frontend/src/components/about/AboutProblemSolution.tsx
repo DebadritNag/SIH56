@@ -58,15 +58,15 @@ export function AboutProblemSolution() {
                 <ArrowRight className="w-6 h-6 stroke-[2.5]" />
               </div>
 
-              {/* Resolution — Vayantara logo */}
-              <div className="w-full max-w-[340px] sm:w-5/12 h-[200px] bg-white border border-slate-200 rounded-2xl shadow-sm flex items-center justify-center p-4">
+              {/* Resolution — Vayantara logo, no card/box */}
+              <div className="w-full sm:w-5/12 flex items-center justify-center">
                 <Image
                   src="/Hero middle.png"
                   alt="Vayantara Airfare Intelligence"
-                  width={1536}
-                  height={1024}
-                  sizes="(max-width: 640px) 80vw, 280px"
-                  className="h-full w-full object-contain"
+                  width={300}
+                  height={200}
+                  sizes="(max-width: 640px) 80vw, 300px"
+                  className="h-auto w-auto max-w-[300px] object-contain"
                 />
               </div>
             </div>
