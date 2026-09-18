@@ -15,7 +15,10 @@ function load(file, mocks = {}) {
   const original = m.require.bind(m);
   m.require = name => {
     if (name in mocks) return mocks[name];
-    if (name.startsWith('./')) return load(path.relative(root, path.resolve(path.dirname(filename), name + '.ts')), mocks);
+    if (name.startsWith('./')) {
+      const base = path.resolve(path.dirname(filename), name);
+      return load(path.relative(root, fs.existsSync(base + '.ts') ? base + '.ts' : base + '.tsx'), mocks);
+    }
     return original(name);
   };
   m._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
@@ -76,7 +79,7 @@ const mutations = [], requests = [];
 const LiveCollection = load('components/LiveCollection.tsx', {
   '@/lib/supported-corridors': corridors,
   './LiveCollectionTelemetry': { __esModule: true, default: stub },
-  'lucide-react': { Clock3: stub, Loader2: stub },
+  'lucide-react': require('lucide-react'),
   '@/lib/queryInvalidation': { invalidateAfterCollection: stub, invalidateAfterIngestion: stub },
   '@/lib/api/client': {
     getData: (url, params) => { requests.push({ url, params }); },
@@ -104,7 +107,7 @@ assert.equal(sourceSelector, '<option value="happyfares" selected="">HappyFares<
 assert.ok(!sourceSelector.toLowerCase().includes('yatra'));
 assert.ok(!collectionHtml.includes('HappyFares (prototype)'));
 assert.ok(collectionHtml.includes('historical-yatra'));
-assert.ok(collectionHtml.includes('>yatra</td>')); // Historical provenance is still rendered.
+assert.ok(collectionHtml.includes('>Yatra</td>')); // Historical provenance is still rendered.
 assert.deepEqual(requests.find(r => r.url === '/live/config').params, { source: 'happyfares' });
 mutations[0].mutationFn();
 const collectionRequest = requests.find(r => r.payload);
@@ -116,6 +119,35 @@ assert.equal(collectionRequest.payload.destination, 'BOM');
 assert.equal(collectionRequest.payload.max_results, 5);
 assert.match(collectionRequest.payload.departure_date, /^\d{4}-\d{2}-\d{2}$/);
 console.log('PASS HappyFares-only selector, unchanged collection payload and preserved Yatra history');
+
+const liveUi = load('components/live-collection-ui.tsx');
+assert.equal(liveUi.engineLabel('CRAWL4AI'), 'Playwright (Crawl4AI)');
+assert.equal(liveUi.isActiveRun({ status: 'COMPLETED' }), false);
+assert.equal(liveUi.isActiveRun({ status: 'FAILED' }), false);
+assert.equal(liveUi.isActiveRun({ status: 'RUNNING' }), true);
+assert.equal(liveUi.isActiveRun({ status: 'COMPLETED', metadata: { ingestion_state: 'RUNNING' } }), true);
+const Telemetry = load('components/LiveCollectionTelemetry.tsx').default;
+const telemetryHtml = renderToStaticMarkup(React.createElement(Telemetry, {
+  status: 'COMPLETED', engine: 'CRAWL4AI', now: Date.now(), count: 2,
+  recordedSteps: [{ step_name: 'POLICY_CHECK', status: 'COMPLETED', records_output: 0 }, { step_name: 'RAW_STORAGE', status: 'RUNNING' }],
+}));
+assert.match(telemetryHtml, /max="6" value="1"/); // Run completion never fabricates stage completion.
+assert.ok(telemetryHtml.includes('Playwright (Crawl4AI)'));
+for (const status of ['BLOCKED', 'RATE_LIMITED', 'CAPTCHA_DETECTED', 'NO_AVAILABILITY', 'PARTIAL']) {
+  assert.ok(renderToStaticMarkup(React.createElement(liveUi.StatusChip, { status })).includes(status));
+}
+const inspector = renderToStaticMarkup(React.createElement(liveUi.RunInspector, {
+  run: { id: 'real-stored-id', status: 'PARTIAL', quotes_received: 1,
+    quotes: [{ id: 'stored-quote', raw_payload: { carrier: 'Observed carrier', gross_total: null } }] },
+  ingestionLabel: 'READY_FOR_INGESTION', refreshing: false,
+}));
+assert.ok(inspector.includes('Observed carrier'));
+assert.ok(inspector.includes('Unavailable'));
+assert.ok(inspector.includes('real-stored-id'));
+assert.ok(!inspector.includes('href='));
+const emptyHistory = renderToStaticMarkup(React.createElement(liveUi.RunHistory, { runs: [], onSelect: stub }));
+assert.ok(emptyHistory.includes('No collection runs yet'));
+console.log('PASS backend-authoritative stages, terminal polling, distinct statuses, missing fares and empty history');
 
 // Reproduce the exact original error using the installed library.
 assert.throws(() => new jsPDF().setTextColor([52, 211, 153]), /jsPDF.f3/);
@@ -154,3 +186,5 @@ assert.throws(() => pdf.renderObservedAnomalies(new jsPDF(), { parameters: { ano
   assert.ok((await blob.text()).startsWith('%PDF-'));
   console.log('PASS real jsPDF/AutoTable integration, null fields, signed deviations, INR, empty and multipage export');
 })().catch(error => { console.error(error); process.exitCode = 1; });
+
+module.exports = { load, root };
