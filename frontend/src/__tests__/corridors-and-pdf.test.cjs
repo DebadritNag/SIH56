@@ -39,12 +39,15 @@ for (const bad of [null, 'DEL-BLR', 'HYD-DEL', 'BOM-GOI', 'BLR-PNQ', 'CCU-GAU', 
 }
 let urlRoute = null, requested, exportRoute, mode = 'real';
 const stub = () => null;
+const routeUi = load('components/route-intelligence-ui.tsx', { '@/lib/formatters': { formatINR: n => `INR ${n}` } });
+let routeResult = { data: { current_median_fare: 4321, booking_window_breakdown: { 'T+7': 4321 } } };
 const mocks = {
+  '@/components/route-intelligence-ui': routeUi,
   '@/lib/supported-corridors': corridors,
   '@/lib/providers/DataModeProvider': { useDataMode: () => ({ mode }) },
   '@tanstack/react-query': { useQuery: options => {
     options.queryFn();
-    return { data: { current_median_fare: 4321, booking_window_breakdown: { 'T+7': 4321 } } };
+    return routeResult;
   } },
   '@/lib/api/client': { getData: url => { requested = url; } },
   'next/navigation': { useRouter: () => ({ push: stub }), useSearchParams: () => ({ get: () => urlRoute }) },
@@ -74,6 +77,30 @@ for (const dataMode of ['real', 'mock']) {
  }
 }
 console.log('PASS corridor options, defaults, unsupported URL and each route query/export rendering');
+assert.equal(routeUi.fareText(null), 'Unavailable');
+assert.equal(routeUi.fareText(NaN), 'Unavailable');
+assert.equal(routeUi.routeContext({ live_count: 0, imported_count: 8 }), 'IMPORTED fallback');
+assert.equal(routeUi.routeContext({ live_count: 3, imported_count: 8 }), 'Hybrid LIVE + IMPORTED');
+assert.equal(routeUi.routeContext({ live_count: 3, imported_count: 0 }), 'LIVE observations');
+assert.equal(routeUi.routeContext({ live_count: 0, imported_count: 0 }), 'No eligible observations');
+const curve = routeUi.observedCurve({ T7: 4000, T19: 6000 }, [1, 7, 15, 30, 45]);
+assert.deepEqual(curve, [{ day: 45, fare: null }, { day: 30, fare: null }, { day: 19, fare: 6000 }, { day: 7, fare: 4000 }, { day: 1, fare: null }]);
+assert.deepEqual(routeUi.observedCurve({ T7: 4000, T19: 6000 }, [7]), [{ day: 7, fare: 4000 }]);
+assert.equal(routeUi.observedCurveOption(curve).series[0].connectNulls, false);
+assert.equal(routeUi.observedCurveOption(curve).series[0].name, 'Stored observed mean fare');
+mode = 'real'; urlRoute = 'DEL-CCU';
+routeResult = { isPending: true };
+const loadingRoute = renderToStaticMarkup(React.createElement(Page));
+assert.ok(loadingRoute.includes('Loading representative fare'));
+assert.ok(!loadingRoute.includes('INR 0'));
+assert.ok(!loadingRoute.includes('0 stored observations'));
+routeResult = { data: { live_count: 0, imported_count: 0, observation_count: 0, booking_window_breakdown: {} } };
+const emptyRoute = renderToStaticMarkup(React.createElement(Page));
+assert.ok(emptyRoute.includes('No eligible stored observations'));
+assert.ok(emptyRoute.includes('Insufficient observations for advance-purchase curve'));
+routeResult = { isError: true, error: new Error('Connection failed') };
+assert.ok(renderToStaticMarkup(React.createElement(Page)).includes('Unable to load route intelligence.'));
+console.log('PASS route provenance, missing-window gaps, filter grouping, loading, empty and error states');
 
 const mutations = [], requests = [];
 const LiveCollection = load('components/LiveCollection.tsx', {

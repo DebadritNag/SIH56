@@ -1,30 +1,19 @@
 'use client';
 
+import React, { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
+import { MapPin, Download, Info, Layers, TrendingUp, Database, RefreshCw, ArrowRight } from 'lucide-react';
 import { SUPPORTED_CORRIDORS, supportedCorridor } from '@/lib/supported-corridors';
 import { useDataMode } from '@/lib/providers/DataModeProvider';
-import { useQuery } from '@tanstack/react-query';
 import { getData } from '@/lib/api/client';
-import { EChartWrapper } from '@/components/charts/EChartWrapper';
-import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { LiveModeBadge, DataCompositionStrip } from '@/components/data/LiveModeBadge';
-import { useLiveModeContext } from '@/lib/hooks/useLiveModeContext';
-import {
-  MapPin,
-  TrendingUp,
-  ArrowUpRight,
-  ShieldCheck,
-  Calendar,
-  Layers,
-  ChevronDown,
-  Download,
-} from 'lucide-react';
 import { getMockRouteDetail } from '@/lib/mock-data/dashboard';
-import { MarketPressureBadge } from '@/components/ui/Badge';
+import { EChartWrapper } from '@/components/charts/EChartWrapper';
 import { RouteAdvancePurchaseChart } from '@/components/charts/RouteAdvancePurchaseChart';
 import { ExportDialog } from '@/components/dialogs/ExportDialog';
-import { formatINR, formatPercent } from '@/lib/formatters';
+import { MarketPressureBadge } from '@/components/ui/Badge';
+import { formatINR } from '@/lib/formatters';
+import { WINDOWS, observedCurve, observedCurveOption, fareText, knownNumber, observationTime, routeContext, Unavailable, RouteSkeleton, FareRange, type RouteObservations } from '@/components/route-intelligence-ui';
 
 export default function RoutesPage() {
   const { mode } = useDataMode();
@@ -53,245 +42,56 @@ function RouteIntelligence({ live }: { live: boolean }) {
 
   const observed = useQuery({
     queryKey: ['route-layout-observations', selectedRouteCode],
-    queryFn: () => getData<{ average_fare: number | null; min_fare: number | null; max_fare: number | null; live_count: number; imported_count: number; latest_observation: string | null; current_median_fare: number | null; distance_km: number | null; observation_count: number; source_coverage_count: number; booking_window_breakdown: Record<string, number> }>(`/routes/${selectedRouteCode}/insights`),
+    queryFn: () => getData<RouteObservations>(`/routes/${selectedRouteCode}/insights`),
     enabled: live,
   });
-  const isFetching = live && observed.isFetching;
-  const route = live ? {
-    route_code: selectedRouteCode, origin: selectedRouteCode.split('-')[0], destination: selectedRouteCode.split('-')[1],
-    market_status: 'UNKNOWN' as const, distance_km: observed.data?.distance_km ?? 0, traffic_weight_pct: 0, data_confidence_pct: 0,
-    current_median_fare: observed.data?.current_median_fare ?? 0, change_7d_pct: 0, change_30d_pct: 0,
-    advance_purchase_curve: [], sources_comparison: [],
-  } : getMockRouteDetail(selectedRouteCode);
-  const observedWindows = Object.entries(observed.data?.booking_window_breakdown ?? {})
-    .map(([label, fare]) => ({ day: Number(label.replace(/^T\+?/, '')), fare }))
-    .filter(p => selectedWindows.includes(p.day <= 2 ? 1 : p.day <= 10 ? 7 : p.day <= 20 ? 15 : p.day <= 35 ? 30 : 45)).sort((a, b) => b.day - a.day);
+  const loading = live && observed.isPending && !observed.data;
+  const refreshing = live && observed.isFetching && !!observed.data;
+  const data = live ? observed.data : undefined;
+  const demo = live ? undefined : getMockRouteDetail(selectedRouteCode);
+  const corridor = SUPPORTED_CORRIDORS.find(c => c.id === selectedRouteCode)!;
+  const routeName = corridor.label.match(/\((.*)\)/)?.[1].replace(' - ', ' → ') ?? selectedRouteCode;
+  const median = live ? data?.current_median_fare : demo?.current_median_fare;
+  const distance = live ? data?.distance_km : demo?.distance_km;
+  const points = observedCurve(data?.booking_window_breakdown ?? {}, selectedWindows);
+  const validPoints = points.filter(p => p.fare != null);
+  const sourceRows = demo?.sources_comparison ?? [];
+  const metrics = [
+    ['7-Day Velocity', demo ? `${demo.change_7d_pct > 0 ? '+' : ''}${demo.change_7d_pct}%` : null],
+    ['30-Day Velocity', demo ? `${demo.change_30d_pct > 0 ? '+' : ''}${demo.change_30d_pct}%` : null],
+    ['Base Reference Fare', demo ? formatINR(Math.round(demo.current_median_fare / (1 + demo.change_30d_pct / 100))) : null],
+    ['Current Route Relative', demo ? (100 + demo.change_30d_pct).toFixed(2) : null],
+    ['APIx Contribution', demo ? `${((demo.change_7d_pct * demo.traffic_weight_pct) / 100).toFixed(2)} pts` : null],
+    ['Route Weight', demo ? `${demo.traffic_weight_pct}% · DEMO` : null],
+  ];
+  return <div className="space-y-5 py-4 text-slate-900 selection:bg-blue-100">
+    <section aria-label="Route data context" className="flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50/60 px-4 py-3.5"><Info aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" /><div className="min-w-0"><div className="flex flex-wrap items-center gap-2 text-xs"><strong className="text-blue-900">{live ? 'Live Mode' : 'Demo Mode · SYNTHETIC'}</strong><span className="text-blue-700">{live ? routeContext(data) : 'Illustrative route analytics'}</span></div><p className="mt-1.5 text-xs leading-relaxed text-slate-600">{live ? 'Stored eligible route observations. The curve shows observed mean fares by lead time; historical comparisons require matching reference history.' : 'Demonstration values are separate from stored LIVE and IMPORTED observations.'}</p></div></section>
+    {live && observed.isError && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"><div><p className="font-medium">Unable to load route intelligence.</p><p className="mt-1 text-xs">{observed.error.message}</p></div><button onClick={() => void observed.refetch()} className="rounded-lg border border-red-300 px-3 py-2 text-xs font-semibold focus-visible:outline-2">Retry</button></div>}
+    {live && <dl aria-label="Route data summary" className="grid grid-cols-2 overflow-hidden rounded-xl border border-slate-200 bg-white sm:grid-cols-3 xl:grid-cols-[repeat(6,minmax(0,1fr))_1.7fr]">{[
+      ['LIVE', data?.live_count], ['IMPORTED', data?.imported_count], ['TOTAL ELIGIBLE', data?.observation_count], ['MEAN FARE', fareText(data?.average_fare)], ['MINIMUM', fareText(data?.min_fare)], ['MAXIMUM', fareText(data?.max_fare)], ['LATEST OBSERVATION', observationTime(data?.latest_observation)],
+    ].map(([label, value]) => <div key={label} className={`min-w-0 border-b border-r border-slate-100 px-4 py-3.5 last:border-r-0 ${label === 'LATEST OBSERVATION' ? 'col-span-2 sm:col-span-3 xl:col-span-1' : ''}`}><dt className="text-[10px] font-medium tracking-wide text-slate-500">{label}</dt><dd className="mt-2 text-sm font-semibold tabular-nums">{loading ? <span aria-label="Loading statistic" className="block h-5 w-16 animate-pulse rounded bg-slate-100 motion-reduce:animate-none" /> : value ?? 'Unavailable'}</dd></div>)}</dl>}
 
-  return (
-    <div className="space-y-5">
-      {live && <p className="rounded border border-blue-100 bg-blue-50 p-3 text-xs text-blue-800">Live Mode · Stored imported and live observations. The curve shows mean fares by lead time; historical comparisons require matching reference data.</p>}
-      {live && observed.isError && <p role="alert" className="rounded border border-red-200 p-3 text-red-700">{observed.error.message} <button onClick={() => void observed.refetch()}>Retry</button></p>}
-      {live && observed.data && <div className="rounded border bg-white p-4 text-sm">LIVE: {observed.data.live_count} · IMPORTED: {observed.data.imported_count} · Mean: {observed.data.average_fare == null ? '—' : formatINR(observed.data.average_fare)} · Min: {observed.data.min_fare == null ? '—' : formatINR(observed.data.min_fare)} · Max: {observed.data.max_fare == null ? '—' : formatINR(observed.data.max_fare)}<p className="mt-2 text-xs">Latest observation: {observed.data.latest_observation ?? 'Unavailable'}</p></div>}
-      {/* Route Header (Financial Security Detail Header) */}
-      <div className="bg-white border border-[#E4E7EC] rounded-lg p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-xl font-black text-[#101828] tracking-tight">{route.route_code}</span>
-            <span className="text-sm font-semibold text-[#475467]">• {route.origin} → {route.destination}</span>
-            {!live && <MarketPressureBadge pressure={route.market_status} />}
-            {isFetching && (
-              <span className="text-[10px] text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded font-mono animate-pulse">
-                Updating...
-              </span>
-            )}
-          </div>
-          <div className="flex flex-wrap items-center gap-3 text-xs text-[#667085]">
-            <span>Flight Distance: <strong className="text-[#101828] font-mono">{live && !observed.data?.distance_km ? 'Unavailable' : `${route.distance_km} km`}</strong></span>
-            <span>•</span>
-            <span>DGCA Passenger Traffic Weight: <strong className="text-[#101828] font-mono">{live ? 'Unavailable' : `${route.traffic_weight_pct}%`}</strong></span>
-            <span>•</span>
-            <span className="flex items-center gap-1 text-emerald-700 font-medium">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              Statistical Confidence: {live ? 'Not calculated' : `${route.data_confidence_pct}%`}
-            </span>
-          </div>
-        </div>
+    <section aria-label="Route selection and metadata" className="rounded-xl border border-slate-200 bg-white p-5">
+      <div className="flex flex-wrap items-start justify-between gap-5"><div><div className="flex flex-wrap items-center gap-3"><h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight"><MapPin aria-hidden className="h-5 w-5 text-blue-600" />{corridor.origin}<ArrowRight aria-hidden className="h-5 w-5 text-slate-400" />{corridor.destination}</h1>{demo && <MarketPressureBadge pressure={demo.market_status} />}{refreshing && <span role="status" className="flex items-center gap-1.5 text-xs text-blue-600"><RefreshCw aria-hidden className="h-3 w-3 animate-spin motion-reduce:animate-none" />Refreshing…</span>}</div><p className="mt-2 text-sm text-slate-500">{routeName}</p></div>
+      <div className="flex w-full flex-col items-stretch gap-3 sm:flex-row sm:items-end lg:w-auto"><label className="grid min-w-0 flex-1 gap-1.5 text-[11px] font-medium text-slate-500">Select Route<select aria-label="Select Route" value={selectedRouteCode} onChange={e => handleRouteChange(e.target.value)} className="h-10 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-800 outline-none focus-visible:ring-2 focus-visible:ring-blue-200 lg:min-w-[250px]">{SUPPORTED_CORRIDORS.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}</select></label><button onClick={() => setShowExport(true)} className="inline-flex h-10 items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 text-xs font-semibold text-blue-700 hover:bg-blue-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"><Download aria-hidden className="h-4 w-4" />Export Route Report</button></div></div>
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 pt-4"><dl className="flex flex-wrap gap-2 text-[10px]">{[['Flight distance', knownNumber(distance) ? `${distance.toLocaleString('en-IN')} km` : 'Unavailable'], ['DGCA Passenger Traffic Weight', demo ? `${demo.traffic_weight_pct}% · DEMO` : 'Unavailable'], ['Statistical Confidence', demo ? `${demo.data_confidence_pct}% · DEMO` : 'Not calculated']].map(([label, value]) => <div key={label} className="flex flex-wrap items-center gap-1.5 rounded-md bg-slate-50 px-2.5 py-2"><dt className="text-slate-500">{label}</dt><dd className="font-medium">{loading ? <span className="inline-block h-3 w-12 animate-pulse rounded bg-slate-200 motion-reduce:animate-none" /> : value}</dd></div>)}</dl>
+      <div role="group" aria-label="Booking-window filters" className="inline-flex max-w-full flex-wrap gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1">{WINDOWS.map(w => <button key={w} type="button" aria-pressed={selectedWindows.includes(w)} title={`Toggle T+${w} window`} onClick={() => { if (selectedWindows.includes(w)) { if (selectedWindows.length > 1) setSelectedWindows(selectedWindows.filter(x => x !== w)); } else setSelectedWindows([...selectedWindows, w].sort((a, b) => a - b)); }} className={`rounded-md px-3 py-1.5 text-[11px] font-semibold focus-visible:outline-2 focus-visible:outline-blue-600 ${selectedWindows.includes(w) ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-white'}`}>T+{w}</button>)}</div></div>
+    </section>
 
-        {/* Route Selector & Export Controls */}
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="text-xs text-[#667085] font-semibold">Select Route:</label>
-          <select
-            aria-label="Select Route"
-            value={selectedRouteCode}
-            onChange={(e) => handleRouteChange(e.target.value)}
-            className="bg-[#F8FAFC] border border-[#D0D5DD] font-semibold text-xs text-[#101828] rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer min-w-[200px]"
-          >
-            {SUPPORTED_CORRIDORS.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.label}
-              </option>
-            ))}
-          </select>
+    <ExportDialog open={showExport} onClose={() => setShowExport(false)} exportType="ROUTE_INTELLIGENCE" defaultFormat="PDF" title={`Corridor Performance Report (${selectedRouteCode})`} filters={{ route: selectedRouteCode }} filterSummary={[{ label: 'Corridor', value: selectedRouteCode }, { label: 'DGCA Passenger Traffic Weight', value: demo ? `${demo.traffic_weight_pct}% · DEMO` : 'Unavailable' }, { label: 'Market Status', value: demo?.market_status ?? 'UNKNOWN' }]} />
 
-          {/* T+ Booking Window Buttons */}
-          <div className="flex items-center gap-1 bg-[#F1F5F9] p-0.5 rounded border border-[#E2E8F0]">
-            {[1, 7, 15, 30, 45].map((w) => {
-              const active = selectedWindows.includes(w);
-              return (
-                <button
-                  key={w}
-                  type="button"
-                  onClick={() => {
-                    if (active) {
-                      if (selectedWindows.length === 1) return;
-                      setSelectedWindows(selectedWindows.filter((x) => x !== w));
-                    } else {
-                      setSelectedWindows([...selectedWindows, w].sort((a, b) => a - b));
-                    }
-                  }}
-                  className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-all cursor-pointer ${
-                    active ? 'bg-white text-blue-700 shadow-2xs border border-blue-200' : 'text-[#94A3B8] hover:text-[#475467]'
-                  }`}
-                  title={`Toggle T+${w} window`}
-                >
-                  T+{w}
-                </button>
-              );
-            })}
-          </div>
-
-          <button
-            onClick={() => setShowExport(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#D0D5DD] text-xs font-semibold text-[#101828] rounded shadow-2xs hover:bg-slate-50 transition-colors cursor-pointer"
-          >
-            <Download className="w-3.5 h-3.5 text-blue-600" />
-            <span>Export Route Report</span>
-          </button>
-        </div>
-      </div>
-
-      <ExportDialog
-        open={showExport}
-        onClose={() => setShowExport(false)}
-        exportType="ROUTE_INTELLIGENCE"
-        defaultFormat="PDF"
-        title={`Corridor Performance Report (${selectedRouteCode})`}
-        filters={{ route: selectedRouteCode }}
-        filterSummary={[
-          { label: 'Corridor', value: selectedRouteCode },
-          { label: 'DGCA Passenger Traffic Weight', value: `${live ? 'Unavailable' : `${route.traffic_weight_pct}%`}` },
-          { label: 'Market Status', value: route.market_status },
-        ]}
-      />
-
-      {/* Hero Section: Current Representative Fare & Advance Purchase Curve */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 min-w-0">
-        {/* Current Representative Fare Card (approx 35% / 4 cols) */}
-        <div className="lg:col-span-4 bg-white border border-[#E4E7EC] rounded-lg p-5 shadow-xs flex flex-col justify-between min-w-0">
-          <div>
-            <span className="text-xs font-semibold text-[#475467] uppercase tracking-wider block">
-              Current Representative Fare (Median)
-            </span>
-            <div className="text-4xl font-bold text-[#101828] tabular-nums tracking-tight mt-2">
-              {live && observed.data?.current_median_fare == null ? '—' : formatINR(route.current_median_fare)}
-            </div>
-            <span className="text-xs text-[#667085] mt-1 block">
-              {live ? `${observed.data?.source_coverage_count ?? 0} sources · ${observed.data?.observation_count ?? 0} stored observations` : 'Calculated across 4 independent sources & 906 validated quotes'}
-            </span>
-
-            <div className="mt-4 space-y-2 border-t border-[#F1F5F9] pt-3 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-[#667085]">7-Day Velocity:</span>
-                <span className="font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 tabular-nums">
-                  {live ? 'Unavailable' : `+${route.change_7d_pct}%`}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-[#667085]">30-Day Velocity:</span>
-                <span className="font-semibold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200 tabular-nums">
-                  {live ? 'Unavailable' : `+${route.change_30d_pct}%`}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-[#667085]">Base Reference Fare{live ? '' : ' (Aug 2026)'}:</span>
-                <span className="font-mono text-[#101828]">
-                  {live ? 'Unavailable' : formatINR(Math.round(route.current_median_fare / (1 + route.change_30d_pct / 100)))}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-[#667085]">Current Route Relative:</span>
-                <span className="font-mono font-bold text-blue-700">
-                  {live ? 'Unavailable' : (100 + route.change_30d_pct).toFixed(2)}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-4 pt-3 border-t border-[#F1F5F9] text-[11px] text-[#667085] flex items-center justify-between">
-            <span>
-              APIx Contribution:{' '}
-              <strong className={route.change_7d_pct >= 0 ? 'text-emerald-700' : 'text-rose-600'}>
-                {!live && route.change_7d_pct >= 0 ? '+' : ''}
-                {live ? 'Unavailable' : `${((route.change_7d_pct * route.traffic_weight_pct) / 100).toFixed(2)} pts`}
-              </strong>
-            </span>
-            <span className="text-blue-600 font-medium">Weight: {live ? 'Unavailable' : `${route.traffic_weight_pct}%`}</span>
-          </div>
-        </div>
-
-        {/* Advance Purchase Curve Chart (approx 65% / 8 cols) */}
-        <div className="lg:col-span-8 bg-white border border-[#E4E7EC] rounded-lg p-5 shadow-xs min-w-0">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h3 className="text-sm font-bold text-[#101828]">Advance Purchase Curve (Yield Curve)</h3>
-              <p className="text-[11px] text-[#667085]">
-                How departure proximity affects observed fares: T+45 down to T+1 (Emergency departure)
-              </p>
-            </div>
-            <span className="text-xs bg-slate-100 text-[#475467] px-2 py-0.5 rounded font-mono">
-              Lead Time Compression
-            </span>
-          </div>
-
-          {live ? (observedWindows.length ? <EChartWrapper option={{ tooltip: { trigger: 'axis' }, xAxis: { type: 'category', data: observedWindows.map(p => `T+${p.day}`) }, yAxis: { type: 'value', name: 'INR' }, series: [{ name: 'Stored observed mean fare', type: 'line', data: observedWindows.map(p => p.fare) }] }} style={{ height: 260 }} /> : <div className="flex h-[260px] items-center justify-center text-sm text-slate-500">No observations match the selected windows.</div>) : <RouteAdvancePurchaseChart
-            curveData={route.advance_purchase_curve}
-            selectedWindows={selectedWindows}
-          />}
-        </div>
-      </div>
-
-      {/* Multi-Source Comparison Table */}
-      <div className="bg-white border border-[#E4E7EC] rounded-lg shadow-xs p-5">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <h3 className="text-sm font-bold text-[#101828]">Cross-Channel Source Comparison</h3>
-            <p className="text-[11px] text-[#667085]">
-              Evaluate multi-source price convergence between Airline Direct portals and major Online Travel Aggregators (OTAs)
-            </p>
-          </div>
-          <span className="text-xs font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-            {live ? 'Source agreement: not calculated' : 'Source Agreement: 98.2% Convergent'}
-          </span>
-        </div>
-
-        <div className="overflow-x-auto border border-[#E4E7EC] rounded">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-[#F8FAFC] text-[#475467] font-semibold border-b border-[#E4E7EC] text-[11px] uppercase">
-              <tr>
-                <th className="p-3">Source Channel</th>
-                <th className="p-3">Channel Type</th>
-                <th className="p-3 text-right">Median Fare</th>
-                <th className="p-3 text-right">Lowest Observed</th>
-                <th className="p-3 text-right">Observations Today</th>
-                <th className="p-3 text-center">Freshness</th>
-                <th className="p-3 text-center">Agreement State</th>
-                <th className="p-3 text-right">Reliability Rating</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#F1F5F9]">
-              {live && <tr><td colSpan={8} className="p-6 text-center text-slate-500">Per-source comparison statistics are not available for this route.</td></tr>}
-              {route.sources_comparison.map((src, idx) => (
-                <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                  <td className="p-3 font-semibold text-[#101828]">{src.source_name}</td>
-                  <td className="p-3 text-[#667085]">{src.source_type}</td>
-                  <td className="p-3 text-right font-bold text-[#101828] tabular-nums">{formatINR(src.median_fare)}</td>
-                  <td className="p-3 text-right text-[#475467] tabular-nums">{formatINR(src.min_fare)}</td>
-                  <td className="p-3 text-right font-mono text-[#101828] tabular-nums">{src.observations}</td>
-                  <td className="p-3 text-center text-[#667085] font-mono text-[11px]">{src.freshness}</td>
-                  <td className="p-3 text-center">
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-emerald-100 text-emerald-800">
-                      {src.agreement_status}
-                    </span>
-                  </td>
-                  <td className="p-3 text-right font-mono font-bold text-blue-700">
-                    {(src.reliability_score * 100).toFixed(1)}%
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+    <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(280px,0.42fr)_minmax(0,1fr)]">
+      <section aria-labelledby="representative-fare" className="min-w-0 rounded-xl border border-slate-200 bg-white p-5"><div className="flex items-center justify-between gap-2"><h2 id="representative-fare" className="text-sm font-semibold">Current Representative Fare</h2><span className="rounded-md bg-blue-50 px-2 py-1 text-[10px] font-medium text-blue-700">Median</span></div>
+      {loading ? <div className="mt-4"><RouteSkeleton label="Loading representative fare" /></div> : <><p className="mt-4 text-3xl font-bold tracking-tight tabular-nums">{fareText(median)}</p><p className="mt-2 text-xs text-slate-500">{live ? `${data?.source_coverage_count ?? '—'} sources · ${data?.observation_count ?? '—'} stored observations` : `${sourceRows.length} demo source channels`}</p>{live && data?.observation_count === 0 && <p className="mt-3 text-xs text-amber-800">No eligible stored observations for this route.</p>}<FareRange min={data?.min_fare} median={median} max={data?.max_fare} /></>}
+      <dl className="mt-5 divide-y divide-slate-100 border-t border-slate-100">{metrics.map(([label, value]) => <div key={label} className="flex items-center justify-between gap-3 py-2.5 text-xs"><dt className="text-slate-500">{label}</dt><dd className="text-right font-semibold tabular-nums">{loading ? <span className="block h-4 w-16 animate-pulse rounded bg-slate-100 motion-reduce:animate-none" /> : value != null ? value : <Unavailable />}</dd></div>)}</dl>{live && <p className="mt-2 text-[10px] leading-relaxed text-slate-500">Historical comparisons, official weights and index relatives are shown only when supplied by the statistical pipeline.</p>}</section>
+      <section aria-labelledby="advance-purchase" className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white"><div className="flex flex-wrap items-start justify-between gap-3 p-5 pb-2"><div><h2 id="advance-purchase" className="flex items-center gap-2 text-sm font-semibold"><TrendingUp aria-hidden className="h-4 w-4 text-blue-600" />Advance Purchase Curve</h2><p className="mt-1.5 text-xs text-slate-500">{live ? 'Observed mean fare by advance-purchase lead time.' : 'Demo representative fare and historical comparison by lead time.'}</p></div><span title="Shows how observed fares vary with proximity to departure; it is not a calculated score." className="rounded-md border border-slate-200 px-2 py-1 text-[10px] text-slate-500">Lead Time Compression</span></div>
+      <div className="px-4 py-2" aria-label="Advance-purchase fare chart">{loading ? <RouteSkeleton tall label="Loading advance-purchase curve" /> : live ? validPoints.length ? <EChartWrapper option={observedCurveOption(points)} style={{ height: 350 }} /> : <div className="flex min-h-[290px] flex-col items-center justify-center gap-3 p-6 text-center"><TrendingUp aria-hidden className="h-7 w-7 text-slate-300" /><p className="text-sm text-slate-600">Insufficient observations for advance-purchase curve.</p><p className="text-xs text-slate-500">No observed fares match the selected windows.</p></div> : <RouteAdvancePurchaseChart curveData={demo!.advance_purchase_curve} selectedWindows={selectedWindows} />}</div>
+      <div className="flex flex-wrap gap-x-6 gap-y-2 border-t border-slate-100 bg-slate-50/50 px-5 py-3 text-[11px] text-slate-500"><span>Coverage <strong className="ml-1 font-medium text-slate-800">{loading ? 'Loading…' : live ? `${validPoints.length} observed lead-time points` : `${demo!.advance_purchase_curve.filter(p => selectedWindows.includes(p.days_prior)).length} demo points`}</strong></span><span>Sources <strong className="ml-1 font-medium text-slate-800">{loading ? 'Loading…' : live ? data?.source_coverage_count ?? 'Unavailable' : sourceRows.length}</strong></span>{live && <span>Latest <strong className="ml-1 font-medium text-slate-800">{loading ? 'Loading…' : observationTime(data?.latest_observation)}</strong></span>}</div>
+      {live && validPoints.length > 0 && <details className="border-t border-slate-100 px-5 py-3 text-xs"><summary className="cursor-pointer rounded text-blue-700 focus-visible:outline-2">View observed curve values</summary><table className="mt-3 w-full text-left"><thead><tr><th className="py-2 font-medium">Lead time</th><th className="py-2 font-medium">Observed mean fare</th></tr></thead><tbody>{points.map(p => <tr key={p.day} className="border-t border-slate-100"><td className="py-2">T+{p.day}</td><td className="py-2 tabular-nums">{fareText(p.fare)}</td></tr>)}</tbody></table></details>}</section>
     </div>
-  );
+
+    <section aria-labelledby="source-comparison" className="overflow-hidden rounded-xl border border-slate-200 bg-white"><div className="flex flex-wrap items-start justify-between gap-3 p-5"><div><h2 id="source-comparison" className="flex items-center gap-2 text-sm font-semibold"><Layers aria-hidden className="h-4 w-4 text-blue-600" />Cross-Channel Source Comparison</h2><p className="mt-1.5 text-xs text-slate-500">Evaluate multi-source price convergence between airline-direct portals and Online Travel Aggregators.</p></div><Unavailable>Source agreement: Not calculated</Unavailable></div>
+      {loading ? <div className="p-5 pt-0"><RouteSkeleton label="Loading source comparison" /></div> : <div className="overflow-x-auto"><table className="w-full text-left text-xs"><thead className="border-y border-slate-100 bg-slate-50 text-[10px] text-slate-500"><tr>{['Source Channel', 'Channel Type', 'Median Fare', 'Lowest Observed', 'Observations Today', 'Freshness', 'Agreement State', 'Reliability Rating'].map(label => <th key={label} scope="col" className="whitespace-nowrap px-4 py-3 font-medium">{label}</th>)}</tr></thead><tbody>{sourceRows.map((src, idx) => <tr key={idx} className="border-b border-slate-100 last:border-0 hover:bg-slate-50"><td className="px-4 py-3 font-medium">{src.source_name}</td><td className="px-4 py-3 text-slate-500">{src.source_type}</td><td className="px-4 py-3 font-semibold tabular-nums">{fareText(src.median_fare)}</td><td className="px-4 py-3 tabular-nums">{fareText(src.min_fare)}</td><td className="px-4 py-3 tabular-nums">{src.observations}</td><td className="px-4 py-3 text-slate-500">{src.freshness}</td><td className="px-4 py-3">{src.agreement_status}</td><td className="px-4 py-3 tabular-nums">{knownNumber(src.reliability_score) ? `${(src.reliability_score * 100).toFixed(1)}%` : 'Unavailable'}</td></tr>)}</tbody></table>{!sourceRows.length && <div className="flex flex-col items-center gap-3 px-5 py-10 text-center"><Database aria-hidden className="h-7 w-7 text-slate-300" /><p className="text-sm font-medium text-slate-600">Per-source comparison statistics are not yet available for this route.</p><p className="max-w-xl text-xs leading-relaxed text-slate-500">Available source coverage is shown above. Source-level fare comparisons will appear when available.</p></div>}</div>}
+    </section>
+  </div>;
 }

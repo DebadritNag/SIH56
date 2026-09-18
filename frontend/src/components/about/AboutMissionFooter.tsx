@@ -79,12 +79,6 @@ export function AboutMissionFooter() {
             <Link href="/signup" className="hover:text-cyan-400 transition-colors">
               Request Access
             </Link>
-            <Link href="/methodology" className="hover:text-cyan-400 transition-colors">
-              Methodology Guide
-            </Link>
-            <Link href="/downloads" className="hover:text-cyan-400 transition-colors">
-              Datasets &amp; Bulletins
-            </Link>
           </div>
 
           <div>

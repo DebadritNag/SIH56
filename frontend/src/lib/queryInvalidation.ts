@@ -32,6 +32,7 @@ export const CANONICAL_QUERY_PREFIXES = [
   ["price-shocks"],
   // Observation tables
   ["fares"],
+  ["route-layout-observations"],
   // Ingestion / pipeline views
   ["ingestion-status"],
   ["runs"],

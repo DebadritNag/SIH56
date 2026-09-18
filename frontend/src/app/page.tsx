@@ -506,12 +506,6 @@ export default function LandingPage() {
               <Link href="/signup" className="hover:text-brand-cyan transition-colors">
                 Request Access
               </Link>
-              <Link href="/methodology" className="hover:text-brand-cyan transition-colors">
-                Methodology Guide
-              </Link>
-              <Link href="/downloads" className="hover:text-brand-cyan transition-colors">
-                Datasets &amp; Bulletins
-              </Link>
             </div>
             <div>
               <span>© {new Date().getFullYear()} Ministry of Statistics &amp; Programme Implementation (MoSPI) · SIH26056</span>

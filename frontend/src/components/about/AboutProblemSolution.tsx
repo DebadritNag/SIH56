@@ -1,4 +1,5 @@
 import React from "react";
+import Image from "next/image";
 import { ArrowRight, X } from "lucide-react";
 
 export function AboutProblemSolution() {
@@ -57,20 +58,16 @@ export function AboutProblemSolution() {
                 <ArrowRight className="w-6 h-6 stroke-[2.5]" />
               </div>
 
-              {/* Resolution Card */}
-              <div className="w-full sm:w-5/12 bg-gradient-to-br from-[#0284c7] to-[#0369a1] text-white p-6 rounded-2xl shadow-lg text-center flex flex-col items-center justify-center">
-                <div className="w-10 h-10 mb-3 text-cyan-200">
-                  <svg className="w-full h-full" fill="currentColor" viewBox="0 0 36 36">
-                    <path d="M6 18L18 6L30 18L18 30L6 18Z" opacity="0.4" />
-                    <path d="M12 18L18 12L24 18L18 24L12 18Z" fill="#ffffff" />
-                  </svg>
-                </div>
-                <span className="text-sm font-extrabold uppercase tracking-widest block mb-1">
-                  VAYANTARA
-                </span>
-                <p className="text-xs text-sky-100 leading-snug">
-                  Brings clarity, structure and intelligence.
-                </p>
+              {/* Resolution — Vayantara logo */}
+              <div className="w-full max-w-[300px] sm:w-5/12 h-40 bg-white border border-slate-200 rounded-2xl shadow-sm flex items-center justify-center p-4">
+                <Image
+                  src="/app.png"
+                  alt="Vayantara Airfare Intel India"
+                  width={1280}
+                  height={1280}
+                  sizes="128px"
+                  className="h-full w-full object-contain"
+                />
               </div>
             </div>
           </div>
