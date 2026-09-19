@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, type ReactNode } from 'react';
 import Link from 'next/link';
+import { OverviewSkeleton } from '@/components/skeletons/OverviewSkeleton';
 import { usePathname } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getData } from '@/lib/api/client';
@@ -23,10 +24,11 @@ export function LiveDataGate({ children }: { children: ReactNode }) {
     if (previous.current !== undefined && previous.current !== revision) void client.invalidateQueries();
     previous.current = revision;
   }, [q.data, client]);
-  const management = ['/ingestion', '/pipeline', '/scraping-test', '/sources', '/settings'];
+  const management = ['/ingestion', '/pipeline', '/scraping-test', '/sources', '/settings', '/apix', '/shocks'];
   if (mode === 'mock' || management.some(p => path === p || path.startsWith(p + '/'))) return children;
-  if (q.isPending) return <p className="p-8 text-slate-500">Checking processed observations…</p>;
-  if (q.isError) return <div className="p-8">Unable to check ingestion status. <button onClick={() => void q.refetch()}>Retry</button></div>;
+  if (q.isPending) return path === '/overview' ? <OverviewSkeleton/> : <div role="status" className="p-8 text-slate-500">Preparing live intelligence…</div>;
+  if (q.isError && !q.data && path === '/overview') return <OverviewSkeleton error="Unable to resolve processed observations." retry={()=>void q.refetch()}/>;
+  if (q.isError && !q.data) return <div className="p-8">Unable to check ingestion status. <button onClick={() => void q.refetch()}>Retry</button></div>;
   if (!q.data?.ready) return <div className="rounded-xl border bg-white p-10 text-center space-y-3">
     <h1 className="text-xl font-semibold">No processed data published yet</h1>
     <p className="text-slate-500">Run Collection to process your imported observations and available live fares. Charts will populate from those records.</p>

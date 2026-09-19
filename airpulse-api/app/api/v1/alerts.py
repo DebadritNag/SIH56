@@ -13,6 +13,12 @@ from app.schemas.common import APIResponse
 router = APIRouter(prefix="/alerts", tags=["Alerts"])
 
 
+@router.get('/readiness', response_model=APIResponse)
+async def readiness(db: AsyncSession = Depends(get_db), current_user: UserContext = Depends(require_viewer)):
+    from app.services.readiness import load_shock_readiness
+    return APIResponse(success=True, data=await load_shock_readiness(db))
+
+
 @router.get("", response_model=PaginatedResponse[AlertResponse])
 async def list_alerts(
     status: Optional[str] = Query(None),

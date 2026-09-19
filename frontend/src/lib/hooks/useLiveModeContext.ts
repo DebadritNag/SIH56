@@ -100,7 +100,10 @@ export function useLiveModeContext() {
 
   return {
     ctx,
-    isLoading: q.isLoading,
+    error: q.error,
+    hasData: q.data !== undefined,
+    refetch: q.refetch,
+    isLoading: q.isPending,
     isFetching: q.isFetching,
     mode: ctx.mode,
     modeLabel: ctx.mode_label,

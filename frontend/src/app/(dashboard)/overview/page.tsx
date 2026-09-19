@@ -47,6 +47,8 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import { EChartWrapper } from '@/components/charts/EChartWrapper';
 import type { EChartsOption } from 'echarts';
+import { OverviewSkeleton } from '@/components/skeletons/OverviewSkeleton';
+import { ReadinessError } from '@/components/readiness/ReadinessUI';
 import { SyncIndicator } from '@/components/ui/SyncIndicator';
 import { NationalIndexChart } from '@/components/charts/NationalIndexChart';
 import { GlobalFilterBar } from '@/components/layout/GlobalFilterBar';
@@ -141,7 +143,7 @@ function CardHeader({ icon, title, subtitle, right }: {
 }
 
 function Skeleton({ className }: { className?: string }) {
-  return <div className={clsx('animate-pulse rounded bg-slate-100 motion-reduce:animate-none', className)} />;
+  return <div aria-hidden="true" className={clsx('animate-pulse rounded bg-slate-100 motion-reduce:animate-none', className)} />;
 }
 
 function EmptyState({ message }: { message: string }) {
@@ -180,7 +182,7 @@ function KpiCard({
         ? <Skeleton className="h-7 w-16 mt-1" />
         : <div className="text-2xl font-bold text-[#101828] tabular-nums leading-tight">{value}</div>
       }
-      {sub && <div className="text-[11px] text-[#475467] mt-0.5 truncate">{sub}</div>}
+      {loading ? <Skeleton className="h-3 w-24 mt-1" /> : sub && <div className="text-[11px] text-[#475467] mt-0.5 truncate">{sub}</div>}
     </Card>
   );
 }
@@ -260,16 +262,16 @@ export default function OverviewPage() {
 
   // ── Data hooks ─────────────────────────────────────────────────────────────
 
-  const { ctx, isLoading: isCtxLoading, isFetching: isCtxFetching } = useLiveModeContext();
-  const { summary, isFetching: isSummaryFetching, refetch: refetchSummary } = useDashboardSummary(filters);
+  const { ctx, isLoading: isCtxLoading, isFetching: isCtxFetching, error: ctxError, hasData: hasCtxData, refetch: refetchContext } = useLiveModeContext();
+  const { summary, isPending: isSummaryPending, error: summaryError, data: summaryData, isFetching: isSummaryFetching, refetch: refetchSummary } = useDashboardSummary(filters);
   const { trend: trendData, isFetching: isTrendFetching, refetch: refetchTrend } = useNationalTrend(filters);
-  const { contributors: contribSets, isFetching: isContribFetching, refetch: refetchContrib } = useRouteContributors(filters);
+  const { contributors: contribSets, error: contribError, isPending: isContribPending, isFetching: isContribFetching, refetch: refetchContrib } = useRouteContributors(filters);
   const { trust: trustMetrics } = useSystemTrust();
   const { activeCount: shockCount, isPending: isShocksPending } = usePriceShocks();
-  const { data: signalsData, isPending: isSignalsPending } = useAnomalies({ status: 'OPEN', page_size: 5 });
-  const { data: sourcesPage, isPending: isSourcesPending } = useSources({ page_size: 20 });
-  const { data: faresList, isPending: isFaresPending } = useFares({ page_size: 5 });
-  const { data: obsHistory, isPending: isHistoryPending } = useObservationHistory();
+  const { data: signalsData, error: signalsError, refetch: refetchSignals, isPending: isSignalsPending } = useAnomalies({ status: 'OPEN', page_size: 5 });
+  const { data: sourcesPage, error: sourcesError, refetch: refetchSources, isPending: isSourcesPending } = useSources({ page_size: 20 });
+  const { data: faresList, error: faresError, refetch: refetchFares, isPending: isFaresPending } = useFares({ page_size: 5 });
+  const { data: obsHistory, error: historyError, refetch: refetchHistory, isPending: isHistoryPending } = useObservationHistory();
 
   const isAnyFetching = isRefreshing || isSummaryFetching || isTrendFetching || isContribFetching || isCtxFetching;
 
@@ -520,6 +522,8 @@ export default function OverviewPage() {
   // RENDER
   // ─────────────────────────────────────────────────────────────────────────────
 
+  if (isCtxLoading && !hasCtxData) return <OverviewSkeleton/>;
+  if (ctxError && !hasCtxData) return <OverviewSkeleton error="Unable to resolve live observations." retry={()=>void refetchContext()}/>;
   return (
     <div className="space-y-4">
 
@@ -562,6 +566,7 @@ export default function OverviewPage() {
             Refresh
           </button>
           <GenerateReportButton
+            disabled={isCtxLoading || isSummaryPending || !!summaryError || !!ctxError || isContribPending || !!contribError || isFaresPending || !!faresError}
             exportType="OVERVIEW_REPORT"
             format="PDF"
             title="AirPulse — Live Intelligence Overview Report"
@@ -581,6 +586,8 @@ export default function OverviewPage() {
         isFilterStale={isAnyFetching}
       />
 
+      {isCtxLoading && <div role="status" className="rounded-lg border border-blue-100 bg-blue-50 p-3 text-blue-900"><p className="text-sm font-semibold">Preparing live intelligence…</p><p className="mt-1 text-xs">Resolving LIVE + IMPORTED observations</p></div>}
+      {summaryError && <ReadinessError title="Unable to load overview summary" retry={()=>void refetchSummary()}/>}
       {/* Sync banner — shown during background refetch so stale values are not
           presented as fresh. Disappears once all active queries have settled. */}
       {isAnyFetching && !isCtxLoading && (
@@ -630,22 +637,23 @@ export default function OverviewPage() {
 
         <KpiCard
           title="Validated Fares"
-          value={quotesTotal > 0 ? quotesTotal.toLocaleString() : '—'}
+          value={summaryError && !summaryData ? 'Unavailable' : quotesTotal > 0 ? quotesTotal.toLocaleString() : '—'}
           sub={quotesTotal > 0 && totalEligible > 0
             ? `${((quotesTotal/Math.max(totalEligible,1))*100).toFixed(0)}% of observations`
-            : 'Awaiting ingestion'}
+            : summaryError ? 'Summary unavailable' : 'Awaiting ingestion'}
           icon={<CheckCircle2 className="w-4 h-4 text-white" />}
           accent="bg-teal-600"
-          loading={isCtxLoading}
+          loading={isSummaryPending}
         />
 
         <KpiCard
           title="Active Anomalies"
-          value={isShocksPending ? '—' : openAnomalies > 0 ? openAnomalies : '0'}
+          loading={isSummaryPending}
+          value={summaryError && !summaryData ? 'Unavailable' : openAnomalies}
           sub={
             isSummaryFetching
               ? <SyncIndicator label="Updating…" />
-              : openAnomalies > 0 ? 'PriceGuard signals' : 'All clear'
+              : openAnomalies > 0 ? 'PriceGuard signals' : summaryError ? 'Summary unavailable' : 'All clear'
           }
           icon={<AlertTriangle className="w-4 h-4 text-white" />}
           accent={openAnomalies > 0 ? 'bg-rose-600' : 'bg-slate-400'}
@@ -663,14 +671,14 @@ export default function OverviewPage() {
             subtitle="Median eligible observed fare per active corridor"
             right={
               <span className="text-[10px] text-[#94A3B8] font-medium">
-                {routeStats.length > 0 ? `${routeStats.length} routes` : 'No data'}
+                {isContribPending ? 'Loading…' : contribError ? 'Unavailable' : routeStats.length > 0 ? `${routeStats.length} routes` : 'No data'}
               </span>
             }
           />
-          {isContribFetching && routeStats.length === 0
+          {contribError && routeStats.length === 0 ? <ReadinessError title="Unable to load route intelligence" retry={()=>void refetchContrib()}/> : isContribPending
             ? <Skeleton className="h-52 w-full" />
             : routeFareChartOption
-            ? <EChartWrapper option={routeFareChartOption} style={{ height: '200px', width: '100%' }} loading={isContribFetching} />
+            ? <EChartWrapper option={routeFareChartOption} style={{ height: '200px', width: '100%' }} />
             : <EmptyState message="No eligible observations for the selected filters and routes." />
           }
         </Card>
@@ -687,10 +695,10 @@ export default function OverviewPage() {
                 : null
             }
           />
-          {isContribFetching && routeStats.length === 0
+          {contribError && routeStats.length === 0 ? <ReadinessError title="Unable to load route intelligence" retry={()=>void refetchContrib()}/> : isContribPending
             ? <Skeleton className="h-52 w-full" />
             : fareRangeChartOption
-            ? <EChartWrapper option={fareRangeChartOption} style={{ height: '200px', width: '100%' }} loading={isContribFetching} />
+            ? <EChartWrapper option={fareRangeChartOption} style={{ height: '200px', width: '100%' }} />
             : <EmptyState message="Fare range unavailable — no eligible route observations." />
           }
         </Card>
@@ -711,7 +719,7 @@ export default function OverviewPage() {
               </Link>
             }
           />
-          {isFaresPending
+          {faresError && !faresList ? <ReadinessError title="Unable to load latest observations" retry={()=>void refetchFares()}/> : isFaresPending
             ? <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-9 w-full" />)}</div>
             : latestFares.length === 0
             ? <EmptyState message="No live observations yet. Run a live collection from Data Ingestion." />
@@ -767,7 +775,7 @@ export default function OverviewPage() {
             title="Route Activity"
             subtitle="Current observation coverage per corridor"
           />
-          {isContribFetching && routeStats.length === 0
+          {contribError && routeStats.length === 0 ? <ReadinessError title="Unable to load route intelligence" retry={()=>void refetchContrib()}/> : isContribPending
             ? <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-12 w-full" />)}</div>
             : routeStats.length === 0
             ? <EmptyState message="No route data yet." />
@@ -932,7 +940,7 @@ export default function OverviewPage() {
             PriceGuard anomaly signals from current eligible observations
           </p>
           <div className="space-y-2 flex-1">
-            {isSignalsPending
+            {signalsError && !signalsData ? <ReadinessError title="Unable to load market signals" retry={()=>void refetchSignals()}/> : isSignalsPending
               ? [1,2].map(i => <Skeleton key={i} className="h-14 w-full" />)
               : (signalsData?.items.length ?? 0) === 0
               ? <EmptyState message="No active market signals" />
@@ -1114,7 +1122,7 @@ export default function OverviewPage() {
               </Link>
             }
           />
-          {isSourcesPending
+          {sourcesError && !sourcesPage ? <ReadinessError title="Unable to load collection sources" retry={()=>void refetchSources()}/> : isSourcesPending
             ? <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-10 w-full" />)}</div>
             : !sourcesPage || sourcesPage.items.length === 0
             ? <EmptyState message="No sources configured." />
@@ -1169,7 +1177,7 @@ export default function OverviewPage() {
                 : `${historyDays} day${historyDays !== 1 ? 's' : ''} of genuine observations (APIx unlocks at ${APIX_HISTORY_THRESHOLD}+ days)`
             }
           />
-          {isHistoryPending
+          {historyError && !obsHistory ? <ReadinessError title="Unable to load observation history" retry={()=>void refetchHistory()}/> : isHistoryPending
             ? <Skeleton className="h-44 w-full" />
             : obsHistoryChartOption
             ? <EChartWrapper option={obsHistoryChartOption} style={{ height: '168px', width: '100%' }} loading={isHistoryPending} />

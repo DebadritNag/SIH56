@@ -3,11 +3,10 @@
 /**
  * Resource list hooks (anomalies, sources, fares, alerts, runs). Mode-aware:
  *  - LIVE mode: fetch real data from FastAPI (returns exactly what the backend has —
- *    empty if there are no rows; the page then shows its empty state). Falls back to
- *    mock only on a hard network error.
+ *    empty if there are no rows; the page then shows its empty state). Network failures remain errors.
  *  - MOCK mode: return the built-in demo dataset (clearly labelled via the toggle).
  */
-import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 
 import { endpoints } from "@/lib/api/endpoints";
 import { mapAnomaly } from "@/lib/api/mappers";
@@ -44,9 +43,8 @@ export function useAnomalies(params?: {
         );
         // LIVE: return exactly what the backend has (may be empty → empty state shown).
         return { items: res.items.map(mapAnomaly), meta: res.meta };
-      } catch {
-        // Hard error only → show mock so the UI never breaks.
-        return { items: mockAnomalyList, meta: MOCK_ANOMALY_META };
+      } catch (error) {
+        throw error;
       }
     },
     placeholderData: mode === "mock" ? { items: mockAnomalyList, meta: MOCK_ANOMALY_META } : undefined,
@@ -82,7 +80,7 @@ export function useSources(params?: { page?: number; page_size?: number }) {
       // Live mode: fetch genuine live sources and telemetry from FastAPI backend
       return endpoints.listSources({ page: params?.page ?? 1, page_size: params?.page_size ?? 50 }, signal);
     },
-    placeholderData: keepPreviousData,
+    placeholderData: (previous, query) => query?.queryKey[1] === mode ? previous : undefined,
   });
 }
 
@@ -124,7 +122,7 @@ export function useFares(params?: {
         signal,
       );
     },
-    placeholderData: keepPreviousData,
+    placeholderData: (previous, query) => query?.queryKey[1] === mode ? previous : undefined,
   });
 }
 
@@ -157,7 +155,7 @@ export function useAlerts(params?: { status?: string; page?: number; page_size?:
         signal,
       );
     },
-    placeholderData: keepPreviousData,
+    placeholderData: (previous, query) => query?.queryKey[1] === mode ? previous : undefined,
   });
 }
 
@@ -169,7 +167,7 @@ export function useRuns(params?: { page?: number; page_size?: number }) {
       if (mode === "mock") return EMPTY_PAGE as never;
       return endpoints.listRuns({ page: params?.page ?? 1, page_size: params?.page_size ?? 25 }, signal);
     },
-    placeholderData: keepPreviousData,
+    placeholderData: (previous, query) => query?.queryKey[1] === mode ? previous : undefined,
   });
 }
 
@@ -205,6 +203,6 @@ export function useRouteInsights(routeCode: string) {
         advance_purchase_curve: [], sources_comparison: [],
       };
     },
-    placeholderData: keepPreviousData,
+    placeholderData: (previous, query) => query?.queryKey[1] === mode ? previous : undefined,
   });
 }

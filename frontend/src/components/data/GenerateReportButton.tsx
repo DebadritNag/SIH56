@@ -15,6 +15,7 @@ interface GenerateReportButtonProps {
   className?: string;
   label?: string;
   autoDownload?: boolean;
+  disabled?: boolean;
 }
 
 /**
@@ -34,6 +35,7 @@ export function GenerateReportButton({
   className = "",
   label = "Generate Report",
   autoDownload = true,
+  disabled: externallyDisabled = false,
 }: GenerateReportButtonProps) {
   const createExport = useCreateExport();
   const downloadExport = useDownloadExport();
@@ -73,7 +75,7 @@ export function GenerateReportButton({
 
   const isWorking = createExport.isPending || downloadExport.isPending;
   // Do not allow export during mode switch — mode state is in transition
-  const disabled = isWorking || isSwitching;
+  const disabled = externallyDisabled || isWorking || isSwitching;
 
   return (
     <button

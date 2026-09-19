@@ -1,89 +1,10 @@
-'use client';
-
-import React from 'react';
-import { clsx } from 'clsx';
-import { MetricSkeleton } from './MetricSkeleton';
-import { ChartSkeleton } from './ChartSkeleton';
-
-export const OverviewSkeleton: React.FC<{ className?: string }> = ({ className }) => {
-  return (
-    <div className={clsx('space-y-6 animate-in fade-in duration-150', className)}>
-      {/* Title & Actions */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="space-y-1.5">
-          <div className="h-6 w-60 bg-slate-200 rounded animate-pulse" />
-          <div className="h-3 w-80 bg-slate-100 rounded animate-pulse" />
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="h-8 w-28 bg-slate-100 rounded animate-pulse" />
-          <div className="h-8 w-32 bg-slate-200 rounded animate-pulse" />
-        </div>
-      </div>
-
-      {/* Hero Strip: 40% Primary Index Card + 3 Intelligence KPI Cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        {/* Dominant APIx Hero Card Placeholder (5 cols) */}
-        <div className="lg:col-span-5 bg-[#081426] border border-[#132238] rounded-xl p-6 shadow-md flex flex-col justify-between space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="h-3 w-28 bg-slate-700 rounded animate-pulse" />
-            <div className="h-5 w-20 bg-slate-800 rounded animate-pulse" />
-          </div>
-
-          <div className="space-y-2 py-2">
-            <div className="h-10 w-44 bg-slate-700 rounded animate-pulse" />
-            <div className="h-3 w-36 bg-slate-800 rounded animate-pulse" />
-          </div>
-
-          <div className="grid grid-cols-3 gap-2 pt-3 border-t border-slate-800">
-            <div className="h-7 bg-slate-800 rounded animate-pulse" />
-            <div className="h-7 bg-slate-800 rounded animate-pulse" />
-            <div className="h-7 bg-slate-800 rounded animate-pulse" />
-          </div>
-        </div>
-
-        {/* 3 Secondary KPI Cards (7 cols) */}
-        <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <MetricSkeleton />
-          <MetricSkeleton />
-          <MetricSkeleton />
-        </div>
-      </div>
-
-      {/* Main Analytical Visualizations Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* National APIx Trend Chart (7 cols) */}
-        <div className="lg:col-span-7">
-          <ChartSkeleton height={340} hasKpi />
-        </div>
-
-        {/* Top Route Contributors Waterfall (5 cols) */}
-        <div className="lg:col-span-5">
-          <ChartSkeleton height={340} />
-        </div>
-      </div>
-
-      {/* Heatmap & Market Signals Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-8">
-          <ChartSkeleton height={280} />
-        </div>
-        <div className="lg:col-span-4 bg-white border border-[#E4E7EC] rounded-lg p-4 space-y-3">
-          <div className="h-4 w-36 bg-slate-200 rounded animate-pulse" />
-          <div className="space-y-2">
-            <div className="h-14 bg-slate-50 border border-slate-100 rounded animate-pulse" />
-            <div className="h-14 bg-slate-50 border border-slate-100 rounded animate-pulse" />
-            <div className="h-14 bg-slate-50 border border-slate-100 rounded animate-pulse" />
-          </div>
-        </div>
-      </div>
-
-      {/* Data Reliability Trust Strip Placeholder */}
-      <div className="h-12 w-full bg-slate-50 border border-[#E4E7EC] rounded-lg flex items-center justify-around px-4">
-        <div className="h-3 w-28 bg-slate-200 rounded animate-pulse" />
-        <div className="h-3 w-24 bg-slate-200 rounded animate-pulse" />
-        <div className="h-3 w-32 bg-slate-200 rounded animate-pulse" />
-        <div className="h-3 w-20 bg-slate-200 rounded animate-pulse" />
-      </div>
-    </div>
-  );
-};
+import { Loader2 } from 'lucide-react';
+export function OverviewSkeleton({className='', error, retry}:{className?:string;error?:string;retry?:()=>void}) {
+  return <div aria-busy={!error} className={`space-y-4 ${className}`}>
+    <header className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-2xl font-bold tracking-tight text-slate-900">Airfare Intelligence Overview</h1><p className="mt-1 text-xs text-slate-600">Real-time domestic airfare collection status, route coverage, and market intelligence.</p></div><div className="flex gap-2"><button disabled className="rounded border px-3 py-2 text-xs text-slate-500">Refresh</button><button disabled className="rounded border px-3 py-2 text-xs text-slate-500">Generate Report</button></div></header>
+    <div role={error?'alert':'status'} className="flex items-center gap-3 rounded-lg border border-blue-100 bg-blue-50 p-3 text-blue-900">{!error&&<Loader2 size={18} className="animate-spin motion-reduce:animate-none"/>}<div><p className="text-sm font-semibold">{error?'Unable to load live overview':'Preparing live intelligence…'}</p><p className="mt-1 text-xs">{error??'Resolving LIVE + IMPORTED observations'}</p></div>{retry&&<button onClick={retry} className="ml-auto rounded border border-blue-300 px-3 py-2 text-sm">Retry</button>}</div>
+    {!error&&<><div aria-label="Loading filters" className="flex flex-wrap gap-3 rounded-lg border border-slate-200 bg-white p-4">{['Date range','Supported corridors','Sources','Compare','Booking window'].map(x=><div key={x} className="text-xs text-slate-600">{x}<div aria-hidden="true" className="mt-2 h-7 w-28 rounded bg-slate-100"/></div>)}</div>
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">{['LIVE OBSERVATIONS','ACTIVE ROUTES','LATEST COLLECTION','VALIDATED FARES','ACTIVE ANOMALIES'].map(x=><div key={x} className="rounded-lg border border-slate-200 bg-white p-4"><p className="text-[10px] font-semibold text-slate-600">{x}</p><div aria-hidden="true" className="my-3 h-7 w-16 animate-pulse rounded bg-slate-100 motion-reduce:animate-none"/><div aria-hidden="true" className="h-3 w-24 rounded bg-slate-100"/></div>)}</div>
+    <div className="grid gap-4 lg:grid-cols-2">{['Current Route Fare Snapshot','Observed Fare Range','Latest Live Observations','Route Activity'].map((x,i)=><section key={x} className="rounded-lg border border-slate-200 bg-white p-4"><h2 className="text-sm font-semibold">{x}</h2>{i<2?<div aria-hidden="true" className="mt-4 h-52 animate-pulse rounded bg-slate-100 motion-reduce:animate-none"/>:<div aria-hidden="true" className="mt-4 space-y-3">{[1,2,3,4].map(n=><div key={n} className="h-10 animate-pulse rounded bg-slate-100 motion-reduce:animate-none"/>)}</div>}</section>)}</div></>}
+  </div>;
+}

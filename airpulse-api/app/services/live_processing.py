@@ -17,6 +17,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.utils import bucket_from_lead_days, utc_now
 from app.services.live_store import rows, insert, audit
+from app.services.readiness import INDEX_ELIGIBILITY_SQL
 
 IST = timezone(timedelta(hours=5, minutes=30))
 
@@ -77,11 +78,9 @@ async def calculate_live_index(db, pipeline_id, as_of=None):
         AND (effective_from IS NULL OR effective_from<=CURRENT_DATE)
         AND (effective_to IS NULL OR effective_to>=CURRENT_DATE)''', id=basket['id'])
     today = as_of or utc_now().date()
-    fares = await rows(db, """SELECT v.* FROM validated_fares v
-        WHERE v.validation_status='VALID' AND NOT v.is_duplicate AND v.cabin='economy'
-          AND v.data_origin IN ('LIVE','IMPORTED') AND v.collected_at >= :base
-          AND v.collected_at < :tomorrow
-          AND EXISTS (SELECT 1 FROM fare_index_eligibility e WHERE e.fare_id=v.id AND e.eligible)""",
+    fares = await rows(db, f"""SELECT v.* FROM validated_fares v
+        WHERE {INDEX_ELIGIBILITY_SQL} AND v.collected_at >= :base
+          AND v.collected_at < :tomorrow""",
         base=datetime.combine(basket['base_period_start'], datetime.min.time(), timezone.utc),
         tomorrow=datetime.combine(today+timedelta(days=1), datetime.min.time(), timezone.utc))
     current, baseline = defaultdict(list), defaultdict(list)

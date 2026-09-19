@@ -47,14 +47,16 @@ const TABLE_INVALIDATIONS: Record<string, string[][]> = {
     ["anomalies"],
     ["fares"],
     ["price-shocks"],
+    ["price-shock-readiness"],
+    ["apix-readiness"],
     ["live-mode-context"],
     ["obs-history"],
   ],
   scraping_test_runs: [["scraping-test"]],
-  alerts: [["alerts"], ["dashboard-summary"], ["price-shocks"]],
+  alerts: [["alerts"], ["dashboard-summary"], ["price-shocks"], ["price-shock-readiness"]],
   anomalies: [["anomalies"], ["dashboard-summary"]],
   source_health_logs: [["sources"], ["source-health"], ["dashboard-summary"]],
-  airfare_index: [["apix-latest"], ["apix-trend"], ["dashboard-summary"]],
+  airfare_index: [["apix-latest"], ["apix-trend"], ["dashboard-summary"], ["apix-readiness"]],
 };
 
 const REALTIME_TABLES = Object.keys(TABLE_INVALIDATIONS);

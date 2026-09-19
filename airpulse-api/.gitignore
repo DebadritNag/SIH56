@@ -120,3 +120,6 @@ Thumbs.db
 !tests/unit/test_live_inference.py
 !tests/unit/test_canonical_fare_view.py
 !tests/unit/test_fareguard_positive_target.py
+
+!tests/unit/test_readiness.py
+!docs/READINESS_DASHBOARDS.md

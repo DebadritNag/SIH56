@@ -18,6 +18,12 @@ from app.schemas.index import (
 router = APIRouter(prefix="/index", tags=["Index"])
 
 
+@router.get('/readiness', response_model=APIResponse)
+async def readiness(db: AsyncSession = Depends(get_db), current_user: UserContext = Depends(require_viewer)):
+    from app.services.readiness import load_index_readiness
+    return APIResponse(success=True, data=await load_index_readiness(db))
+
+
 @router.get("")
 async def list_indices(
     frequency: str = Query("daily"),

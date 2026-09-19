@@ -23,6 +23,7 @@ export const CANONICAL_QUERY_PREFIXES = [
   // APIx charts and basket
   ["apix-trend"],
   ["apix-latest"],
+  ["apix-readiness"],
   ["top-route-movements"],
   ["booking-window-summary"],
   // Anomalies and alerts (sidebar badges + Anomaly Center + Overview signals)
@@ -30,6 +31,7 @@ export const CANONICAL_QUERY_PREFIXES = [
   ["alerts"],
   // Price shocks (sidebar badge + Price Shock Center)
   ["price-shocks"],
+  ["price-shock-readiness"],
   // Observation tables
   ["fares"],
   ["route-layout-observations"],

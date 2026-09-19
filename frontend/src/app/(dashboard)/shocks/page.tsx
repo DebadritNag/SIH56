@@ -1,50 +1,19 @@
-'use client';
-
-import React from 'react';
+"use client";
 import { Zap } from 'lucide-react';
 import { formatINR } from '@/lib/formatters';
 import { usePriceShocks } from '@/lib/hooks/usePriceShocks';
-import { DataSourceMeta } from '@/components/data/DataBadge';
-import { EmptyShocksState } from '@/components/states/EmptyState';
 import { GenerateReportButton } from '@/components/data/GenerateReportButton';
-
-
+import { PriceShockReadiness } from '@/components/readiness/PriceShockReadiness';
+import { ReadinessSkeleton, ReadinessError } from '@/components/readiness/ReadinessUI';
 export default function PriceShocksPage() {
-  const { isMock, shocks, activeCount, isPending, error, refetch } = usePriceShocks();
-
-  return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
-        <div>
-          <div className="flex items-center gap-2">
-            <Zap className="w-5 h-5 text-rose-600" />
-            <h1 className="text-xl md:text-2xl font-bold text-[#101828] tracking-tight">
-              Price Shock Center &amp; Multi-Source Surge Verification
-            </h1>
-          </div>
-          <p className="text-xs text-[#475467] mt-0.5">
-            A route surge is only certified as a Price Shock when synchronous elevated pricing is verified across multiple independent channels, eliminating scraping artifacts.
-          </p>
-          <div className="mt-1.5">
-            <DataSourceMeta isMock={isMock} source={isMock ? 'Demo dataset' : 'Confirmed price shock alerts (live)'} />
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <GenerateReportButton
-            exportType="PRICE_SHOCKS"
-            format="PDF"
-            title="AirPulse — Market Price Shock Summary"
-          />
-          <span className="px-2.5 py-1 bg-rose-50 text-rose-800 border border-rose-300 font-bold text-xs rounded">
-            {isPending ? 'Loading confirmed shocks…' : error ? 'Shock count unavailable' : `${activeCount} Active Confirmed Shocks`}
-          </span>
-        </div>
-      </div>
-
-      {isPending ? <div role="status" className="h-32 animate-pulse rounded bg-slate-100">Loading confirmed price shocks…</div> : error ? <div role="alert" className="rounded border p-4">Unable to load confirmed shocks. <button className="text-blue-700 underline" onClick={() => void refetch()}>Retry</button></div> : shocks.length === 0 ? (
-        <EmptyShocksState layout="card" />
-      ) : (
+  const {isMock,shocks,activeCount,isPending,error,refetch,data,isFetching}=usePriceShocks();
+  return <div className="space-y-5">
+    <header className="flex flex-wrap items-start justify-between gap-4"><div className="max-w-3xl"><h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight"><Zap size={22} className="shrink-0 text-blue-600"/>Price Shock Center &amp; Multi-Source Surge Verification</h1><p className="mt-2 text-sm leading-6 text-slate-600">A route surge is only certified as a Price Shock when synchronous elevated pricing is verified across multiple independent channels, reducing the risk of treating source-specific artifacts as market-wide movement.</p><p className="mt-2 text-xs text-slate-500">{isMock?'DEMO / SYNTHETIC':'LIVE MODE'}</p></div><GenerateReportButton exportType="PRICE_SHOCKS" format="PDF" title="AirPulse — Market Price Shock Summary" disabled={!data}/></header>
+    {!isMock && <PriceShockReadiness/>}
+    <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-lg font-semibold">Confirmed Price Shocks</h2><span className="rounded border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold">{isPending?'Loading confirmed shocks…':!data?'Shock count unavailable':`${activeCount} Active Confirmed Shocks`}</span></div>
+    {isFetching&&data&&<p role="status" className="text-xs text-blue-700">Refreshing confirmed events…</p>}
+    {error&&<ReadinessError title="Unable to load Price Shock verification status" retry={()=>void refetch()}/>}
+    {isPending?<ReadinessSkeleton/>:!data?null:shocks.length===0?<section className="rounded-xl border border-slate-200 bg-white p-5"><h3 className="font-semibold">None currently verified</h3><p className="mt-2 text-sm text-slate-600">No event currently satisfies the configured multi-source confirmation criteria.</p></section>:(
       /* Shocks Table */
       <div className="bg-white border border-[#E4E7EC] rounded-lg shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
@@ -92,7 +61,6 @@ export default function PriceShocksPage() {
           </table>
         </div>
       </div>
-      )}
-    </div>
-  );
+)}
+  </div>;
 }
